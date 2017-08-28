@@ -1,0 +1,261 @@
+=============================================
+CPU frequency on i5-2310 set to max of 2.9GHz
+
+To be able to set a specific CPU frequency used intel_pstate=disable in the boot line.
+
+[When the intel_pstate driver was enabled then the reported max CPU frequency was 3.2 GHz, but couldn't set a fixed
+ frequency and ib_write_bw reported warnings about the CPU frequency changing during the test]
+
+$ sudo cpufreq-set -f 3200000 -c 0 
+$ sudo cpufreq-set -f 3200000 -c 1
+$ sudo cpufreq-set -f 3200000 -c 2
+$ sudo cpufreq-set -f 3200000 -c 3
+$ cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq 
+2901000
+2901000
+2901000
+2901000
+
+Server:
+$ /usr/bin/time -v ib_write_bw -a --ib-port=2
+
+************************************
+* Waiting for client to connect... *
+************************************
+---------------------------------------------------------------------------------------
+                    RDMA_Write BW Test
+ Dual-port       : OFF		Device         : mlx4_0
+ Number of qps   : 1		Transport type : IB
+ Connection type : RC		Using SRQ      : OFF
+ CQ Moderation   : 100
+ Mtu             : 4096[B]
+ Link type       : IB
+ Max inline data : 0[B]
+ rdma_cm QPs	 : OFF
+ Data ex. method : Ethernet
+---------------------------------------------------------------------------------------
+ local address: LID 0x02 QPN 0x033c PSN 0x3eed8c RKey 0x90001109 VAddr 0x007ffb3144c000
+ remote address: LID 0x01 QPN 0x033d PSN 0xc9c4d5 RKey 0x90001209 VAddr 0x007f6402247000
+---------------------------------------------------------------------------------------
+ #bytes     #iterations    BW peak[MB/sec]    BW average[MB/sec]   MsgRate[Mpps]
+ 8388608    5000             2708.76            2707.23		   0.000338
+---------------------------------------------------------------------------------------
+	Command being timed: "ib_write_bw -a --ib-port=2"
+	User time (seconds): 0.00
+	System time (seconds): 0.00
+	Percent of CPU this job got: 0%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.16
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 18544
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 655
+	Voluntary context switches: 33
+	Involuntary context switches: 1
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Client:
+$ /usr/bin/time -v ib_write_bw -a localhost --ib-port=1
+---------------------------------------------------------------------------------------
+                    RDMA_Write BW Test
+ Dual-port       : OFF		Device         : mlx4_0
+ Number of qps   : 1		Transport type : IB
+ Connection type : RC		Using SRQ      : OFF
+ TX depth        : 128
+ CQ Moderation   : 100
+ Mtu             : 4096[B]
+ Link type       : IB
+ Max inline data : 0[B]
+ rdma_cm QPs	 : OFF
+ Data ex. method : Ethernet
+---------------------------------------------------------------------------------------
+ local address: LID 0x01 QPN 0x033d PSN 0xc9c4d5 RKey 0x90001209 VAddr 0x007f6402247000
+ remote address: LID 0x02 QPN 0x033c PSN 0x3eed8c RKey 0x90001109 VAddr 0x007ffb3144c000
+---------------------------------------------------------------------------------------
+ #bytes     #iterations    BW peak[MB/sec]    BW average[MB/sec]   MsgRate[Mpps]
+ 2          5000             21.61              21.05  		   11.035521
+ 4          5000             43.23              42.11  		   11.039376
+ 8          5000             86.46              84.34  		   11.054798
+ 16         5000             172.24             168.33 		   11.031995
+ 32         5000             343.15             335.32 		   10.987637
+ 64         5000             668.16             663.69 		   10.873876
+ 128        5000             1287.73            1252.16		   10.257690
+ 256        5000             1858.93            1836.63		   7.522853
+ 512        5000             2493.84            2466.20		   5.050781
+ 1024       5000             2698.10            2695.16		   2.759843
+ 2048       5000             2827.35            2822.39		   1.445063
+ 4096       5000             2880.54            2866.31		   0.733776
+ 8192       5000             2904.90            2903.01		   0.371585
+ 16384      5000             2924.96            2916.98		   0.186687
+ 32768      5000             2930.26            2923.45		   0.093550
+ 65536      5000             2931.68            2931.61		   0.046906
+ 131072     5000             2932.84            2932.83		   0.023463
+ 262144     5000             2933.85            2932.99		   0.011732
+ 524288     5000             2934.27            2933.83		   0.005868
+ 1048576    5000             2935.89            2934.64		   0.002935
+ 2097152    5000             2935.35            2935.00		   0.001468
+ 4194304    5000             2934.35            2933.80		   0.000733
+ 8388608    5000             2708.76            2707.23		   0.000338
+---------------------------------------------------------------------------------------
+	Command being timed: "ib_write_bw -a localhost --ib-port=1"
+	User time (seconds): 36.60
+	System time (seconds): 0.00
+	Percent of CPU this job got: 97%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:37.61
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 18848
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 678
+	Voluntary context switches: 35
+	Involuntary context switches: 66
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+=============================================
+CPU frequency on i5-2310 reduced to 1.8GHz
+
+$ sudo cpufreq-set -f 1800000 -c 0
+$ sudo cpufreq-set -f 1800000 -c 1
+$ sudo cpufreq-set -f 1800000 -c 2
+$ sudo cpufreq-set -f 1800000 -c 3
+$ cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq 
+1800000
+1800000
+1800000
+1800000
+
+Server:
+$ /usr/bin/time -v ib_write_bw -a --ib-port=2
+
+************************************
+* Waiting for client to connect... *
+************************************
+---------------------------------------------------------------------------------------
+                    RDMA_Write BW Test
+ Dual-port       : OFF		Device         : mlx4_0
+ Number of qps   : 1		Transport type : IB
+ Connection type : RC		Using SRQ      : OFF
+ CQ Moderation   : 100
+ Mtu             : 4096[B]
+ Link type       : IB
+ Max inline data : 0[B]
+ rdma_cm QPs	 : OFF
+ Data ex. method : Ethernet
+---------------------------------------------------------------------------------------
+ local address: LID 0x02 QPN 0x0340 PSN 0xaabe10 RKey 0xb0001109 VAddr 0x007fd3aa863000
+ remote address: LID 0x01 QPN 0x0341 PSN 0x8edccb RKey 0xb0001209 VAddr 0x007fd6bbfe7000
+---------------------------------------------------------------------------------------
+ #bytes     #iterations    BW peak[MB/sec]    BW average[MB/sec]   MsgRate[Mpps]
+ 8388608    5000             2710.27            2709.44		   0.000339
+---------------------------------------------------------------------------------------
+	Command being timed: "ib_write_bw -a --ib-port=2"
+	User time (seconds): 0.00
+	System time (seconds): 0.00
+	Percent of CPU this job got: 0%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:43.11
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 18712
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 656
+	Voluntary context switches: 34
+	Involuntary context switches: 1
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+Server:
+$ /usr/bin/time -v ib_write_bw -a localhost --ib-port=1
+---------------------------------------------------------------------------------------
+                    RDMA_Write BW Test
+ Dual-port       : OFF		Device         : mlx4_0
+ Number of qps   : 1		Transport type : IB
+ Connection type : RC		Using SRQ      : OFF
+ TX depth        : 128
+ CQ Moderation   : 100
+ Mtu             : 4096[B]
+ Link type       : IB
+ Max inline data : 0[B]
+ rdma_cm QPs	 : OFF
+ Data ex. method : Ethernet
+---------------------------------------------------------------------------------------
+ local address: LID 0x01 QPN 0x0341 PSN 0x8edccb RKey 0xb0001209 VAddr 0x007fd6bbfe7000
+ remote address: LID 0x02 QPN 0x0340 PSN 0xaabe10 RKey 0xb0001109 VAddr 0x007fd3aa863000
+---------------------------------------------------------------------------------------
+ #bytes     #iterations    BW peak[MB/sec]    BW average[MB/sec]   MsgRate[Mpps]
+ 2          5000             12.15              12.12  		   6.352649
+ 4          5000             24.26              24.20  		   6.342714
+ 8          5000             48.62              48.47  		   6.353534
+ 16         5000             97.25              96.99  		   6.356604
+ 32         5000             194.49             194.10 		   6.360359
+ 64         5000             391.58             390.23 		   6.393535
+ 128        5000             742.02             739.97 		   6.061806
+ 256        5000             1863.86            1853.79		   7.593130
+ 512        5000             2491.71            2486.95		   5.093279
+ 1024       5000             2711.70            2708.04		   2.773030
+ 2048       5000             2831.26            2830.40		   1.449164
+ 4096       5000             2882.54            2882.16		   0.737833
+ 8192       5000             2907.39            2906.06		   0.371976
+ 16384      5000             2919.95            2918.05		   0.186755
+ 32768      5000             2922.80            2922.73		   0.093527
+ 65536      5000             2931.52            2931.49		   0.046904
+ 131072     5000             2932.75            2932.69		   0.023462
+ 262144     5000             2931.96            2931.95		   0.011728
+ 524288     5000             2931.86            2931.80		   0.005864
+ 1048576    5000             2933.29            2933.26		   0.002933
+ 2097152    5000             2934.85            2934.77		   0.001467
+ 4194304    5000             2935.98            2935.97		   0.000734
+ 8388608    5000             2710.27            2709.44		   0.000339
+---------------------------------------------------------------------------------------
+	Command being timed: "ib_write_bw -a localhost --ib-port=1"
+	User time (seconds): 38.24
+	System time (seconds): 0.00
+	Percent of CPU this job got: 97%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:39.25
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 18848
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 679
+	Voluntary context switches: 35
+	Involuntary context switches: 105
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
