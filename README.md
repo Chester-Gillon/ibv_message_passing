@@ -1,4 +1,4 @@
-# ibv_message_parsing
+# ibv_message_passing
 Tests of using Infiniband to pass messages, built upon the verbs API
 
 The tests have been run using:

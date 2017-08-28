@@ -1,0 +1,2550 @@
+Testing using use_events=0 message_size=1 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=18  user time=1.900000  system time=0.004000
+   local address:  LID 0x0001, QPN 0x000416, PSN 0xf119db, GID ::
+   remote address: LID 0x0002, QPN 0x000417, PSN 0x1914f6, GID ::
+ 2000000 bytes in 1.90 seconds = 8.42 Mbit/sec
+ 1000000 iters in 1.90 seconds = 1.90 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=1.900000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000417, PSN 0x1914f6, GID ::
+   remote address: LID 0x0001, QPN 0x000416, PSN 0xf119db, GID ::
+ 2000000 bytes in 1.90 seconds = 8.42 Mbit/sec
+ 1000000 iters in 1.90 seconds = 1.90 usec/iter
+
+Test generated 30 mlx4 interrupts (186854177 -> 186854207)
+
+===============================================================================
+Testing using use_events=1 message_size=1 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=1195560  user time=2.444000  system time=0.372000
+   local address:  LID 0x0001, QPN 0x000418, PSN 0xb10fb6, GID ::
+   remote address: LID 0x0002, QPN 0x000419, PSN 0xc5f13e, GID ::
+ 2000000 bytes in 4.62 seconds = 3.47 Mbit/sec
+ 1000000 iters in 4.62 seconds = 4.62 usec/iter
+
+Client  voluntary_ctxt_switches=1199032  user time=2.476000  system time=0.344000
+   local address:  LID 0x0002, QPN 0x000419, PSN 0xc5f13e, GID ::
+   remote address: LID 0x0001, QPN 0x000418, PSN 0xb10fb6, GID ::
+ 2000000 bytes in 4.62 seconds = 3.47 Mbit/sec
+ 1000000 iters in 4.62 seconds = 4.62 usec/iter
+
+Test generated 2050425 mlx4 interrupts (186854207 -> 188904632)
+
+===============================================================================
+Testing using use_events=0 message_size=1 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=1.924000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00041a, PSN 0x135203, GID ::
+   remote address: LID 0x0002, QPN 0x00041b, PSN 0x78739c, GID ::
+ 2000000 bytes in 1.92 seconds = 8.32 Mbit/sec
+ 1000000 iters in 1.92 seconds = 1.92 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=1.924000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00041b, PSN 0x78739c, GID ::
+   remote address: LID 0x0001, QPN 0x00041a, PSN 0x135203, GID ::
+ 2000000 bytes in 1.92 seconds = 8.32 Mbit/sec
+ 1000000 iters in 1.92 seconds = 1.92 usec/iter
+
+Test generated 30 mlx4 interrupts (188904632 -> 188904662)
+
+===============================================================================
+Testing using use_events=1 message_size=1 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=1174450  user time=2.396000  system time=0.352000
+   local address:  LID 0x0001, QPN 0x00041c, PSN 0x012e8d, GID ::
+   remote address: LID 0x0002, QPN 0x00041d, PSN 0x533693, GID ::
+ 2000000 bytes in 4.54 seconds = 3.52 Mbit/sec
+ 1000000 iters in 4.54 seconds = 4.54 usec/iter
+
+Client  voluntary_ctxt_switches=1178412  user time=2.396000  system time=0.360000
+   local address:  LID 0x0002, QPN 0x00041d, PSN 0x533693, GID ::
+   remote address: LID 0x0001, QPN 0x00041c, PSN 0x012e8d, GID ::
+ 2000000 bytes in 4.54 seconds = 3.52 Mbit/sec
+ 1000000 iters in 4.54 seconds = 4.54 usec/iter
+
+Test generated 2045642 mlx4 interrupts (188904662 -> 190950304)
+
+===============================================================================
+Testing using use_events=0 message_size=1 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=20  user time=1.900000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00041e, PSN 0xa00afe, GID ::
+   remote address: LID 0x0002, QPN 0x00041f, PSN 0xcbdfde, GID ::
+ 2000000 bytes in 1.90 seconds = 8.42 Mbit/sec
+ 1000000 iters in 1.90 seconds = 1.90 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=1.900000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00041f, PSN 0xcbdfde, GID ::
+   remote address: LID 0x0001, QPN 0x00041e, PSN 0xa00afe, GID ::
+ 2000000 bytes in 1.90 seconds = 8.42 Mbit/sec
+ 1000000 iters in 1.90 seconds = 1.90 usec/iter
+
+Test generated 30 mlx4 interrupts (190950304 -> 190950334)
+
+===============================================================================
+Testing using use_events=1 message_size=1 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=1342056  user time=2.456000  system time=0.716000
+   local address:  LID 0x0001, QPN 0x000420, PSN 0xcee7ca, GID ::
+   remote address: LID 0x0002, QPN 0x000421, PSN 0xe7a317, GID ::
+ 2000000 bytes in 5.51 seconds = 2.90 Mbit/sec
+ 1000000 iters in 5.51 seconds = 5.51 usec/iter
+
+Client  voluntary_ctxt_switches=1353534  user time=2.548000  system time=0.644000
+   local address:  LID 0x0002, QPN 0x000421, PSN 0xe7a317, GID ::
+   remote address: LID 0x0001, QPN 0x000420, PSN 0xcee7ca, GID ::
+ 2000000 bytes in 5.51 seconds = 2.90 Mbit/sec
+ 1000000 iters in 5.51 seconds = 5.51 usec/iter
+
+Test generated 2052057 mlx4 interrupts (190950334 -> 193002391)
+
+===============================================================================
+Testing using use_events=0 message_size=2 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=20  user time=1.908000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000422, PSN 0x135e18, GID ::
+   remote address: LID 0x0002, QPN 0x000423, PSN 0xf2ccac, GID ::
+ 4000000 bytes in 1.92 seconds = 16.68 Mbit/sec
+ 1000000 iters in 1.92 seconds = 1.92 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=1.920000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000423, PSN 0xf2ccac, GID ::
+   remote address: LID 0x0001, QPN 0x000422, PSN 0x135e18, GID ::
+ 4000000 bytes in 1.92 seconds = 16.68 Mbit/sec
+ 1000000 iters in 1.92 seconds = 1.92 usec/iter
+
+Test generated 30 mlx4 interrupts (193002391 -> 193002421)
+
+===============================================================================
+Testing using use_events=1 message_size=2 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=1075634  user time=2.144000  system time=0.432000
+   local address:  LID 0x0001, QPN 0x000424, PSN 0xc20702, GID ::
+   remote address: LID 0x0002, QPN 0x000425, PSN 0x8e5c02, GID ::
+ 4000000 bytes in 3.83 seconds = 8.36 Mbit/sec
+ 1000000 iters in 3.83 seconds = 3.83 usec/iter
+
+Client  voluntary_ctxt_switches=1078557  user time=2.272000  system time=0.304000
+   local address:  LID 0x0002, QPN 0x000425, PSN 0x8e5c02, GID ::
+   remote address: LID 0x0001, QPN 0x000424, PSN 0xc20702, GID ::
+ 4000000 bytes in 3.83 seconds = 8.36 Mbit/sec
+ 1000000 iters in 3.83 seconds = 3.83 usec/iter
+
+Test generated 2044233 mlx4 interrupts (193002421 -> 195046654)
+
+===============================================================================
+Testing using use_events=0 message_size=2 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=1.904000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000426, PSN 0xb14ac7, GID ::
+   remote address: LID 0x0002, QPN 0x000427, PSN 0x576ca1, GID ::
+ 4000000 bytes in 1.91 seconds = 16.79 Mbit/sec
+ 1000000 iters in 1.91 seconds = 1.91 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=1.904000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000427, PSN 0x576ca1, GID ::
+   remote address: LID 0x0001, QPN 0x000426, PSN 0xb14ac7, GID ::
+ 4000000 bytes in 1.91 seconds = 16.79 Mbit/sec
+ 1000000 iters in 1.91 seconds = 1.91 usec/iter
+
+Test generated 30 mlx4 interrupts (195046654 -> 195046684)
+
+===============================================================================
+Testing using use_events=1 message_size=2 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=1298767  user time=2.552000  system time=0.564000
+   local address:  LID 0x0001, QPN 0x000428, PSN 0x02a838, GID ::
+   remote address: LID 0x0002, QPN 0x000429, PSN 0x95b07f, GID ::
+ 4000000 bytes in 5.22 seconds = 6.13 Mbit/sec
+ 1000000 iters in 5.22 seconds = 5.22 usec/iter
+
+Client  voluntary_ctxt_switches=1293745  user time=2.480000  system time=0.552000
+   local address:  LID 0x0002, QPN 0x000429, PSN 0x95b07f, GID ::
+   remote address: LID 0x0001, QPN 0x000428, PSN 0x02a838, GID ::
+ 4000000 bytes in 5.22 seconds = 6.13 Mbit/sec
+ 1000000 iters in 5.22 seconds = 5.22 usec/iter
+
+Test generated 2045569 mlx4 interrupts (195046684 -> 197092253)
+
+===============================================================================
+Testing using use_events=0 message_size=2 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=18  user time=1.908000  system time=0.004000
+   local address:  LID 0x0001, QPN 0x00042a, PSN 0x55f93e, GID ::
+   remote address: LID 0x0002, QPN 0x00042b, PSN 0x394196, GID ::
+ 4000000 bytes in 1.91 seconds = 16.75 Mbit/sec
+ 1000000 iters in 1.91 seconds = 1.91 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=1.912000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00042b, PSN 0x394196, GID ::
+   remote address: LID 0x0001, QPN 0x00042a, PSN 0x55f93e, GID ::
+ 4000000 bytes in 1.91 seconds = 16.75 Mbit/sec
+ 1000000 iters in 1.91 seconds = 1.91 usec/iter
+
+Test generated 30 mlx4 interrupts (197092253 -> 197092283)
+
+===============================================================================
+Testing using use_events=1 message_size=2 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=1212718  user time=2.528000  system time=0.360000
+   local address:  LID 0x0001, QPN 0x00042c, PSN 0xd53d5e, GID ::
+   remote address: LID 0x0002, QPN 0x00042d, PSN 0xa56c23, GID ::
+ 4000000 bytes in 4.80 seconds = 6.67 Mbit/sec
+ 1000000 iters in 4.80 seconds = 4.80 usec/iter
+
+Client  voluntary_ctxt_switches=1216305  user time=2.496000  system time=0.348000
+   local address:  LID 0x0002, QPN 0x00042d, PSN 0xa56c23, GID ::
+   remote address: LID 0x0001, QPN 0x00042c, PSN 0xd53d5e, GID ::
+ 4000000 bytes in 4.80 seconds = 6.67 Mbit/sec
+ 1000000 iters in 4.80 seconds = 4.80 usec/iter
+
+Test generated 2042298 mlx4 interrupts (197092283 -> 199134581)
+
+===============================================================================
+Testing using use_events=0 message_size=4 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=18  user time=1.904000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00042e, PSN 0xe3dba1, GID ::
+   remote address: LID 0x0002, QPN 0x00042f, PSN 0x044a76, GID ::
+ 8000000 bytes in 1.90 seconds = 33.62 Mbit/sec
+ 1000000 iters in 1.90 seconds = 1.90 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=1.900000  system time=0.004000
+   local address:  LID 0x0002, QPN 0x00042f, PSN 0x044a76, GID ::
+   remote address: LID 0x0001, QPN 0x00042e, PSN 0xe3dba1, GID ::
+ 8000000 bytes in 1.90 seconds = 33.63 Mbit/sec
+ 1000000 iters in 1.90 seconds = 1.90 usec/iter
+
+Test generated 28 mlx4 interrupts (199134581 -> 199134609)
+
+===============================================================================
+Testing using use_events=1 message_size=4 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=1205060  user time=2.492000  system time=0.392000
+   local address:  LID 0x0001, QPN 0x000430, PSN 0x5adfde, GID ::
+   remote address: LID 0x0002, QPN 0x000431, PSN 0xf1c1ea, GID ::
+ 8000000 bytes in 4.70 seconds = 13.62 Mbit/sec
+ 1000000 iters in 4.70 seconds = 4.70 usec/iter
+
+Client  voluntary_ctxt_switches=1205062  user time=2.468000  system time=0.360000
+   local address:  LID 0x0002, QPN 0x000431, PSN 0xf1c1ea, GID ::
+   remote address: LID 0x0001, QPN 0x000430, PSN 0x5adfde, GID ::
+ 8000000 bytes in 4.70 seconds = 13.62 Mbit/sec
+ 1000000 iters in 4.70 seconds = 4.70 usec/iter
+
+Test generated 2048077 mlx4 interrupts (199134609 -> 201182686)
+
+===============================================================================
+Testing using use_events=0 message_size=4 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=1.892000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000432, PSN 0x06292a, GID ::
+   remote address: LID 0x0002, QPN 0x000433, PSN 0xed4b46, GID ::
+ 8000000 bytes in 1.89 seconds = 33.82 Mbit/sec
+ 1000000 iters in 1.89 seconds = 1.89 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=1.892000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000433, PSN 0xed4b46, GID ::
+   remote address: LID 0x0001, QPN 0x000432, PSN 0x06292a, GID ::
+ 8000000 bytes in 1.89 seconds = 33.82 Mbit/sec
+ 1000000 iters in 1.89 seconds = 1.89 usec/iter
+
+Test generated 30 mlx4 interrupts (201182686 -> 201182716)
+
+===============================================================================
+Testing using use_events=1 message_size=4 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=1243329  user time=2.500000  system time=0.448000
+   local address:  LID 0x0001, QPN 0x000434, PSN 0xce2115, GID ::
+   remote address: LID 0x0002, QPN 0x000435, PSN 0xa2299e, GID ::
+ 8000000 bytes in 4.91 seconds = 13.04 Mbit/sec
+ 1000000 iters in 4.91 seconds = 4.91 usec/iter
+
+Client  voluntary_ctxt_switches=1247869  user time=2.524000  system time=0.420000
+   local address:  LID 0x0002, QPN 0x000435, PSN 0xa2299e, GID ::
+   remote address: LID 0x0001, QPN 0x000434, PSN 0xce2115, GID ::
+ 8000000 bytes in 4.91 seconds = 13.04 Mbit/sec
+ 1000000 iters in 4.91 seconds = 4.91 usec/iter
+
+Test generated 2045471 mlx4 interrupts (201182716 -> 203228187)
+
+===============================================================================
+Testing using use_events=0 message_size=4 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=20  user time=1.900000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000436, PSN 0x06f386, GID ::
+   remote address: LID 0x0002, QPN 0x000437, PSN 0x2b3c20, GID ::
+ 8000000 bytes in 1.90 seconds = 33.66 Mbit/sec
+ 1000000 iters in 1.90 seconds = 1.90 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=1.896000  system time=0.004000
+   local address:  LID 0x0002, QPN 0x000437, PSN 0x2b3c20, GID ::
+   remote address: LID 0x0001, QPN 0x000436, PSN 0x06f386, GID ::
+ 8000000 bytes in 1.90 seconds = 33.66 Mbit/sec
+ 1000000 iters in 1.90 seconds = 1.90 usec/iter
+
+Test generated 27 mlx4 interrupts (203228187 -> 203228214)
+
+===============================================================================
+Testing using use_events=1 message_size=4 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=1139267  user time=2.388000  system time=0.340000
+   local address:  LID 0x0001, QPN 0x000438, PSN 0xfcd220, GID ::
+   remote address: LID 0x0002, QPN 0x000439, PSN 0x0e0127, GID ::
+ 8000000 bytes in 4.37 seconds = 14.66 Mbit/sec
+ 1000000 iters in 4.37 seconds = 4.37 usec/iter
+
+Client  voluntary_ctxt_switches=1142079  user time=2.384000  system time=0.324000
+   local address:  LID 0x0002, QPN 0x000439, PSN 0x0e0127, GID ::
+   remote address: LID 0x0001, QPN 0x000438, PSN 0xfcd220, GID ::
+ 8000000 bytes in 4.37 seconds = 14.66 Mbit/sec
+ 1000000 iters in 4.37 seconds = 4.37 usec/iter
+
+Test generated 2047158 mlx4 interrupts (203228214 -> 205275372)
+
+===============================================================================
+Testing using use_events=0 message_size=8 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=18  user time=1.956000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00043a, PSN 0x2d64ae, GID ::
+   remote address: LID 0x0002, QPN 0x00043b, PSN 0x18608f, GID ::
+ 16000000 bytes in 1.96 seconds = 65.43 Mbit/sec
+ 1000000 iters in 1.96 seconds = 1.96 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=1.956000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00043b, PSN 0x18608f, GID ::
+   remote address: LID 0x0001, QPN 0x00043a, PSN 0x2d64ae, GID ::
+ 16000000 bytes in 1.96 seconds = 65.44 Mbit/sec
+ 1000000 iters in 1.96 seconds = 1.96 usec/iter
+
+Test generated 30 mlx4 interrupts (205275372 -> 205275402)
+
+===============================================================================
+Testing using use_events=1 message_size=8 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=1206744  user time=2.568000  system time=0.328000
+   local address:  LID 0x0001, QPN 0x00043c, PSN 0x64438a, GID ::
+   remote address: LID 0x0002, QPN 0x00043d, PSN 0x3c25d8, GID ::
+ 16000000 bytes in 4.69 seconds = 27.30 Mbit/sec
+ 1000000 iters in 4.69 seconds = 4.69 usec/iter
+
+Client  voluntary_ctxt_switches=1207928  user time=2.560000  system time=0.304000
+   local address:  LID 0x0002, QPN 0x00043d, PSN 0x3c25d8, GID ::
+   remote address: LID 0x0001, QPN 0x00043c, PSN 0x64438a, GID ::
+ 16000000 bytes in 4.69 seconds = 27.30 Mbit/sec
+ 1000000 iters in 4.69 seconds = 4.69 usec/iter
+
+Test generated 2055109 mlx4 interrupts (205275402 -> 207330511)
+
+===============================================================================
+Testing using use_events=0 message_size=8 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=20  user time=1.960000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00043e, PSN 0x26ca08, GID ::
+   remote address: LID 0x0002, QPN 0x00043f, PSN 0x4eec66, GID ::
+ 16000000 bytes in 1.96 seconds = 65.32 Mbit/sec
+ 1000000 iters in 1.96 seconds = 1.96 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=1.960000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00043f, PSN 0x4eec66, GID ::
+   remote address: LID 0x0001, QPN 0x00043e, PSN 0x26ca08, GID ::
+ 16000000 bytes in 1.96 seconds = 65.32 Mbit/sec
+ 1000000 iters in 1.96 seconds = 1.96 usec/iter
+
+Test generated 30 mlx4 interrupts (207330511 -> 207330541)
+
+===============================================================================
+Testing using use_events=1 message_size=8 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=1287376  user time=2.704000  system time=0.348000
+   local address:  LID 0x0001, QPN 0x000440, PSN 0x8b8f93, GID ::
+   remote address: LID 0x0002, QPN 0x000441, PSN 0xa0985e, GID ::
+ 16000000 bytes in 5.01 seconds = 25.56 Mbit/sec
+ 1000000 iters in 5.01 seconds = 5.01 usec/iter
+
+Client  voluntary_ctxt_switches=1291974  user time=2.616000  system time=0.424000
+   local address:  LID 0x0002, QPN 0x000441, PSN 0xa0985e, GID ::
+   remote address: LID 0x0001, QPN 0x000440, PSN 0x8b8f93, GID ::
+ 16000000 bytes in 5.01 seconds = 25.57 Mbit/sec
+ 1000000 iters in 5.01 seconds = 5.01 usec/iter
+
+Test generated 2047597 mlx4 interrupts (207330541 -> 209378138)
+
+===============================================================================
+Testing using use_events=0 message_size=8 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=18  user time=1.956000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000442, PSN 0x09634e, GID ::
+   remote address: LID 0x0002, QPN 0x000443, PSN 0x6eac2a, GID ::
+ 16000000 bytes in 1.96 seconds = 65.39 Mbit/sec
+ 1000000 iters in 1.96 seconds = 1.96 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=1.956000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000443, PSN 0x6eac2a, GID ::
+   remote address: LID 0x0001, QPN 0x000442, PSN 0x09634e, GID ::
+ 16000000 bytes in 1.96 seconds = 65.40 Mbit/sec
+ 1000000 iters in 1.96 seconds = 1.96 usec/iter
+
+Test generated 30 mlx4 interrupts (209378138 -> 209378168)
+
+===============================================================================
+Testing using use_events=1 message_size=8 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=1280557  user time=2.604000  system time=0.420000
+   local address:  LID 0x0001, QPN 0x000444, PSN 0x9c0f88, GID ::
+   remote address: LID 0x0002, QPN 0x000445, PSN 0xee3ed1, GID ::
+ 16000000 bytes in 5.02 seconds = 25.49 Mbit/sec
+ 1000000 iters in 5.02 seconds = 5.02 usec/iter
+
+Client  voluntary_ctxt_switches=1283021  user time=2.604000  system time=0.380000
+   local address:  LID 0x0002, QPN 0x000445, PSN 0xee3ed1, GID ::
+   remote address: LID 0x0001, QPN 0x000444, PSN 0x9c0f88, GID ::
+ 16000000 bytes in 5.02 seconds = 25.49 Mbit/sec
+ 1000000 iters in 5.02 seconds = 5.02 usec/iter
+
+Test generated 2048565 mlx4 interrupts (209378168 -> 211426733)
+
+===============================================================================
+Testing using use_events=0 message_size=16 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=18  user time=1.920000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000446, PSN 0xd53080, GID ::
+   remote address: LID 0x0002, QPN 0x000447, PSN 0x779fd9, GID ::
+ 32000000 bytes in 1.92 seconds = 133.31 Mbit/sec
+ 1000000 iters in 1.92 seconds = 1.92 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=1.920000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000447, PSN 0x779fd9, GID ::
+   remote address: LID 0x0001, QPN 0x000446, PSN 0xd53080, GID ::
+ 32000000 bytes in 1.92 seconds = 133.32 Mbit/sec
+ 1000000 iters in 1.92 seconds = 1.92 usec/iter
+
+Test generated 30 mlx4 interrupts (211426733 -> 211426763)
+
+===============================================================================
+Testing using use_events=1 message_size=16 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=1197204  user time=2.452000  system time=0.372000
+   local address:  LID 0x0001, QPN 0x000448, PSN 0x95c369, GID ::
+   remote address: LID 0x0002, QPN 0x000449, PSN 0x25192f, GID ::
+ 32000000 bytes in 4.66 seconds = 54.99 Mbit/sec
+ 1000000 iters in 4.66 seconds = 4.66 usec/iter
+
+Client  voluntary_ctxt_switches=1200491  user time=2.492000  system time=0.348000
+   local address:  LID 0x0002, QPN 0x000449, PSN 0x25192f, GID ::
+   remote address: LID 0x0001, QPN 0x000448, PSN 0x95c369, GID ::
+ 32000000 bytes in 4.66 seconds = 54.99 Mbit/sec
+ 1000000 iters in 4.66 seconds = 4.66 usec/iter
+
+Test generated 2050561 mlx4 interrupts (211426763 -> 213477324)
+
+===============================================================================
+Testing using use_events=0 message_size=16 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=20  user time=1.920000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00044a, PSN 0x5f7116, GID ::
+   remote address: LID 0x0002, QPN 0x00044b, PSN 0xc893b6, GID ::
+ 32000000 bytes in 1.92 seconds = 133.35 Mbit/sec
+ 1000000 iters in 1.92 seconds = 1.92 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=1.920000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00044b, PSN 0xc893b6, GID ::
+   remote address: LID 0x0001, QPN 0x00044a, PSN 0x5f7116, GID ::
+ 32000000 bytes in 1.92 seconds = 133.37 Mbit/sec
+ 1000000 iters in 1.92 seconds = 1.92 usec/iter
+
+Test generated 27 mlx4 interrupts (213477324 -> 213477351)
+
+===============================================================================
+Testing using use_events=1 message_size=16 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=1230854  user time=2.544000  system time=0.352000
+   local address:  LID 0x0001, QPN 0x00044c, PSN 0x610441, GID ::
+   remote address: LID 0x0002, QPN 0x00044d, PSN 0xb70d4e, GID ::
+ 32000000 bytes in 4.80 seconds = 53.37 Mbit/sec
+ 1000000 iters in 4.80 seconds = 4.80 usec/iter
+
+Client  voluntary_ctxt_switches=1234671  user time=2.496000  system time=0.392000
+   local address:  LID 0x0002, QPN 0x00044d, PSN 0xb70d4e, GID ::
+   remote address: LID 0x0001, QPN 0x00044c, PSN 0x610441, GID ::
+ 32000000 bytes in 4.80 seconds = 53.37 Mbit/sec
+ 1000000 iters in 4.80 seconds = 4.80 usec/iter
+
+Test generated 2056016 mlx4 interrupts (213477351 -> 215533367)
+
+===============================================================================
+Testing using use_events=0 message_size=16 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=18  user time=1.916000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00044e, PSN 0x23d946, GID ::
+   remote address: LID 0x0002, QPN 0x00044f, PSN 0xca2264, GID ::
+ 32000000 bytes in 1.92 seconds = 133.52 Mbit/sec
+ 1000000 iters in 1.92 seconds = 1.92 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=1.920000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00044f, PSN 0xca2264, GID ::
+   remote address: LID 0x0001, QPN 0x00044e, PSN 0x23d946, GID ::
+ 32000000 bytes in 1.92 seconds = 133.54 Mbit/sec
+ 1000000 iters in 1.92 seconds = 1.92 usec/iter
+
+Test generated 42 mlx4 interrupts (215533367 -> 215533409)
+
+===============================================================================
+Testing using use_events=1 message_size=16 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=1282849  user time=2.672000  system time=0.420000
+   local address:  LID 0x0001, QPN 0x000450, PSN 0x535320, GID ::
+   remote address: LID 0x0002, QPN 0x000451, PSN 0xe682ab, GID ::
+ 32000000 bytes in 4.98 seconds = 51.45 Mbit/sec
+ 1000000 iters in 4.98 seconds = 4.98 usec/iter
+
+Client  voluntary_ctxt_switches=1281103  user time=2.600000  system time=0.404000
+   local address:  LID 0x0002, QPN 0x000451, PSN 0xe682ab, GID ::
+   remote address: LID 0x0001, QPN 0x000450, PSN 0x535320, GID ::
+ 32000000 bytes in 4.98 seconds = 51.45 Mbit/sec
+ 1000000 iters in 4.98 seconds = 4.98 usec/iter
+
+Test generated 2050516 mlx4 interrupts (215533409 -> 217583925)
+
+===============================================================================
+Testing using use_events=0 message_size=32 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=18  user time=2.936000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000452, PSN 0xd17562, GID ::
+   remote address: LID 0x0002, QPN 0x000453, PSN 0xb4e4fd, GID ::
+ 64000000 bytes in 2.93 seconds = 174.49 Mbit/sec
+ 1000000 iters in 2.93 seconds = 2.93 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=2.936000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000453, PSN 0xb4e4fd, GID ::
+   remote address: LID 0x0001, QPN 0x000452, PSN 0xd17562, GID ::
+ 64000000 bytes in 2.93 seconds = 174.51 Mbit/sec
+ 1000000 iters in 2.93 seconds = 2.93 usec/iter
+
+Test generated 30 mlx4 interrupts (217583925 -> 217583955)
+
+===============================================================================
+Testing using use_events=1 message_size=32 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=1985577  user time=3.740000  system time=0.912000
+   local address:  LID 0x0001, QPN 0x000454, PSN 0xfa1694, GID ::
+   remote address: LID 0x0002, QPN 0x000455, PSN 0x40dfd3, GID ::
+ 64000000 bytes in 9.60 seconds = 53.31 Mbit/sec
+ 1000000 iters in 9.60 seconds = 9.60 usec/iter
+
+Client  voluntary_ctxt_switches=1986368  user time=3.748000  system time=0.952000
+   local address:  LID 0x0002, QPN 0x000455, PSN 0x40dfd3, GID ::
+   remote address: LID 0x0001, QPN 0x000454, PSN 0xfa1694, GID ::
+ 64000000 bytes in 9.60 seconds = 53.31 Mbit/sec
+ 1000000 iters in 9.60 seconds = 9.60 usec/iter
+
+Test generated 2028672 mlx4 interrupts (217583955 -> 219612627)
+
+===============================================================================
+Testing using use_events=0 message_size=32 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=2.944000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000456, PSN 0x87c2ae, GID ::
+   remote address: LID 0x0002, QPN 0x000457, PSN 0x6f0c0e, GID ::
+ 64000000 bytes in 2.94 seconds = 173.95 Mbit/sec
+ 1000000 iters in 2.94 seconds = 2.94 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=2.944000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000457, PSN 0x6f0c0e, GID ::
+   remote address: LID 0x0001, QPN 0x000456, PSN 0x87c2ae, GID ::
+ 64000000 bytes in 2.94 seconds = 173.96 Mbit/sec
+ 1000000 iters in 2.94 seconds = 2.94 usec/iter
+
+Test generated 42 mlx4 interrupts (219612627 -> 219612669)
+
+===============================================================================
+Testing using use_events=1 message_size=32 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=1984456  user time=3.708000  system time=0.876000
+   local address:  LID 0x0001, QPN 0x000458, PSN 0x0c313e, GID ::
+   remote address: LID 0x0002, QPN 0x000459, PSN 0x56d441, GID ::
+ 64000000 bytes in 9.42 seconds = 54.34 Mbit/sec
+ 1000000 iters in 9.42 seconds = 9.42 usec/iter
+
+Client  voluntary_ctxt_switches=1985092  user time=3.732000  system time=0.824000
+   local address:  LID 0x0002, QPN 0x000459, PSN 0x56d441, GID ::
+   remote address: LID 0x0001, QPN 0x000458, PSN 0x0c313e, GID ::
+ 64000000 bytes in 9.42 seconds = 54.34 Mbit/sec
+ 1000000 iters in 9.42 seconds = 9.42 usec/iter
+
+Test generated 2027249 mlx4 interrupts (219612669 -> 221639918)
+
+===============================================================================
+Testing using use_events=0 message_size=32 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=20  user time=2.952000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00045a, PSN 0x17248a, GID ::
+   remote address: LID 0x0002, QPN 0x00045b, PSN 0x8bd478, GID ::
+ 64000000 bytes in 2.95 seconds = 173.46 Mbit/sec
+ 1000000 iters in 2.95 seconds = 2.95 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=2.952000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00045b, PSN 0x8bd478, GID ::
+   remote address: LID 0x0001, QPN 0x00045a, PSN 0x17248a, GID ::
+ 64000000 bytes in 2.95 seconds = 173.47 Mbit/sec
+ 1000000 iters in 2.95 seconds = 2.95 usec/iter
+
+Test generated 30 mlx4 interrupts (221639918 -> 221639948)
+
+===============================================================================
+Testing using use_events=1 message_size=32 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=1976553  user time=3.580000  system time=1.060000
+   local address:  LID 0x0001, QPN 0x00045c, PSN 0x43c6c4, GID ::
+   remote address: LID 0x0002, QPN 0x00045d, PSN 0x1bd055, GID ::
+ 64000000 bytes in 9.59 seconds = 53.41 Mbit/sec
+ 1000000 iters in 9.59 seconds = 9.59 usec/iter
+
+Client  voluntary_ctxt_switches=1977099  user time=3.672000  system time=0.984000
+   local address:  LID 0x0002, QPN 0x00045d, PSN 0x1bd055, GID ::
+   remote address: LID 0x0001, QPN 0x00045c, PSN 0x43c6c4, GID ::
+ 64000000 bytes in 9.59 seconds = 53.41 Mbit/sec
+ 1000000 iters in 9.59 seconds = 9.59 usec/iter
+
+Test generated 2040141 mlx4 interrupts (221639948 -> 223680089)
+
+===============================================================================
+Testing using use_events=0 message_size=64 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=20  user time=3.032000  system time=0.004000
+   local address:  LID 0x0001, QPN 0x00045e, PSN 0xe2ebbf, GID ::
+   remote address: LID 0x0002, QPN 0x00045f, PSN 0x5b7572, GID ::
+ 128000000 bytes in 3.04 seconds = 337.33 Mbit/sec
+ 1000000 iters in 3.04 seconds = 3.04 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=3.036000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00045f, PSN 0x5b7572, GID ::
+   remote address: LID 0x0001, QPN 0x00045e, PSN 0xe2ebbf, GID ::
+ 128000000 bytes in 3.04 seconds = 337.34 Mbit/sec
+ 1000000 iters in 3.04 seconds = 3.04 usec/iter
+
+Test generated 30 mlx4 interrupts (223680089 -> 223680119)
+
+===============================================================================
+Testing using use_events=1 message_size=64 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=1982482  user time=3.628000  system time=0.896000
+   local address:  LID 0x0001, QPN 0x000460, PSN 0x0801b4, GID ::
+   remote address: LID 0x0002, QPN 0x000461, PSN 0xe3e50a, GID ::
+ 128000000 bytes in 9.38 seconds = 109.15 Mbit/sec
+ 1000000 iters in 9.38 seconds = 9.38 usec/iter
+
+Client  voluntary_ctxt_switches=1983233  user time=3.848000  system time=0.720000
+   local address:  LID 0x0002, QPN 0x000461, PSN 0xe3e50a, GID ::
+   remote address: LID 0x0001, QPN 0x000460, PSN 0x0801b4, GID ::
+ 128000000 bytes in 9.38 seconds = 109.15 Mbit/sec
+ 1000000 iters in 9.38 seconds = 9.38 usec/iter
+
+Test generated 2029969 mlx4 interrupts (223680119 -> 225710088)
+
+===============================================================================
+Testing using use_events=0 message_size=64 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=3.032000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000462, PSN 0xc1baa5, GID ::
+   remote address: LID 0x0002, QPN 0x000463, PSN 0xc7aae5, GID ::
+ 128000000 bytes in 3.03 seconds = 337.80 Mbit/sec
+ 1000000 iters in 3.03 seconds = 3.03 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=3.032000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000463, PSN 0xc7aae5, GID ::
+   remote address: LID 0x0001, QPN 0x000462, PSN 0xc1baa5, GID ::
+ 128000000 bytes in 3.03 seconds = 337.81 Mbit/sec
+ 1000000 iters in 3.03 seconds = 3.03 usec/iter
+
+Test generated 30 mlx4 interrupts (225710088 -> 225710118)
+
+===============================================================================
+Testing using use_events=1 message_size=64 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=1987503  user time=3.748000  system time=0.896000
+   local address:  LID 0x0001, QPN 0x000464, PSN 0xb9112e, GID ::
+   remote address: LID 0x0002, QPN 0x000465, PSN 0x225b12, GID ::
+ 128000000 bytes in 9.51 seconds = 107.69 Mbit/sec
+ 1000000 iters in 9.51 seconds = 9.51 usec/iter
+
+Client  voluntary_ctxt_switches=1988308  user time=3.788000  system time=0.852000
+   local address:  LID 0x0002, QPN 0x000465, PSN 0x225b12, GID ::
+   remote address: LID 0x0001, QPN 0x000464, PSN 0xb9112e, GID ::
+ 128000000 bytes in 9.51 seconds = 107.69 Mbit/sec
+ 1000000 iters in 9.51 seconds = 9.51 usec/iter
+
+Test generated 2029904 mlx4 interrupts (225710118 -> 227740022)
+
+===============================================================================
+Testing using use_events=0 message_size=64 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=20  user time=3.036000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000466, PSN 0x882ea8, GID ::
+   remote address: LID 0x0002, QPN 0x000467, PSN 0x91f8ad, GID ::
+ 128000000 bytes in 3.04 seconds = 337.30 Mbit/sec
+ 1000000 iters in 3.04 seconds = 3.04 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=3.036000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000467, PSN 0x91f8ad, GID ::
+   remote address: LID 0x0001, QPN 0x000466, PSN 0x882ea8, GID ::
+ 128000000 bytes in 3.04 seconds = 337.31 Mbit/sec
+ 1000000 iters in 3.04 seconds = 3.04 usec/iter
+
+Test generated 42 mlx4 interrupts (227740022 -> 227740064)
+
+===============================================================================
+Testing using use_events=1 message_size=64 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=1988780  user time=3.640000  system time=0.976000
+   local address:  LID 0x0001, QPN 0x000468, PSN 0x149f48, GID ::
+   remote address: LID 0x0002, QPN 0x000469, PSN 0x81c2f0, GID ::
+ 128000000 bytes in 9.67 seconds = 105.93 Mbit/sec
+ 1000000 iters in 9.67 seconds = 9.67 usec/iter
+
+Client  voluntary_ctxt_switches=1988840  user time=3.604000  system time=1.048000
+   local address:  LID 0x0002, QPN 0x000469, PSN 0x81c2f0, GID ::
+   remote address: LID 0x0001, QPN 0x000468, PSN 0x149f48, GID ::
+ 128000000 bytes in 9.67 seconds = 105.93 Mbit/sec
+ 1000000 iters in 9.67 seconds = 9.67 usec/iter
+
+Test generated 2029048 mlx4 interrupts (227740064 -> 229769112)
+
+===============================================================================
+Testing using use_events=0 message_size=128 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=18  user time=3.152000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00046a, PSN 0xdbf756, GID ::
+   remote address: LID 0x0002, QPN 0x00046b, PSN 0x7327e9, GID ::
+ 256000000 bytes in 3.15 seconds = 649.41 Mbit/sec
+ 1000000 iters in 3.15 seconds = 3.15 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=3.152000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00046b, PSN 0x7327e9, GID ::
+   remote address: LID 0x0001, QPN 0x00046a, PSN 0xdbf756, GID ::
+ 256000000 bytes in 3.15 seconds = 649.47 Mbit/sec
+ 1000000 iters in 3.15 seconds = 3.15 usec/iter
+
+Test generated 30 mlx4 interrupts (229769112 -> 229769142)
+
+===============================================================================
+Testing using use_events=1 message_size=128 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=1988189  user time=3.748000  system time=0.900000
+   local address:  LID 0x0001, QPN 0x00046c, PSN 0x70f660, GID ::
+   remote address: LID 0x0002, QPN 0x00046d, PSN 0xe1f3cd, GID ::
+ 256000000 bytes in 9.72 seconds = 210.67 Mbit/sec
+ 1000000 iters in 9.72 seconds = 9.72 usec/iter
+
+Client  voluntary_ctxt_switches=1988554  user time=3.640000  system time=0.980000
+   local address:  LID 0x0002, QPN 0x00046d, PSN 0xe1f3cd, GID ::
+   remote address: LID 0x0001, QPN 0x00046c, PSN 0x70f660, GID ::
+ 256000000 bytes in 9.72 seconds = 210.68 Mbit/sec
+ 1000000 iters in 9.72 seconds = 9.72 usec/iter
+
+Test generated 2041046 mlx4 interrupts (229769142 -> 231810188)
+
+===============================================================================
+Testing using use_events=0 message_size=128 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=21  user time=3.156000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00046e, PSN 0x0dee50, GID ::
+   remote address: LID 0x0002, QPN 0x00046f, PSN 0xa8f8a7, GID ::
+ 256000000 bytes in 3.16 seconds = 648.60 Mbit/sec
+ 1000000 iters in 3.16 seconds = 3.16 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=3.156000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00046f, PSN 0xa8f8a7, GID ::
+   remote address: LID 0x0001, QPN 0x00046e, PSN 0x0dee50, GID ::
+ 256000000 bytes in 3.16 seconds = 648.62 Mbit/sec
+ 1000000 iters in 3.16 seconds = 3.16 usec/iter
+
+Test generated 30 mlx4 interrupts (231810188 -> 231810218)
+
+===============================================================================
+Testing using use_events=1 message_size=128 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=1987200  user time=3.788000  system time=0.860000
+   local address:  LID 0x0001, QPN 0x000470, PSN 0x9e5ff8, GID ::
+   remote address: LID 0x0002, QPN 0x000471, PSN 0x9cc3f3, GID ::
+ 256000000 bytes in 9.60 seconds = 213.26 Mbit/sec
+ 1000000 iters in 9.60 seconds = 9.60 usec/iter
+
+Client  voluntary_ctxt_switches=1987671  user time=3.616000  system time=0.996000
+   local address:  LID 0x0002, QPN 0x000471, PSN 0x9cc3f3, GID ::
+   remote address: LID 0x0001, QPN 0x000470, PSN 0x9e5ff8, GID ::
+ 256000000 bytes in 9.60 seconds = 213.27 Mbit/sec
+ 1000000 iters in 9.60 seconds = 9.60 usec/iter
+
+Test generated 2033379 mlx4 interrupts (231810218 -> 233843597)
+
+===============================================================================
+Testing using use_events=0 message_size=128 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=20  user time=3.148000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000472, PSN 0x5eb36e, GID ::
+   remote address: LID 0x0002, QPN 0x000473, PSN 0xfd978a, GID ::
+ 256000000 bytes in 3.15 seconds = 650.22 Mbit/sec
+ 1000000 iters in 3.15 seconds = 3.15 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=3.148000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000473, PSN 0xfd978a, GID ::
+   remote address: LID 0x0001, QPN 0x000472, PSN 0x5eb36e, GID ::
+ 256000000 bytes in 3.15 seconds = 650.27 Mbit/sec
+ 1000000 iters in 3.15 seconds = 3.15 usec/iter
+
+Test generated 30 mlx4 interrupts (233843597 -> 233843627)
+
+===============================================================================
+Testing using use_events=1 message_size=128 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=1991283  user time=3.688000  system time=0.852000
+   local address:  LID 0x0001, QPN 0x000474, PSN 0x843f2d, GID ::
+   remote address: LID 0x0002, QPN 0x000475, PSN 0x867cec, GID ::
+ 256000000 bytes in 9.55 seconds = 214.34 Mbit/sec
+ 1000000 iters in 9.55 seconds = 9.55 usec/iter
+
+Client  voluntary_ctxt_switches=1991477  user time=3.748000  system time=0.820000
+   local address:  LID 0x0002, QPN 0x000475, PSN 0x867cec, GID ::
+   remote address: LID 0x0001, QPN 0x000474, PSN 0x843f2d, GID ::
+ 256000000 bytes in 9.55 seconds = 214.35 Mbit/sec
+ 1000000 iters in 9.55 seconds = 9.55 usec/iter
+
+Test generated 2035404 mlx4 interrupts (233843627 -> 235879031)
+
+===============================================================================
+Testing using use_events=0 message_size=256 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=20  user time=3.388000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000476, PSN 0xce46b0, GID ::
+   remote address: LID 0x0002, QPN 0x000477, PSN 0x710490, GID ::
+ 512000000 bytes in 3.39 seconds = 1209.37 Mbit/sec
+ 1000000 iters in 3.39 seconds = 3.39 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=3.388000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000477, PSN 0x710490, GID ::
+   remote address: LID 0x0001, QPN 0x000476, PSN 0xce46b0, GID ::
+ 512000000 bytes in 3.39 seconds = 1209.40 Mbit/sec
+ 1000000 iters in 3.39 seconds = 3.39 usec/iter
+
+Test generated 42 mlx4 interrupts (235879031 -> 235879073)
+
+===============================================================================
+Testing using use_events=1 message_size=256 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=1992492  user time=3.632000  system time=1.020000
+   local address:  LID 0x0001, QPN 0x000478, PSN 0x88ec86, GID ::
+   remote address: LID 0x0002, QPN 0x000479, PSN 0x8f040a, GID ::
+ 512000000 bytes in 10.02 seconds = 408.71 Mbit/sec
+ 1000000 iters in 10.02 seconds = 10.02 usec/iter
+
+Client  voluntary_ctxt_switches=1992441  user time=3.740000  system time=0.900000
+   local address:  LID 0x0002, QPN 0x000479, PSN 0x8f040a, GID ::
+   remote address: LID 0x0001, QPN 0x000478, PSN 0x88ec86, GID ::
+ 512000000 bytes in 10.02 seconds = 408.72 Mbit/sec
+ 1000000 iters in 10.02 seconds = 10.02 usec/iter
+
+Test generated 2038208 mlx4 interrupts (235879073 -> 237917281)
+
+===============================================================================
+Testing using use_events=0 message_size=256 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=3.380000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00047a, PSN 0xa9d760, GID ::
+   remote address: LID 0x0002, QPN 0x00047b, PSN 0x506f05, GID ::
+ 512000000 bytes in 3.38 seconds = 1211.84 Mbit/sec
+ 1000000 iters in 3.38 seconds = 3.38 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=3.376000  system time=0.004000
+   local address:  LID 0x0002, QPN 0x00047b, PSN 0x506f05, GID ::
+   remote address: LID 0x0001, QPN 0x00047a, PSN 0xa9d760, GID ::
+ 512000000 bytes in 3.38 seconds = 1211.89 Mbit/sec
+ 1000000 iters in 3.38 seconds = 3.38 usec/iter
+
+Test generated 28 mlx4 interrupts (237917281 -> 237917309)
+
+===============================================================================
+Testing using use_events=1 message_size=256 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=1993471  user time=3.572000  system time=1.180000
+   local address:  LID 0x0001, QPN 0x00047c, PSN 0xae0be2, GID ::
+   remote address: LID 0x0002, QPN 0x00047d, PSN 0x2e7061, GID ::
+ 512000000 bytes in 10.12 seconds = 404.60 Mbit/sec
+ 1000000 iters in 10.12 seconds = 10.12 usec/iter
+
+Client  voluntary_ctxt_switches=1993708  user time=3.532000  system time=1.232000
+   local address:  LID 0x0002, QPN 0x00047d, PSN 0x2e7061, GID ::
+   remote address: LID 0x0001, QPN 0x00047c, PSN 0xae0be2, GID ::
+ 512000000 bytes in 10.12 seconds = 404.60 Mbit/sec
+ 1000000 iters in 10.12 seconds = 10.12 usec/iter
+
+Test generated 2031898 mlx4 interrupts (237917309 -> 239949207)
+
+===============================================================================
+Testing using use_events=0 message_size=256 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=18  user time=3.380000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00047e, PSN 0x39622e, GID ::
+   remote address: LID 0x0002, QPN 0x00047f, PSN 0x5a46ce, GID ::
+ 512000000 bytes in 3.38 seconds = 1211.59 Mbit/sec
+ 1000000 iters in 3.38 seconds = 3.38 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=3.380000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00047f, PSN 0x5a46ce, GID ::
+   remote address: LID 0x0001, QPN 0x00047e, PSN 0x39622e, GID ::
+ 512000000 bytes in 3.38 seconds = 1211.62 Mbit/sec
+ 1000000 iters in 3.38 seconds = 3.38 usec/iter
+
+Test generated 30 mlx4 interrupts (239949207 -> 239949237)
+
+===============================================================================
+Testing using use_events=1 message_size=256 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=1993134  user time=3.468000  system time=1.288000
+   local address:  LID 0x0001, QPN 0x000480, PSN 0xd1d5e6, GID ::
+   remote address: LID 0x0002, QPN 0x000481, PSN 0x561429, GID ::
+ 512000000 bytes in 10.22 seconds = 400.95 Mbit/sec
+ 1000000 iters in 10.22 seconds = 10.22 usec/iter
+
+Client  voluntary_ctxt_switches=1993092  user time=3.560000  system time=1.200000
+   local address:  LID 0x0002, QPN 0x000481, PSN 0x561429, GID ::
+   remote address: LID 0x0001, QPN 0x000480, PSN 0xd1d5e6, GID ::
+ 512000000 bytes in 10.22 seconds = 400.96 Mbit/sec
+ 1000000 iters in 10.22 seconds = 10.22 usec/iter
+
+Test generated 2030898 mlx4 interrupts (239949237 -> 241980135)
+
+===============================================================================
+Testing using use_events=0 message_size=512 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=20  user time=3.820000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000482, PSN 0xe6e03f, GID ::
+   remote address: LID 0x0002, QPN 0x000483, PSN 0x0b9ea3, GID ::
+ 1024000000 bytes in 3.82 seconds = 2144.45 Mbit/sec
+ 1000000 iters in 3.82 seconds = 3.82 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=3.820000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000483, PSN 0x0b9ea3, GID ::
+   remote address: LID 0x0001, QPN 0x000482, PSN 0xe6e03f, GID ::
+ 1024000000 bytes in 3.82 seconds = 2144.47 Mbit/sec
+ 1000000 iters in 3.82 seconds = 3.82 usec/iter
+
+Test generated 42 mlx4 interrupts (241980135 -> 241980177)
+
+===============================================================================
+Testing using use_events=1 message_size=512 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=1997193  user time=3.616000  system time=1.080000
+   local address:  LID 0x0001, QPN 0x000484, PSN 0xb5c910, GID ::
+   remote address: LID 0x0002, QPN 0x000485, PSN 0xb4544e, GID ::
+ 1024000000 bytes in 10.66 seconds = 768.20 Mbit/sec
+ 1000000 iters in 10.66 seconds = 10.66 usec/iter
+
+Client  voluntary_ctxt_switches=1997654  user time=3.792000  system time=0.980000
+   local address:  LID 0x0002, QPN 0x000485, PSN 0xb4544e, GID ::
+   remote address: LID 0x0001, QPN 0x000484, PSN 0xb5c910, GID ::
+ 1024000000 bytes in 10.66 seconds = 768.22 Mbit/sec
+ 1000000 iters in 10.66 seconds = 10.66 usec/iter
+
+Test generated 2027896 mlx4 interrupts (241980177 -> 244008073)
+
+===============================================================================
+Testing using use_events=0 message_size=512 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=3.828000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000486, PSN 0xe52de8, GID ::
+   remote address: LID 0x0002, QPN 0x000487, PSN 0xfaac7e, GID ::
+ 1024000000 bytes in 3.83 seconds = 2140.76 Mbit/sec
+ 1000000 iters in 3.83 seconds = 3.83 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=3.828000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000487, PSN 0xfaac7e, GID ::
+   remote address: LID 0x0001, QPN 0x000486, PSN 0xe52de8, GID ::
+ 1024000000 bytes in 3.83 seconds = 2140.82 Mbit/sec
+ 1000000 iters in 3.83 seconds = 3.83 usec/iter
+
+Test generated 29 mlx4 interrupts (244008073 -> 244008102)
+
+===============================================================================
+Testing using use_events=1 message_size=512 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=1998413  user time=3.808000  system time=0.904000
+   local address:  LID 0x0001, QPN 0x000488, PSN 0xd6975e, GID ::
+   remote address: LID 0x0002, QPN 0x000489, PSN 0xc5e2ce, GID ::
+ 1024000000 bytes in 10.40 seconds = 787.76 Mbit/sec
+ 1000000 iters in 10.40 seconds = 10.40 usec/iter
+
+Client  voluntary_ctxt_switches=1998546  user time=3.840000  system time=0.860000
+   local address:  LID 0x0002, QPN 0x000489, PSN 0xc5e2ce, GID ::
+   remote address: LID 0x0001, QPN 0x000488, PSN 0xd6975e, GID ::
+ 1024000000 bytes in 10.40 seconds = 787.77 Mbit/sec
+ 1000000 iters in 10.40 seconds = 10.40 usec/iter
+
+Test generated 2018568 mlx4 interrupts (244008102 -> 246026670)
+
+===============================================================================
+Testing using use_events=0 message_size=512 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=18  user time=3.824000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00048a, PSN 0x663d39, GID ::
+   remote address: LID 0x0002, QPN 0x00048b, PSN 0xf608ca, GID ::
+ 1024000000 bytes in 3.82 seconds = 2142.63 Mbit/sec
+ 1000000 iters in 3.82 seconds = 3.82 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=3.820000  system time=0.004000
+   local address:  LID 0x0002, QPN 0x00048b, PSN 0xf608ca, GID ::
+   remote address: LID 0x0001, QPN 0x00048a, PSN 0x663d39, GID ::
+ 1024000000 bytes in 3.82 seconds = 2142.70 Mbit/sec
+ 1000000 iters in 3.82 seconds = 3.82 usec/iter
+
+Test generated 42 mlx4 interrupts (246026670 -> 246026712)
+
+===============================================================================
+Testing using use_events=1 message_size=512 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=1997402  user time=3.704000  system time=1.036000
+   local address:  LID 0x0001, QPN 0x00048c, PSN 0x86a4e3, GID ::
+   remote address: LID 0x0002, QPN 0x00048d, PSN 0xf03d4e, GID ::
+ 1024000000 bytes in 10.61 seconds = 772.46 Mbit/sec
+ 1000000 iters in 10.61 seconds = 10.61 usec/iter
+
+Client  voluntary_ctxt_switches=1997700  user time=3.652000  system time=1.096000
+   local address:  LID 0x0002, QPN 0x00048d, PSN 0xf03d4e, GID ::
+   remote address: LID 0x0001, QPN 0x00048c, PSN 0x86a4e3, GID ::
+ 1024000000 bytes in 10.60 seconds = 772.47 Mbit/sec
+ 1000000 iters in 10.60 seconds = 10.60 usec/iter
+
+Test generated 2029111 mlx4 interrupts (246026712 -> 248055823)
+
+===============================================================================
+Testing using use_events=0 message_size=1024 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=18  user time=4.680000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00048e, PSN 0x731a40, GID ::
+   remote address: LID 0x0002, QPN 0x00048f, PSN 0xf3a603, GID ::
+ 2048000000 bytes in 4.68 seconds = 3500.07 Mbit/sec
+ 1000000 iters in 4.68 seconds = 4.68 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=4.680000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00048f, PSN 0xf3a603, GID ::
+   remote address: LID 0x0001, QPN 0x00048e, PSN 0x731a40, GID ::
+ 2048000000 bytes in 4.68 seconds = 3500.30 Mbit/sec
+ 1000000 iters in 4.68 seconds = 4.68 usec/iter
+
+Test generated 28 mlx4 interrupts (248055823 -> 248055851)
+
+===============================================================================
+Testing using use_events=1 message_size=1024 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=1999263  user time=3.776000  system time=0.916000
+   local address:  LID 0x0001, QPN 0x000490, PSN 0xbc9e93, GID ::
+   remote address: LID 0x0002, QPN 0x000491, PSN 0x16f730, GID ::
+ 2048000000 bytes in 11.44 seconds = 1431.81 Mbit/sec
+ 1000000 iters in 11.44 seconds = 11.44 usec/iter
+
+Client  voluntary_ctxt_switches=1999474  user time=3.816000  system time=0.884000
+   local address:  LID 0x0002, QPN 0x000491, PSN 0x16f730, GID ::
+   remote address: LID 0x0001, QPN 0x000490, PSN 0xbc9e93, GID ::
+ 2048000000 bytes in 11.44 seconds = 1431.84 Mbit/sec
+ 1000000 iters in 11.44 seconds = 11.44 usec/iter
+
+Test generated 2007516 mlx4 interrupts (248055851 -> 250063367)
+
+===============================================================================
+Testing using use_events=0 message_size=1024 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=20  user time=4.672000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000492, PSN 0x656352, GID ::
+   remote address: LID 0x0002, QPN 0x000493, PSN 0x4d227d, GID ::
+ 2048000000 bytes in 4.67 seconds = 3507.99 Mbit/sec
+ 1000000 iters in 4.67 seconds = 4.67 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=4.668000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000493, PSN 0x4d227d, GID ::
+   remote address: LID 0x0001, QPN 0x000492, PSN 0x656352, GID ::
+ 2048000000 bytes in 4.67 seconds = 3508.00 Mbit/sec
+ 1000000 iters in 4.67 seconds = 4.67 usec/iter
+
+Test generated 42 mlx4 interrupts (250063367 -> 250063409)
+
+===============================================================================
+Testing using use_events=1 message_size=1024 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=1999167  user time=3.576000  system time=1.260000
+   local address:  LID 0x0001, QPN 0x000494, PSN 0xe481dd, GID ::
+   remote address: LID 0x0002, QPN 0x000495, PSN 0xa60de2, GID ::
+ 2048000000 bytes in 11.72 seconds = 1397.91 Mbit/sec
+ 1000000 iters in 11.72 seconds = 11.72 usec/iter
+
+Client  voluntary_ctxt_switches=1999288  user time=3.684000  system time=1.204000
+   local address:  LID 0x0002, QPN 0x000495, PSN 0xa60de2, GID ::
+   remote address: LID 0x0001, QPN 0x000494, PSN 0xe481dd, GID ::
+ 2048000000 bytes in 11.72 seconds = 1397.92 Mbit/sec
+ 1000000 iters in 11.72 seconds = 11.72 usec/iter
+
+Test generated 2009660 mlx4 interrupts (250063409 -> 252073069)
+
+===============================================================================
+Testing using use_events=0 message_size=1024 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=20  user time=4.676000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000496, PSN 0x9147a4, GID ::
+   remote address: LID 0x0002, QPN 0x000497, PSN 0xe03a37, GID ::
+ 2048000000 bytes in 4.68 seconds = 3504.44 Mbit/sec
+ 1000000 iters in 4.68 seconds = 4.68 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=4.676000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000497, PSN 0xe03a37, GID ::
+   remote address: LID 0x0001, QPN 0x000496, PSN 0x9147a4, GID ::
+ 2048000000 bytes in 4.68 seconds = 3504.45 Mbit/sec
+ 1000000 iters in 4.68 seconds = 4.68 usec/iter
+
+Test generated 28 mlx4 interrupts (252073069 -> 252073097)
+
+===============================================================================
+Testing using use_events=1 message_size=1024 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=1999274  user time=3.736000  system time=1.068000
+   local address:  LID 0x0001, QPN 0x000498, PSN 0x8bb54f, GID ::
+   remote address: LID 0x0002, QPN 0x000499, PSN 0x2ae7f2, GID ::
+ 2048000000 bytes in 11.66 seconds = 1404.89 Mbit/sec
+ 1000000 iters in 11.66 seconds = 11.66 usec/iter
+
+Client  voluntary_ctxt_switches=1999247  user time=3.764000  system time=1.128000
+   local address:  LID 0x0002, QPN 0x000499, PSN 0x2ae7f2, GID ::
+   remote address: LID 0x0001, QPN 0x000498, PSN 0x8bb54f, GID ::
+ 2048000000 bytes in 11.66 seconds = 1404.90 Mbit/sec
+ 1000000 iters in 11.66 seconds = 11.66 usec/iter
+
+Test generated 2009770 mlx4 interrupts (252073097 -> 254082867)
+
+===============================================================================
+Testing using use_events=0 message_size=2048 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=18  user time=5.392000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00049a, PSN 0x63132b, GID ::
+   remote address: LID 0x0002, QPN 0x00049b, PSN 0x193926, GID ::
+ 4096000000 bytes in 5.39 seconds = 6078.39 Mbit/sec
+ 1000000 iters in 5.39 seconds = 5.39 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=5.392000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00049b, PSN 0x193926, GID ::
+   remote address: LID 0x0001, QPN 0x00049a, PSN 0x63132b, GID ::
+ 4096000000 bytes in 5.39 seconds = 6078.50 Mbit/sec
+ 1000000 iters in 5.39 seconds = 5.39 usec/iter
+
+Test generated 30 mlx4 interrupts (254082867 -> 254082897)
+
+===============================================================================
+Testing using use_events=1 message_size=2048 num_exchanges=1000000 mtu=1024
+
+Server  voluntary_ctxt_switches=1999443  user time=3.692000  system time=1.036000
+   local address:  LID 0x0001, QPN 0x00049c, PSN 0x19d037, GID ::
+   remote address: LID 0x0002, QPN 0x00049d, PSN 0x96a979, GID ::
+ 4096000000 bytes in 12.43 seconds = 2635.40 Mbit/sec
+ 1000000 iters in 12.43 seconds = 12.43 usec/iter
+
+Client  voluntary_ctxt_switches=1999536  user time=3.660000  system time=1.084000
+   local address:  LID 0x0002, QPN 0x00049d, PSN 0x96a979, GID ::
+   remote address: LID 0x0001, QPN 0x00049c, PSN 0x19d037, GID ::
+ 4096000000 bytes in 12.43 seconds = 2635.45 Mbit/sec
+ 1000000 iters in 12.43 seconds = 12.43 usec/iter
+
+Test generated 2003794 mlx4 interrupts (254082897 -> 256086691)
+
+===============================================================================
+Testing using use_events=0 message_size=2048 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=6.396000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00049e, PSN 0xc33204, GID ::
+   remote address: LID 0x0002, QPN 0x00049f, PSN 0xcd71d4, GID ::
+ 4096000000 bytes in 6.39 seconds = 5124.26 Mbit/sec
+ 1000000 iters in 6.39 seconds = 6.39 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=6.396000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00049f, PSN 0xcd71d4, GID ::
+   remote address: LID 0x0001, QPN 0x00049e, PSN 0xc33204, GID ::
+ 4096000000 bytes in 6.39 seconds = 5124.37 Mbit/sec
+ 1000000 iters in 6.39 seconds = 6.39 usec/iter
+
+Test generated 39 mlx4 interrupts (256086691 -> 256086730)
+
+===============================================================================
+Testing using use_events=1 message_size=2048 num_exchanges=1000000 mtu=2048
+
+Server  voluntary_ctxt_switches=1999521  user time=3.464000  system time=1.476000
+   local address:  LID 0x0001, QPN 0x0004a0, PSN 0x2324df, GID ::
+   remote address: LID 0x0002, QPN 0x0004a1, PSN 0x6a8b2c, GID ::
+ 4096000000 bytes in 13.77 seconds = 2379.18 Mbit/sec
+ 1000000 iters in 13.77 seconds = 13.77 usec/iter
+
+Client  voluntary_ctxt_switches=1999535  user time=3.752000  system time=1.280000
+   local address:  LID 0x0002, QPN 0x0004a1, PSN 0x6a8b2c, GID ::
+   remote address: LID 0x0001, QPN 0x0004a0, PSN 0x2324df, GID ::
+ 4096000000 bytes in 13.77 seconds = 2379.20 Mbit/sec
+ 1000000 iters in 13.77 seconds = 13.77 usec/iter
+
+Test generated 2002209 mlx4 interrupts (256086730 -> 258088939)
+
+===============================================================================
+Testing using use_events=0 message_size=2048 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=20  user time=6.416000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004a2, PSN 0x6a5670, GID ::
+   remote address: LID 0x0002, QPN 0x0004a3, PSN 0xb59682, GID ::
+ 4096000000 bytes in 6.41 seconds = 5108.04 Mbit/sec
+ 1000000 iters in 6.41 seconds = 6.41 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=6.416000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004a3, PSN 0xb59682, GID ::
+   remote address: LID 0x0001, QPN 0x0004a2, PSN 0x6a5670, GID ::
+ 4096000000 bytes in 6.41 seconds = 5108.14 Mbit/sec
+ 1000000 iters in 6.41 seconds = 6.41 usec/iter
+
+Test generated 39 mlx4 interrupts (258088939 -> 258088978)
+
+===============================================================================
+Testing using use_events=1 message_size=2048 num_exchanges=1000000 mtu=4096
+
+Server  voluntary_ctxt_switches=1999458  user time=3.432000  system time=1.560000
+   local address:  LID 0x0001, QPN 0x0004a4, PSN 0x40e3c5, GID ::
+   remote address: LID 0x0002, QPN 0x0004a5, PSN 0xc94a54, GID ::
+ 4096000000 bytes in 13.94 seconds = 2349.89 Mbit/sec
+ 1000000 iters in 13.94 seconds = 13.94 usec/iter
+
+Client  voluntary_ctxt_switches=1999370  user time=3.460000  system time=1.572000
+   local address:  LID 0x0002, QPN 0x0004a5, PSN 0xc94a54, GID ::
+   remote address: LID 0x0001, QPN 0x0004a4, PSN 0x40e3c5, GID ::
+ 4096000000 bytes in 13.94 seconds = 2349.91 Mbit/sec
+ 1000000 iters in 13.94 seconds = 13.94 usec/iter
+
+Test generated 2003037 mlx4 interrupts (258088978 -> 260092015)
+
+===============================================================================
+Testing using use_events=0 message_size=4096 num_exchanges=976562 mtu=1024
+
+Server  voluntary_ctxt_switches=18  user time=6.580000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004a6, PSN 0xc6653c, GID ::
+   remote address: LID 0x0002, QPN 0x0004a7, PSN 0xc918c6, GID ::
+ 7999995904 bytes in 6.58 seconds = 9724.91 Mbit/sec
+ 976562 iters in 6.58 seconds = 6.74 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=6.580000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004a7, PSN 0xc918c6, GID ::
+   remote address: LID 0x0001, QPN 0x0004a6, PSN 0xc6653c, GID ::
+ 7999995904 bytes in 6.58 seconds = 9725.18 Mbit/sec
+ 976562 iters in 6.58 seconds = 6.74 usec/iter
+
+Test generated 42 mlx4 interrupts (260092015 -> 260092057)
+
+===============================================================================
+Testing using use_events=1 message_size=4096 num_exchanges=976562 mtu=1024
+
+Server  voluntary_ctxt_switches=1952630  user time=3.252000  system time=1.720000
+   local address:  LID 0x0001, QPN 0x0004a8, PSN 0xf9725d, GID ::
+   remote address: LID 0x0002, QPN 0x0004a9, PSN 0xc2d92e, GID ::
+ 7999995904 bytes in 13.95 seconds = 4587.28 Mbit/sec
+ 976562 iters in 13.95 seconds = 14.29 usec/iter
+
+Client  voluntary_ctxt_switches=1952647  user time=3.396000  system time=1.564000
+   local address:  LID 0x0002, QPN 0x0004a9, PSN 0xc2d92e, GID ::
+   remote address: LID 0x0001, QPN 0x0004a8, PSN 0xf9725d, GID ::
+ 7999995904 bytes in 13.95 seconds = 4587.30 Mbit/sec
+ 976562 iters in 13.95 seconds = 14.29 usec/iter
+
+Test generated 1955769 mlx4 interrupts (260092057 -> 262047826)
+
+===============================================================================
+Testing using use_events=0 message_size=4096 num_exchanges=976562 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=7.676000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004aa, PSN 0xdec23a, GID ::
+   remote address: LID 0x0002, QPN 0x0004ab, PSN 0x227606, GID ::
+ 7999995904 bytes in 7.68 seconds = 8336.47 Mbit/sec
+ 976562 iters in 7.68 seconds = 7.86 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=7.676000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004ab, PSN 0x227606, GID ::
+   remote address: LID 0x0001, QPN 0x0004aa, PSN 0xdec23a, GID ::
+ 7999995904 bytes in 7.68 seconds = 8336.59 Mbit/sec
+ 976562 iters in 7.68 seconds = 7.86 usec/iter
+
+Test generated 30 mlx4 interrupts (262047826 -> 262047856)
+
+===============================================================================
+Testing using use_events=1 message_size=4096 num_exchanges=976562 mtu=2048
+
+Server  voluntary_ctxt_switches=1952677  user time=3.308000  system time=1.712000
+   local address:  LID 0x0001, QPN 0x0004ac, PSN 0x6a39ee, GID ::
+   remote address: LID 0x0002, QPN 0x0004ad, PSN 0x61876e, GID ::
+ 7999995904 bytes in 15.09 seconds = 4242.12 Mbit/sec
+ 976562 iters in 15.09 seconds = 15.45 usec/iter
+
+Client  voluntary_ctxt_switches=1952635  user time=3.308000  system time=1.728000
+   local address:  LID 0x0002, QPN 0x0004ad, PSN 0x61876e, GID ::
+   remote address: LID 0x0001, QPN 0x0004ac, PSN 0x6a39ee, GID ::
+ 7999995904 bytes in 15.09 seconds = 4242.15 Mbit/sec
+ 976562 iters in 15.09 seconds = 15.45 usec/iter
+
+Test generated 1955046 mlx4 interrupts (262047856 -> 264002902)
+
+===============================================================================
+Testing using use_events=0 message_size=4096 num_exchanges=976562 mtu=4096
+
+Server  voluntary_ctxt_switches=20  user time=9.716000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004ae, PSN 0xb20ee8, GID ::
+   remote address: LID 0x0002, QPN 0x0004af, PSN 0x9a1c9a, GID ::
+ 7999995904 bytes in 9.72 seconds = 6586.67 Mbit/sec
+ 976562 iters in 9.72 seconds = 9.95 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=9.716000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004af, PSN 0x9a1c9a, GID ::
+   remote address: LID 0x0001, QPN 0x0004ae, PSN 0xb20ee8, GID ::
+ 7999995904 bytes in 9.72 seconds = 6586.75 Mbit/sec
+ 976562 iters in 9.72 seconds = 9.95 usec/iter
+
+Test generated 40 mlx4 interrupts (264002902 -> 264002942)
+
+===============================================================================
+Testing using use_events=1 message_size=4096 num_exchanges=976562 mtu=4096
+
+Server  voluntary_ctxt_switches=1952656  user time=3.100000  system time=2.204000
+   local address:  LID 0x0001, QPN 0x0004b0, PSN 0x0a3f34, GID ::
+   remote address: LID 0x0002, QPN 0x0004b1, PSN 0x92cd07, GID ::
+ 7999995904 bytes in 17.60 seconds = 3635.61 Mbit/sec
+ 976562 iters in 17.60 seconds = 18.03 usec/iter
+
+Client  voluntary_ctxt_switches=1952628  user time=3.040000  system time=2.260000
+   local address:  LID 0x0002, QPN 0x0004b1, PSN 0x92cd07, GID ::
+   remote address: LID 0x0001, QPN 0x0004b0, PSN 0x0a3f34, GID ::
+ 7999995904 bytes in 17.60 seconds = 3635.64 Mbit/sec
+ 976562 iters in 17.60 seconds = 18.03 usec/iter
+
+Test generated 1955795 mlx4 interrupts (264002942 -> 265958737)
+
+===============================================================================
+Testing using use_events=0 message_size=8192 num_exchanges=488281 mtu=1024
+
+Server  voluntary_ctxt_switches=18  user time=4.628000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004b2, PSN 0x1b44b7, GID ::
+   remote address: LID 0x0002, QPN 0x0004b3, PSN 0xf7ec5e, GID ::
+ 7999995904 bytes in 4.63 seconds = 13827.65 Mbit/sec
+ 488281 iters in 4.63 seconds = 9.48 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=4.628000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004b3, PSN 0xf7ec5e, GID ::
+   remote address: LID 0x0001, QPN 0x0004b2, PSN 0x1b44b7, GID ::
+ 7999995904 bytes in 4.63 seconds = 13828.19 Mbit/sec
+ 488281 iters in 4.63 seconds = 9.48 usec/iter
+
+Test generated 30 mlx4 interrupts (265958737 -> 265958767)
+
+===============================================================================
+Testing using use_events=1 message_size=8192 num_exchanges=488281 mtu=1024
+
+Server  voluntary_ctxt_switches=976353  user time=1.524000  system time=1.064000
+   local address:  LID 0x0001, QPN 0x0004b4, PSN 0x660326, GID ::
+   remote address: LID 0x0002, QPN 0x0004b5, PSN 0x1c77a7, GID ::
+ 7999995904 bytes in 8.50 seconds = 7531.70 Mbit/sec
+ 488281 iters in 8.50 seconds = 17.40 usec/iter
+
+Client  voluntary_ctxt_switches=976345  user time=1.576000  system time=1.044000
+   local address:  LID 0x0002, QPN 0x0004b5, PSN 0x1c77a7, GID ::
+   remote address: LID 0x0001, QPN 0x0004b4, PSN 0x660326, GID ::
+ 7999995904 bytes in 8.50 seconds = 7531.76 Mbit/sec
+ 488281 iters in 8.50 seconds = 17.40 usec/iter
+
+Test generated 977321 mlx4 interrupts (265958767 -> 266936088)
+
+===============================================================================
+Testing using use_events=0 message_size=8192 num_exchanges=488281 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=5.136000  system time=0.004000
+   local address:  LID 0x0001, QPN 0x0004b6, PSN 0xae4006, GID ::
+   remote address: LID 0x0002, QPN 0x0004b7, PSN 0x8ec172, GID ::
+ 7999995904 bytes in 5.14 seconds = 12454.19 Mbit/sec
+ 488281 iters in 5.14 seconds = 10.52 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=5.140000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004b7, PSN 0x8ec172, GID ::
+   remote address: LID 0x0001, QPN 0x0004b6, PSN 0xae4006, GID ::
+ 7999995904 bytes in 5.14 seconds = 12454.48 Mbit/sec
+ 488281 iters in 5.14 seconds = 10.52 usec/iter
+
+Test generated 27 mlx4 interrupts (266936088 -> 266936115)
+
+===============================================================================
+Testing using use_events=1 message_size=8192 num_exchanges=488281 mtu=2048
+
+Server  voluntary_ctxt_switches=976363  user time=1.584000  system time=1.040000
+   local address:  LID 0x0001, QPN 0x0004b8, PSN 0xa60e08, GID ::
+   remote address: LID 0x0002, QPN 0x0004b9, PSN 0xd6cf84, GID ::
+ 7999995904 bytes in 9.04 seconds = 7081.30 Mbit/sec
+ 488281 iters in 9.04 seconds = 18.51 usec/iter
+
+Client  voluntary_ctxt_switches=976353  user time=1.608000  system time=1.012000
+   local address:  LID 0x0002, QPN 0x0004b9, PSN 0xd6cf84, GID ::
+   remote address: LID 0x0001, QPN 0x0004b8, PSN 0xa60e08, GID ::
+ 7999995904 bytes in 9.04 seconds = 7081.45 Mbit/sec
+ 488281 iters in 9.04 seconds = 18.51 usec/iter
+
+Test generated 977291 mlx4 interrupts (266936115 -> 267913406)
+
+===============================================================================
+Testing using use_events=0 message_size=8192 num_exchanges=488281 mtu=4096
+
+Server  voluntary_ctxt_switches=20  user time=6.188000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004ba, PSN 0x8b1888, GID ::
+   remote address: LID 0x0002, QPN 0x0004bb, PSN 0xe5e6ef, GID ::
+ 7999995904 bytes in 6.19 seconds = 10342.85 Mbit/sec
+ 488281 iters in 6.19 seconds = 12.67 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=6.188000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004bb, PSN 0xe5e6ef, GID ::
+   remote address: LID 0x0001, QPN 0x0004ba, PSN 0x8b1888, GID ::
+ 7999995904 bytes in 6.19 seconds = 10342.94 Mbit/sec
+ 488281 iters in 6.19 seconds = 12.67 usec/iter
+
+Test generated 42 mlx4 interrupts (267913406 -> 267913448)
+
+===============================================================================
+Testing using use_events=1 message_size=8192 num_exchanges=488281 mtu=4096
+
+Server  voluntary_ctxt_switches=976266  user time=1.636000  system time=0.968000
+   local address:  LID 0x0001, QPN 0x0004bc, PSN 0xd0763e, GID ::
+   remote address: LID 0x0002, QPN 0x0004bd, PSN 0xf1f7ec, GID ::
+ 7999995904 bytes in 10.09 seconds = 6345.22 Mbit/sec
+ 488281 iters in 10.09 seconds = 20.66 usec/iter
+
+Client  voluntary_ctxt_switches=976252  user time=1.584000  system time=1.024000
+   local address:  LID 0x0002, QPN 0x0004bd, PSN 0xf1f7ec, GID ::
+   remote address: LID 0x0001, QPN 0x0004bc, PSN 0xd0763e, GID ::
+ 7999995904 bytes in 10.09 seconds = 6345.40 Mbit/sec
+ 488281 iters in 10.09 seconds = 20.66 usec/iter
+
+Test generated 977519 mlx4 interrupts (267913448 -> 268890967)
+
+===============================================================================
+Testing using use_events=0 message_size=16384 num_exchanges=244140 mtu=1024
+
+Server  voluntary_ctxt_switches=20  user time=3.632000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004be, PSN 0x4410b4, GID ::
+   remote address: LID 0x0002, QPN 0x0004bf, PSN 0x061283, GID ::
+ 7999979520 bytes in 3.63 seconds = 17623.66 Mbit/sec
+ 244140 iters in 3.63 seconds = 14.87 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=3.632000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004bf, PSN 0x061283, GID ::
+   remote address: LID 0x0001, QPN 0x0004be, PSN 0x4410b4, GID ::
+ 7999979520 bytes in 3.63 seconds = 17624.55 Mbit/sec
+ 244140 iters in 3.63 seconds = 14.87 usec/iter
+
+Test generated 27 mlx4 interrupts (268890967 -> 268890994)
+
+===============================================================================
+Testing using use_events=1 message_size=16384 num_exchanges=244140 mtu=1024
+
+Server  voluntary_ctxt_switches=488138  user time=0.692000  system time=0.692000
+   local address:  LID 0x0001, QPN 0x0004c0, PSN 0x8f1daa, GID ::
+   remote address: LID 0x0002, QPN 0x0004c1, PSN 0x2aec53, GID ::
+ 7999979520 bytes in 5.69 seconds = 11243.08 Mbit/sec
+ 244140 iters in 5.69 seconds = 23.32 usec/iter
+
+Client  voluntary_ctxt_switches=488176  user time=0.732000  system time=0.648000
+   local address:  LID 0x0002, QPN 0x0004c1, PSN 0x2aec53, GID ::
+   remote address: LID 0x0001, QPN 0x0004c0, PSN 0x8f1daa, GID ::
+ 7999979520 bytes in 5.69 seconds = 11243.37 Mbit/sec
+ 244140 iters in 5.69 seconds = 23.32 usec/iter
+
+Test generated 488744 mlx4 interrupts (268890994 -> 269379738)
+
+===============================================================================
+Testing using use_events=0 message_size=16384 num_exchanges=244140 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=3.868000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004c2, PSN 0x26355e, GID ::
+   remote address: LID 0x0002, QPN 0x0004c3, PSN 0x88b74e, GID ::
+ 7999979520 bytes in 3.87 seconds = 16550.76 Mbit/sec
+ 244140 iters in 3.87 seconds = 15.84 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=3.868000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004c3, PSN 0x88b74e, GID ::
+   remote address: LID 0x0001, QPN 0x0004c2, PSN 0x26355e, GID ::
+ 7999979520 bytes in 3.87 seconds = 16551.48 Mbit/sec
+ 244140 iters in 3.87 seconds = 15.84 usec/iter
+
+Test generated 27 mlx4 interrupts (269379738 -> 269379765)
+
+===============================================================================
+Testing using use_events=1 message_size=16384 num_exchanges=244140 mtu=2048
+
+Server  voluntary_ctxt_switches=488133  user time=0.632000  system time=0.868000
+   local address:  LID 0x0001, QPN 0x0004c4, PSN 0x77f3b8, GID ::
+   remote address: LID 0x0002, QPN 0x0004c5, PSN 0x3dcf4c, GID ::
+ 7999979520 bytes in 6.10 seconds = 10485.25 Mbit/sec
+ 244140 iters in 6.10 seconds = 25.00 usec/iter
+
+Client  voluntary_ctxt_switches=488121  user time=0.668000  system time=0.832000
+   local address:  LID 0x0002, QPN 0x0004c5, PSN 0x3dcf4c, GID ::
+   remote address: LID 0x0001, QPN 0x0004c4, PSN 0x77f3b8, GID ::
+ 7999979520 bytes in 6.10 seconds = 10485.46 Mbit/sec
+ 244140 iters in 6.10 seconds = 25.00 usec/iter
+
+Test generated 488826 mlx4 interrupts (269379765 -> 269868591)
+
+===============================================================================
+Testing using use_events=0 message_size=16384 num_exchanges=244140 mtu=4096
+
+Server  voluntary_ctxt_switches=18  user time=4.404000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004c6, PSN 0xc655a3, GID ::
+   remote address: LID 0x0002, QPN 0x0004c7, PSN 0xc957b4, GID ::
+ 7999979520 bytes in 4.40 seconds = 14530.92 Mbit/sec
+ 244140 iters in 4.40 seconds = 18.04 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=4.404000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004c7, PSN 0xc957b4, GID ::
+   remote address: LID 0x0001, QPN 0x0004c6, PSN 0xc655a3, GID ::
+ 7999979520 bytes in 4.40 seconds = 14531.31 Mbit/sec
+ 244140 iters in 4.40 seconds = 18.04 usec/iter
+
+Test generated 28 mlx4 interrupts (269868591 -> 269868619)
+
+===============================================================================
+Testing using use_events=1 message_size=16384 num_exchanges=244140 mtu=4096
+
+Server  voluntary_ctxt_switches=488082  user time=0.540000  system time=0.992000
+   local address:  LID 0x0001, QPN 0x0004c8, PSN 0xef307b, GID ::
+   remote address: LID 0x0002, QPN 0x0004c9, PSN 0xcbff66, GID ::
+ 7999979520 bytes in 6.70 seconds = 9550.31 Mbit/sec
+ 244140 iters in 6.70 seconds = 27.45 usec/iter
+
+Client  voluntary_ctxt_switches=488095  user time=0.604000  system time=0.916000
+   local address:  LID 0x0002, QPN 0x0004c9, PSN 0xcbff66, GID ::
+   remote address: LID 0x0001, QPN 0x0004c8, PSN 0xef307b, GID ::
+ 7999979520 bytes in 6.70 seconds = 9550.46 Mbit/sec
+ 244140 iters in 6.70 seconds = 27.45 usec/iter
+
+Test generated 488906 mlx4 interrupts (269868619 -> 270357525)
+
+===============================================================================
+Testing using use_events=0 message_size=32768 num_exchanges=122070 mtu=1024
+
+Server  voluntary_ctxt_switches=20  user time=3.124000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004ca, PSN 0x60130a, GID ::
+   remote address: LID 0x0002, QPN 0x0004cb, PSN 0x7a0873, GID ::
+ 7999979520 bytes in 3.12 seconds = 20502.47 Mbit/sec
+ 122070 iters in 3.12 seconds = 25.57 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=3.124000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004cb, PSN 0x7a0873, GID ::
+   remote address: LID 0x0001, QPN 0x0004ca, PSN 0x60130a, GID ::
+ 7999979520 bytes in 3.12 seconds = 20503.19 Mbit/sec
+ 122070 iters in 3.12 seconds = 25.57 usec/iter
+
+Test generated 28 mlx4 interrupts (270357525 -> 270357553)
+
+===============================================================================
+Testing using use_events=1 message_size=32768 num_exchanges=122070 mtu=1024
+
+Server  voluntary_ctxt_switches=243985  user time=0.344000  system time=0.416000
+   local address:  LID 0x0001, QPN 0x0004cc, PSN 0x3b8572, GID ::
+   remote address: LID 0x0002, QPN 0x0004cd, PSN 0xb8d47e, GID ::
+ 7999979520 bytes in 4.26 seconds = 15031.56 Mbit/sec
+ 122070 iters in 4.26 seconds = 34.88 usec/iter
+
+Client  voluntary_ctxt_switches=243980  user time=0.308000  system time=0.460000
+   local address:  LID 0x0002, QPN 0x0004cd, PSN 0xb8d47e, GID ::
+   remote address: LID 0x0001, QPN 0x0004cc, PSN 0x3b8572, GID ::
+ 7999979520 bytes in 4.26 seconds = 15032.47 Mbit/sec
+ 122070 iters in 4.26 seconds = 34.88 usec/iter
+
+Test generated 244596 mlx4 interrupts (270357553 -> 270602149)
+
+===============================================================================
+Testing using use_events=0 message_size=32768 num_exchanges=122070 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=3.220000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004ce, PSN 0x73c75c, GID ::
+   remote address: LID 0x0002, QPN 0x0004cf, PSN 0xcae342, GID ::
+ 7999979520 bytes in 3.22 seconds = 19890.19 Mbit/sec
+ 122070 iters in 3.22 seconds = 26.36 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=3.220000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004cf, PSN 0xcae342, GID ::
+   remote address: LID 0x0001, QPN 0x0004ce, PSN 0x73c75c, GID ::
+ 7999979520 bytes in 3.22 seconds = 19890.89 Mbit/sec
+ 122070 iters in 3.22 seconds = 26.36 usec/iter
+
+Test generated 30 mlx4 interrupts (270602149 -> 270602179)
+
+===============================================================================
+Testing using use_events=1 message_size=32768 num_exchanges=122070 mtu=2048
+
+Server  voluntary_ctxt_switches=243987  user time=0.276000  system time=0.504000
+   local address:  LID 0x0001, QPN 0x0004d0, PSN 0x56ed4c, GID ::
+   remote address: LID 0x0002, QPN 0x0004d1, PSN 0x1162d6, GID ::
+ 7999979520 bytes in 4.37 seconds = 14660.60 Mbit/sec
+ 122070 iters in 4.37 seconds = 35.76 usec/iter
+
+Client  voluntary_ctxt_switches=243984  user time=0.340000  system time=0.440000
+   local address:  LID 0x0002, QPN 0x0004d1, PSN 0x1162d6, GID ::
+   remote address: LID 0x0001, QPN 0x0004d0, PSN 0x56ed4c, GID ::
+ 7999979520 bytes in 4.37 seconds = 14661.13 Mbit/sec
+ 122070 iters in 4.37 seconds = 35.76 usec/iter
+
+Test generated 244575 mlx4 interrupts (270602179 -> 270846754)
+
+===============================================================================
+Testing using use_events=0 message_size=32768 num_exchanges=122070 mtu=4096
+
+Server  voluntary_ctxt_switches=18  user time=3.480000  system time=0.004000
+   local address:  LID 0x0001, QPN 0x0004d2, PSN 0x19e568, GID ::
+   remote address: LID 0x0002, QPN 0x0004d3, PSN 0x249b02, GID ::
+ 7999979520 bytes in 3.48 seconds = 18381.75 Mbit/sec
+ 122070 iters in 3.48 seconds = 28.52 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=3.480000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004d3, PSN 0x249b02, GID ::
+   remote address: LID 0x0001, QPN 0x0004d2, PSN 0x19e568, GID ::
+ 7999979520 bytes in 3.48 seconds = 18383.02 Mbit/sec
+ 122070 iters in 3.48 seconds = 28.52 usec/iter
+
+Test generated 42 mlx4 interrupts (270846754 -> 270846796)
+
+===============================================================================
+Testing using use_events=1 message_size=32768 num_exchanges=122070 mtu=4096
+
+Server  voluntary_ctxt_switches=243942  user time=0.368000  system time=0.848000
+   local address:  LID 0x0001, QPN 0x0004d4, PSN 0xf1a54e, GID ::
+   remote address: LID 0x0002, QPN 0x0004d5, PSN 0x5fb48c, GID ::
+ 7999979520 bytes in 5.24 seconds = 12224.58 Mbit/sec
+ 122070 iters in 5.24 seconds = 42.89 usec/iter
+
+Client  voluntary_ctxt_switches=243912  user time=0.380000  system time=0.828000
+   local address:  LID 0x0002, QPN 0x0004d5, PSN 0x5fb48c, GID ::
+   remote address: LID 0x0001, QPN 0x0004d4, PSN 0xf1a54e, GID ::
+ 7999979520 bytes in 5.24 seconds = 12224.71 Mbit/sec
+ 122070 iters in 5.24 seconds = 42.89 usec/iter
+
+Test generated 244651 mlx4 interrupts (270846796 -> 271091447)
+
+===============================================================================
+Testing using use_events=0 message_size=65536 num_exchanges=61035 mtu=1024
+
+Server  voluntary_ctxt_switches=18  user time=2.864000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004d6, PSN 0x5cd114, GID ::
+   remote address: LID 0x0002, QPN 0x0004d7, PSN 0x1b2062, GID ::
+ 7999979520 bytes in 2.86 seconds = 22354.34 Mbit/sec
+ 61035 iters in 2.86 seconds = 46.91 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=2.864000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004d7, PSN 0x1b2062, GID ::
+   remote address: LID 0x0001, QPN 0x0004d6, PSN 0x5cd114, GID ::
+ 7999979520 bytes in 2.86 seconds = 22355.86 Mbit/sec
+ 61035 iters in 2.86 seconds = 46.90 usec/iter
+
+Test generated 42 mlx4 interrupts (271091447 -> 271091489)
+
+===============================================================================
+Testing using use_events=1 message_size=65536 num_exchanges=61035 mtu=1024
+
+Server  voluntary_ctxt_switches=121761  user time=0.184000  system time=0.436000
+   local address:  LID 0x0001, QPN 0x0004d8, PSN 0x292af0, GID ::
+   remote address: LID 0x0002, QPN 0x0004d9, PSN 0x4ad3e2, GID ::
+ 7999979520 bytes in 3.79 seconds = 16891.98 Mbit/sec
+ 61035 iters in 3.79 seconds = 62.08 usec/iter
+
+Client  voluntary_ctxt_switches=121828  user time=0.220000  system time=0.388000
+   local address:  LID 0x0002, QPN 0x0004d9, PSN 0x4ad3e2, GID ::
+   remote address: LID 0x0001, QPN 0x0004d8, PSN 0x292af0, GID ::
+ 7999979520 bytes in 3.79 seconds = 16892.43 Mbit/sec
+ 61035 iters in 3.79 seconds = 62.07 usec/iter
+
+Test generated 122683 mlx4 interrupts (271091489 -> 271214172)
+
+===============================================================================
+Testing using use_events=0 message_size=65536 num_exchanges=61035 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=2.896000  system time=0.004000
+   local address:  LID 0x0001, QPN 0x0004da, PSN 0xdfbadd, GID ::
+   remote address: LID 0x0002, QPN 0x0004db, PSN 0xdb30a9, GID ::
+ 7999979520 bytes in 2.90 seconds = 22069.56 Mbit/sec
+ 61035 iters in 2.90 seconds = 47.51 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=2.900000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004db, PSN 0xdb30a9, GID ::
+   remote address: LID 0x0001, QPN 0x0004da, PSN 0xdfbadd, GID ::
+ 7999979520 bytes in 2.90 seconds = 22070.44 Mbit/sec
+ 61035 iters in 2.90 seconds = 47.51 usec/iter
+
+Test generated 28 mlx4 interrupts (271214172 -> 271214200)
+
+===============================================================================
+Testing using use_events=1 message_size=65536 num_exchanges=61035 mtu=2048
+
+Server  voluntary_ctxt_switches=121819  user time=0.132000  system time=0.376000
+   local address:  LID 0x0001, QPN 0x0004dc, PSN 0xb3c843, GID ::
+   remote address: LID 0x0002, QPN 0x0004dd, PSN 0x1297b2, GID ::
+ 7999979520 bytes in 3.76 seconds = 17036.75 Mbit/sec
+ 61035 iters in 3.76 seconds = 61.55 usec/iter
+
+Client  voluntary_ctxt_switches=121912  user time=0.128000  system time=0.376000
+   local address:  LID 0x0002, QPN 0x0004dd, PSN 0x1297b2, GID ::
+   remote address: LID 0x0001, QPN 0x0004dc, PSN 0xb3c843, GID ::
+ 7999979520 bytes in 3.76 seconds = 17037.28 Mbit/sec
+ 61035 iters in 3.76 seconds = 61.55 usec/iter
+
+Test generated 122578 mlx4 interrupts (271214200 -> 271336778)
+
+===============================================================================
+Testing using use_events=0 message_size=65536 num_exchanges=61035 mtu=4096
+
+Server  voluntary_ctxt_switches=18  user time=3.028000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004de, PSN 0xbd1125, GID ::
+   remote address: LID 0x0002, QPN 0x0004df, PSN 0xf5ad6e, GID ::
+ 7999979520 bytes in 3.03 seconds = 21137.80 Mbit/sec
+ 61035 iters in 3.03 seconds = 49.61 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=3.028000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004df, PSN 0xf5ad6e, GID ::
+   remote address: LID 0x0001, QPN 0x0004de, PSN 0xbd1125, GID ::
+ 7999979520 bytes in 3.03 seconds = 21138.63 Mbit/sec
+ 61035 iters in 3.03 seconds = 49.60 usec/iter
+
+Test generated 30 mlx4 interrupts (271336778 -> 271336808)
+
+===============================================================================
+Testing using use_events=1 message_size=65536 num_exchanges=61035 mtu=4096
+
+Server  voluntary_ctxt_switches=121940  user time=0.124000  system time=0.388000
+   local address:  LID 0x0001, QPN 0x0004e0, PSN 0x5f855a, GID ::
+   remote address: LID 0x0002, QPN 0x0004e1, PSN 0xfb7b47, GID ::
+ 7999979520 bytes in 3.91 seconds = 16360.98 Mbit/sec
+ 61035 iters in 3.91 seconds = 64.09 usec/iter
+
+Client  voluntary_ctxt_switches=121894  user time=0.140000  system time=0.376000
+   local address:  LID 0x0002, QPN 0x0004e1, PSN 0xfb7b47, GID ::
+   remote address: LID 0x0001, QPN 0x0004e0, PSN 0x5f855a, GID ::
+ 7999979520 bytes in 3.91 seconds = 16362.04 Mbit/sec
+ 61035 iters in 3.91 seconds = 64.09 usec/iter
+
+Test generated 122461 mlx4 interrupts (271336808 -> 271459269)
+
+===============================================================================
+Testing using use_events=0 message_size=131072 num_exchanges=30517 mtu=1024
+
+Server  voluntary_ctxt_switches=18  user time=2.740000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004e2, PSN 0x8cafc1, GID ::
+   remote address: LID 0x0002, QPN 0x0004e3, PSN 0x027288, GID ::
+ 7999848448 bytes in 2.74 seconds = 23356.93 Mbit/sec
+ 30517 iters in 2.74 seconds = 89.79 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=2.740000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004e3, PSN 0x027288, GID ::
+   remote address: LID 0x0001, QPN 0x0004e2, PSN 0x8cafc1, GID ::
+ 7999848448 bytes in 2.74 seconds = 23358.01 Mbit/sec
+ 30517 iters in 2.74 seconds = 89.78 usec/iter
+
+Test generated 42 mlx4 interrupts (271459269 -> 271459311)
+
+===============================================================================
+Testing using use_events=1 message_size=131072 num_exchanges=30517 mtu=1024
+
+Server  voluntary_ctxt_switches=61049  user time=0.060000  system time=0.224000
+   local address:  LID 0x0001, QPN 0x0004e4, PSN 0x4ca16f, GID ::
+   remote address: LID 0x0002, QPN 0x0004e5, PSN 0xaf4aa3, GID ::
+ 7999848448 bytes in 3.16 seconds = 20283.78 Mbit/sec
+ 30517 iters in 3.16 seconds = 103.39 usec/iter
+
+Client  voluntary_ctxt_switches=61050  user time=0.108000  system time=0.168000
+   local address:  LID 0x0002, QPN 0x0004e5, PSN 0xaf4aa3, GID ::
+   remote address: LID 0x0001, QPN 0x0004e4, PSN 0x4ca16f, GID ::
+ 7999848448 bytes in 3.16 seconds = 20284.54 Mbit/sec
+ 30517 iters in 3.16 seconds = 103.39 usec/iter
+
+Test generated 61072 mlx4 interrupts (271459311 -> 271520383)
+
+===============================================================================
+Testing using use_events=0 message_size=131072 num_exchanges=30517 mtu=2048
+
+Server  voluntary_ctxt_switches=20  user time=2.744000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004e6, PSN 0x6e65cc, GID ::
+   remote address: LID 0x0002, QPN 0x0004e7, PSN 0xaadbda, GID ::
+ 7999848448 bytes in 2.74 seconds = 23331.40 Mbit/sec
+ 30517 iters in 2.74 seconds = 89.89 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=2.744000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004e7, PSN 0xaadbda, GID ::
+   remote address: LID 0x0001, QPN 0x0004e6, PSN 0x6e65cc, GID ::
+ 7999848448 bytes in 2.74 seconds = 23333.06 Mbit/sec
+ 30517 iters in 2.74 seconds = 89.88 usec/iter
+
+Test generated 27 mlx4 interrupts (271520383 -> 271520410)
+
+===============================================================================
+Testing using use_events=1 message_size=131072 num_exchanges=30517 mtu=2048
+
+Server  voluntary_ctxt_switches=61046  user time=0.080000  system time=0.188000
+   local address:  LID 0x0001, QPN 0x0004e8, PSN 0x6f57bc, GID ::
+   remote address: LID 0x0002, QPN 0x0004e9, PSN 0x98b437, GID ::
+ 7999848448 bytes in 3.15 seconds = 20319.65 Mbit/sec
+ 30517 iters in 3.15 seconds = 103.21 usec/iter
+
+Client  voluntary_ctxt_switches=61049  user time=0.060000  system time=0.212000
+   local address:  LID 0x0002, QPN 0x0004e9, PSN 0x98b437, GID ::
+   remote address: LID 0x0001, QPN 0x0004e8, PSN 0x6f57bc, GID ::
+ 7999848448 bytes in 3.15 seconds = 20320.40 Mbit/sec
+ 30517 iters in 3.15 seconds = 103.20 usec/iter
+
+Test generated 61085 mlx4 interrupts (271520410 -> 271581495)
+
+===============================================================================
+Testing using use_events=0 message_size=131072 num_exchanges=30517 mtu=4096
+
+Server  voluntary_ctxt_switches=18  user time=2.816000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004ea, PSN 0x85b60f, GID ::
+   remote address: LID 0x0002, QPN 0x0004eb, PSN 0x88df64, GID ::
+ 7999848448 bytes in 2.82 seconds = 22721.35 Mbit/sec
+ 30517 iters in 2.82 seconds = 92.30 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=2.816000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004eb, PSN 0x88df64, GID ::
+   remote address: LID 0x0001, QPN 0x0004ea, PSN 0x85b60f, GID ::
+ 7999848448 bytes in 2.82 seconds = 22722.96 Mbit/sec
+ 30517 iters in 2.82 seconds = 92.29 usec/iter
+
+Test generated 30 mlx4 interrupts (271581495 -> 271581525)
+
+===============================================================================
+Testing using use_events=1 message_size=131072 num_exchanges=30517 mtu=4096
+
+Server  voluntary_ctxt_switches=61054  user time=0.060000  system time=0.212000
+   local address:  LID 0x0001, QPN 0x0004ec, PSN 0xc7a841, GID ::
+   remote address: LID 0x0002, QPN 0x0004ed, PSN 0xb7b803, GID ::
+ 7999848448 bytes in 3.22 seconds = 19894.50 Mbit/sec
+ 30517 iters in 3.22 seconds = 105.41 usec/iter
+
+Client  voluntary_ctxt_switches=61047  user time=0.048000  system time=0.224000
+   local address:  LID 0x0002, QPN 0x0004ed, PSN 0xb7b803, GID ::
+   remote address: LID 0x0001, QPN 0x0004ec, PSN 0xc7a841, GID ::
+ 7999848448 bytes in 3.22 seconds = 19896.19 Mbit/sec
+ 30517 iters in 3.22 seconds = 105.40 usec/iter
+
+Test generated 61072 mlx4 interrupts (271581525 -> 271642597)
+
+===============================================================================
+Testing using use_events=0 message_size=262144 num_exchanges=15258 mtu=1024
+
+Server  voluntary_ctxt_switches=18  user time=2.668000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004ee, PSN 0xd2a08a, GID ::
+   remote address: LID 0x0002, QPN 0x0004ef, PSN 0x9c7d26, GID ::
+ 7999586304 bytes in 2.67 seconds = 23997.30 Mbit/sec
+ 15258 iters in 2.67 seconds = 174.78 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=2.668000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004ef, PSN 0x9c7d26, GID ::
+   remote address: LID 0x0001, QPN 0x0004ee, PSN 0xd2a08a, GID ::
+ 7999586304 bytes in 2.67 seconds = 23998.35 Mbit/sec
+ 15258 iters in 2.67 seconds = 174.77 usec/iter
+
+Test generated 30 mlx4 interrupts (271642597 -> 271642627)
+
+===============================================================================
+Testing using use_events=1 message_size=262144 num_exchanges=15258 mtu=1024
+
+Server  voluntary_ctxt_switches=30536  user time=0.020000  system time=0.132000
+   local address:  LID 0x0001, QPN 0x0004f0, PSN 0x5592fe, GID ::
+   remote address: LID 0x0002, QPN 0x0004f1, PSN 0x0c5607, GID ::
+ 7999586304 bytes in 2.90 seconds = 22055.70 Mbit/sec
+ 15258 iters in 2.90 seconds = 190.17 usec/iter
+
+Client  voluntary_ctxt_switches=30531  user time=0.040000  system time=0.124000
+   local address:  LID 0x0002, QPN 0x0004f1, PSN 0x0c5607, GID ::
+   remote address: LID 0x0001, QPN 0x0004f0, PSN 0x5592fe, GID ::
+ 7999586304 bytes in 2.90 seconds = 22056.07 Mbit/sec
+ 15258 iters in 2.90 seconds = 190.17 usec/iter
+
+Test generated 30559 mlx4 interrupts (271642627 -> 271673186)
+
+===============================================================================
+Testing using use_events=0 message_size=262144 num_exchanges=15258 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=2.668000  system time=0.008000
+   local address:  LID 0x0001, QPN 0x0004f2, PSN 0xf0a232, GID ::
+   remote address: LID 0x0002, QPN 0x0004f3, PSN 0x0abede, GID ::
+ 7999586304 bytes in 2.68 seconds = 23917.90 Mbit/sec
+ 15258 iters in 2.68 seconds = 175.36 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=2.672000  system time=0.004000
+   local address:  LID 0x0002, QPN 0x0004f3, PSN 0x0abede, GID ::
+   remote address: LID 0x0001, QPN 0x0004f2, PSN 0xf0a232, GID ::
+ 7999586304 bytes in 2.68 seconds = 23919.62 Mbit/sec
+ 15258 iters in 2.68 seconds = 175.35 usec/iter
+
+Test generated 30 mlx4 interrupts (271673186 -> 271673216)
+
+===============================================================================
+Testing using use_events=1 message_size=262144 num_exchanges=15258 mtu=2048
+
+Server  voluntary_ctxt_switches=30535  user time=0.040000  system time=0.120000
+   local address:  LID 0x0001, QPN 0x0004f4, PSN 0x1917f3, GID ::
+   remote address: LID 0x0002, QPN 0x0004f5, PSN 0x968e43, GID ::
+ 7999586304 bytes in 2.89 seconds = 22110.03 Mbit/sec
+ 15258 iters in 2.89 seconds = 189.70 usec/iter
+
+Client  voluntary_ctxt_switches=30531  user time=0.032000  system time=0.120000
+   local address:  LID 0x0002, QPN 0x0004f5, PSN 0x968e43, GID ::
+   remote address: LID 0x0001, QPN 0x0004f4, PSN 0x1917f3, GID ::
+ 7999586304 bytes in 2.89 seconds = 22110.86 Mbit/sec
+ 15258 iters in 2.89 seconds = 189.69 usec/iter
+
+Test generated 30548 mlx4 interrupts (271673216 -> 271703764)
+
+===============================================================================
+Testing using use_events=0 message_size=262144 num_exchanges=15258 mtu=4096
+
+Server  voluntary_ctxt_switches=18  user time=2.712000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004f6, PSN 0x71641c, GID ::
+   remote address: LID 0x0002, QPN 0x0004f7, PSN 0x52340f, GID ::
+ 7999586304 bytes in 2.71 seconds = 23608.49 Mbit/sec
+ 15258 iters in 2.71 seconds = 177.66 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=2.712000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004f7, PSN 0x52340f, GID ::
+   remote address: LID 0x0001, QPN 0x0004f6, PSN 0x71641c, GID ::
+ 7999586304 bytes in 2.71 seconds = 23608.93 Mbit/sec
+ 15258 iters in 2.71 seconds = 177.66 usec/iter
+
+Test generated 39 mlx4 interrupts (271703764 -> 271703803)
+
+===============================================================================
+Testing using use_events=1 message_size=262144 num_exchanges=15258 mtu=4096
+
+Server  voluntary_ctxt_switches=30533  user time=0.056000  system time=0.092000
+   local address:  LID 0x0001, QPN 0x0004f8, PSN 0xdeb3e4, GID ::
+   remote address: LID 0x0002, QPN 0x0004f9, PSN 0x22dd7a, GID ::
+ 7999586304 bytes in 2.93 seconds = 21829.07 Mbit/sec
+ 15258 iters in 2.93 seconds = 192.14 usec/iter
+
+Client  voluntary_ctxt_switches=30533  user time=0.044000  system time=0.112000
+   local address:  LID 0x0002, QPN 0x0004f9, PSN 0x22dd7a, GID ::
+   remote address: LID 0x0001, QPN 0x0004f8, PSN 0xdeb3e4, GID ::
+ 7999586304 bytes in 2.93 seconds = 21829.51 Mbit/sec
+ 15258 iters in 2.93 seconds = 192.14 usec/iter
+
+Test generated 30548 mlx4 interrupts (271703803 -> 271734351)
+
+===============================================================================
+Testing using use_events=0 message_size=524288 num_exchanges=7629 mtu=1024
+
+Server  voluntary_ctxt_switches=18  user time=2.636000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004fa, PSN 0x5df3d7, GID ::
+   remote address: LID 0x0002, QPN 0x0004fb, PSN 0x8f03da, GID ::
+ 7999586304 bytes in 2.63 seconds = 24288.28 Mbit/sec
+ 7629 iters in 2.63 seconds = 345.38 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=2.636000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x0004fb, PSN 0x8f03da, GID ::
+   remote address: LID 0x0001, QPN 0x0004fa, PSN 0x5df3d7, GID ::
+ 7999586304 bytes in 2.63 seconds = 24289.28 Mbit/sec
+ 7629 iters in 2.63 seconds = 345.36 usec/iter
+
+Test generated 29 mlx4 interrupts (271734351 -> 271734380)
+
+===============================================================================
+Testing using use_events=1 message_size=524288 num_exchanges=7629 mtu=1024
+
+Server  voluntary_ctxt_switches=15276  user time=0.056000  system time=0.084000
+   local address:  LID 0x0001, QPN 0x0004fc, PSN 0xf92a4e, GID ::
+   remote address: LID 0x0002, QPN 0x0004fd, PSN 0x8d93f5, GID ::
+ 7999586304 bytes in 2.86 seconds = 22382.76 Mbit/sec
+ 7629 iters in 2.86 seconds = 374.78 usec/iter
+
+Client  voluntary_ctxt_switches=15275  user time=0.044000  system time=0.056000
+   local address:  LID 0x0002, QPN 0x0004fd, PSN 0x8d93f5, GID ::
+   remote address: LID 0x0001, QPN 0x0004fc, PSN 0xf92a4e, GID ::
+ 7999586304 bytes in 2.86 seconds = 22383.74 Mbit/sec
+ 7629 iters in 2.86 seconds = 374.76 usec/iter
+
+Test generated 15289 mlx4 interrupts (271734380 -> 271749669)
+
+===============================================================================
+Testing using use_events=0 message_size=524288 num_exchanges=7629 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=2.640000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x0004fe, PSN 0x21c753, GID ::
+   remote address: LID 0x0002, QPN 0x0004ff, PSN 0x198a9d, GID ::
+ 7999586304 bytes in 2.64 seconds = 24251.85 Mbit/sec
+ 7629 iters in 2.64 seconds = 345.90 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=2.636000  system time=0.004000
+   local address:  LID 0x0002, QPN 0x0004ff, PSN 0x198a9d, GID ::
+   remote address: LID 0x0001, QPN 0x0004fe, PSN 0x21c753, GID ::
+ 7999586304 bytes in 2.64 seconds = 24253.59 Mbit/sec
+ 7629 iters in 2.64 seconds = 345.87 usec/iter
+
+Test generated 42 mlx4 interrupts (271749669 -> 271749711)
+
+===============================================================================
+Testing using use_events=1 message_size=524288 num_exchanges=7629 mtu=2048
+
+Server  voluntary_ctxt_switches=15278  user time=0.028000  system time=0.072000
+   local address:  LID 0x0001, QPN 0x000500, PSN 0xd7cae6, GID ::
+   remote address: LID 0x0002, QPN 0x000501, PSN 0x32e7d4, GID ::
+ 7999586304 bytes in 2.80 seconds = 22834.61 Mbit/sec
+ 7629 iters in 2.80 seconds = 367.36 usec/iter
+
+Client  voluntary_ctxt_switches=15273  user time=0.024000  system time=0.104000
+   local address:  LID 0x0002, QPN 0x000501, PSN 0x32e7d4, GID ::
+   remote address: LID 0x0001, QPN 0x000500, PSN 0xd7cae6, GID ::
+ 7999586304 bytes in 2.80 seconds = 22835.65 Mbit/sec
+ 7629 iters in 2.80 seconds = 367.35 usec/iter
+
+Test generated 15289 mlx4 interrupts (271749711 -> 271765000)
+
+===============================================================================
+Testing using use_events=0 message_size=524288 num_exchanges=7629 mtu=4096
+
+Server  voluntary_ctxt_switches=20  user time=2.648000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000502, PSN 0xec24f0, GID ::
+   remote address: LID 0x0002, QPN 0x000503, PSN 0x34284b, GID ::
+ 7999586304 bytes in 2.65 seconds = 24176.15 Mbit/sec
+ 7629 iters in 2.65 seconds = 346.98 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=2.648000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000503, PSN 0x34284b, GID ::
+   remote address: LID 0x0001, QPN 0x000502, PSN 0xec24f0, GID ::
+ 7999586304 bytes in 2.65 seconds = 24176.43 Mbit/sec
+ 7629 iters in 2.65 seconds = 346.97 usec/iter
+
+Test generated 30 mlx4 interrupts (271765000 -> 271765030)
+
+===============================================================================
+Testing using use_events=1 message_size=524288 num_exchanges=7629 mtu=4096
+
+Server  voluntary_ctxt_switches=15278  user time=0.012000  system time=0.096000
+   local address:  LID 0x0001, QPN 0x000504, PSN 0xd00f32, GID ::
+   remote address: LID 0x0002, QPN 0x000505, PSN 0x7b6c30, GID ::
+ 7999586304 bytes in 2.83 seconds = 22634.81 Mbit/sec
+ 7629 iters in 2.83 seconds = 370.61 usec/iter
+
+Client  voluntary_ctxt_switches=15273  user time=0.020000  system time=0.088000
+   local address:  LID 0x0002, QPN 0x000505, PSN 0x7b6c30, GID ::
+   remote address: LID 0x0001, QPN 0x000504, PSN 0xd00f32, GID ::
+ 7999586304 bytes in 2.83 seconds = 22635.24 Mbit/sec
+ 7629 iters in 2.83 seconds = 370.60 usec/iter
+
+Test generated 15301 mlx4 interrupts (271765030 -> 271780331)
+
+===============================================================================
+Testing using use_events=0 message_size=1048576 num_exchanges=3814 mtu=1024
+
+Server  voluntary_ctxt_switches=20  user time=2.632000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000506, PSN 0x416002, GID ::
+   remote address: LID 0x0002, QPN 0x000507, PSN 0x5016a4, GID ::
+ 7998537728 bytes in 2.63 seconds = 24345.61 Mbit/sec
+ 3814 iters in 2.63 seconds = 689.13 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=2.628000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000507, PSN 0x5016a4, GID ::
+   remote address: LID 0x0001, QPN 0x000506, PSN 0x416002, GID ::
+ 7998537728 bytes in 2.63 seconds = 24347.28 Mbit/sec
+ 3814 iters in 2.63 seconds = 689.08 usec/iter
+
+Test generated 30 mlx4 interrupts (271780331 -> 271780361)
+
+===============================================================================
+Testing using use_events=1 message_size=1048576 num_exchanges=3814 mtu=1024
+
+Server  voluntary_ctxt_switches=7648  user time=0.068000  system time=0.112000
+   local address:  LID 0x0001, QPN 0x000508, PSN 0x2437eb, GID ::
+   remote address: LID 0x0002, QPN 0x000509, PSN 0x964830, GID ::
+ 7998537728 bytes in 2.99 seconds = 21398.45 Mbit/sec
+ 3814 iters in 2.99 seconds = 784.04 usec/iter
+
+Client  voluntary_ctxt_switches=7643  user time=0.060000  system time=0.104000
+   local address:  LID 0x0002, QPN 0x000509, PSN 0x964830, GID ::
+   remote address: LID 0x0001, QPN 0x000508, PSN 0x2437eb, GID ::
+ 7998537728 bytes in 2.99 seconds = 21399.30 Mbit/sec
+ 3814 iters in 2.99 seconds = 784.01 usec/iter
+
+Test generated 7656 mlx4 interrupts (271780361 -> 271788017)
+
+===============================================================================
+Testing using use_events=0 message_size=1048576 num_exchanges=3814 mtu=2048
+
+Server  voluntary_ctxt_switches=21  user time=2.620000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00050a, PSN 0x4c7307, GID ::
+   remote address: LID 0x0002, QPN 0x00050b, PSN 0x21dcf0, GID ::
+ 7998537728 bytes in 2.62 seconds = 24422.34 Mbit/sec
+ 3814 iters in 2.62 seconds = 686.96 usec/iter
+
+Client  voluntary_ctxt_switches=16  user time=2.620000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00050b, PSN 0x21dcf0, GID ::
+   remote address: LID 0x0001, QPN 0x00050a, PSN 0x4c7307, GID ::
+ 7998537728 bytes in 2.62 seconds = 24423.38 Mbit/sec
+ 3814 iters in 2.62 seconds = 686.93 usec/iter
+
+Test generated 30 mlx4 interrupts (271788017 -> 271788047)
+
+===============================================================================
+Testing using use_events=1 message_size=1048576 num_exchanges=3814 mtu=2048
+
+Server  voluntary_ctxt_switches=7648  user time=0.056000  system time=0.052000
+   local address:  LID 0x0001, QPN 0x00050c, PSN 0x5d1a90, GID ::
+   remote address: LID 0x0002, QPN 0x00050d, PSN 0x1f6ae6, GID ::
+ 7998537728 bytes in 2.92 seconds = 21883.14 Mbit/sec
+ 3814 iters in 2.92 seconds = 766.67 usec/iter
+
+Client  voluntary_ctxt_switches=7643  user time=0.056000  system time=0.088000
+   local address:  LID 0x0002, QPN 0x00050d, PSN 0x1f6ae6, GID ::
+   remote address: LID 0x0001, QPN 0x00050c, PSN 0x5d1a90, GID ::
+ 7998537728 bytes in 2.92 seconds = 21885.14 Mbit/sec
+ 3814 iters in 2.92 seconds = 766.60 usec/iter
+
+Test generated 7668 mlx4 interrupts (271788047 -> 271795715)
+
+===============================================================================
+Testing using use_events=0 message_size=1048576 num_exchanges=3814 mtu=4096
+
+Server  voluntary_ctxt_switches=18  user time=2.624000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00050e, PSN 0x412c15, GID ::
+   remote address: LID 0x0002, QPN 0x00050f, PSN 0x66d60f, GID ::
+ 7998537728 bytes in 2.62 seconds = 24414.47 Mbit/sec
+ 3814 iters in 2.62 seconds = 687.18 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=2.624000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00050f, PSN 0x66d60f, GID ::
+   remote address: LID 0x0001, QPN 0x00050e, PSN 0x412c15, GID ::
+ 7998537728 bytes in 2.62 seconds = 24416.09 Mbit/sec
+ 3814 iters in 2.62 seconds = 687.14 usec/iter
+
+Test generated 30 mlx4 interrupts (271795715 -> 271795745)
+
+===============================================================================
+Testing using use_events=1 message_size=1048576 num_exchanges=3814 mtu=4096
+
+Server  voluntary_ctxt_switches=7648  user time=0.100000  system time=0.076000
+   local address:  LID 0x0001, QPN 0x000510, PSN 0xb2a429, GID ::
+   remote address: LID 0x0002, QPN 0x000511, PSN 0x3ba7c6, GID ::
+ 7998537728 bytes in 2.99 seconds = 21386.82 Mbit/sec
+ 3814 iters in 2.99 seconds = 784.47 usec/iter
+
+Client  voluntary_ctxt_switches=7643  user time=0.068000  system time=0.104000
+   local address:  LID 0x0002, QPN 0x000511, PSN 0x3ba7c6, GID ::
+   remote address: LID 0x0001, QPN 0x000510, PSN 0xb2a429, GID ::
+ 7998537728 bytes in 2.99 seconds = 21387.54 Mbit/sec
+ 3814 iters in 2.99 seconds = 784.44 usec/iter
+
+Test generated 7658 mlx4 interrupts (271795745 -> 271803403)
+
+===============================================================================
+Testing using use_events=0 message_size=2097152 num_exchanges=1907 mtu=1024
+
+Server  voluntary_ctxt_switches=18  user time=2.608000  system time=0.004000
+   local address:  LID 0x0001, QPN 0x000512, PSN 0xb182ca, GID ::
+   remote address: LID 0x0002, QPN 0x000513, PSN 0x9de00b, GID ::
+ 7998537728 bytes in 2.61 seconds = 24520.50 Mbit/sec
+ 1907 iters in 2.61 seconds = 1368.42 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=2.612000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000513, PSN 0x9de00b, GID ::
+   remote address: LID 0x0001, QPN 0x000512, PSN 0xb182ca, GID ::
+ 7998537728 bytes in 2.61 seconds = 24521.86 Mbit/sec
+ 1907 iters in 2.61 seconds = 1368.35 usec/iter
+
+Test generated 28 mlx4 interrupts (271803403 -> 271803431)
+
+===============================================================================
+Testing using use_events=1 message_size=2097152 num_exchanges=1907 mtu=1024
+
+Server  voluntary_ctxt_switches=3834  user time=0.016000  system time=0.112000
+   local address:  LID 0x0001, QPN 0x000514, PSN 0x57446a, GID ::
+   remote address: LID 0x0002, QPN 0x000515, PSN 0x308818, GID ::
+ 7998537728 bytes in 2.89 seconds = 22172.53 Mbit/sec
+ 1907 iters in 2.89 seconds = 1513.33 usec/iter
+
+Client  voluntary_ctxt_switches=3829  user time=0.028000  system time=0.104000
+   local address:  LID 0x0002, QPN 0x000515, PSN 0x308818, GID ::
+   remote address: LID 0x0001, QPN 0x000514, PSN 0x57446a, GID ::
+ 7998537728 bytes in 2.89 seconds = 22173.51 Mbit/sec
+ 1907 iters in 2.89 seconds = 1513.27 usec/iter
+
+Test generated 3854 mlx4 interrupts (271803431 -> 271807285)
+
+===============================================================================
+Testing using use_events=0 message_size=2097152 num_exchanges=1907 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=2.604000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000516, PSN 0x8409bb, GID ::
+   remote address: LID 0x0002, QPN 0x000517, PSN 0xc0a70c, GID ::
+ 7998537728 bytes in 2.60 seconds = 24594.33 Mbit/sec
+ 1907 iters in 2.60 seconds = 1364.32 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=2.604000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000517, PSN 0xc0a70c, GID ::
+   remote address: LID 0x0001, QPN 0x000516, PSN 0x8409bb, GID ::
+ 7998537728 bytes in 2.60 seconds = 24596.16 Mbit/sec
+ 1907 iters in 2.60 seconds = 1364.21 usec/iter
+
+Test generated 30 mlx4 interrupts (271807285 -> 271807315)
+
+===============================================================================
+Testing using use_events=1 message_size=2097152 num_exchanges=1907 mtu=2048
+
+Server  voluntary_ctxt_switches=3834  user time=0.012000  system time=0.104000
+   local address:  LID 0x0001, QPN 0x000518, PSN 0x3e3599, GID ::
+   remote address: LID 0x0002, QPN 0x000519, PSN 0xde2c8e, GID ::
+ 7998537728 bytes in 2.87 seconds = 22323.90 Mbit/sec
+ 1907 iters in 2.87 seconds = 1503.07 usec/iter
+
+Client  voluntary_ctxt_switches=3829  user time=0.028000  system time=0.096000
+   local address:  LID 0x0002, QPN 0x000519, PSN 0xde2c8e, GID ::
+   remote address: LID 0x0001, QPN 0x000518, PSN 0x3e3599, GID ::
+ 7998537728 bytes in 2.87 seconds = 22324.55 Mbit/sec
+ 1907 iters in 2.87 seconds = 1503.03 usec/iter
+
+Test generated 3841 mlx4 interrupts (271807315 -> 271811156)
+
+===============================================================================
+Testing using use_events=0 message_size=2097152 num_exchanges=1907 mtu=4096
+
+Server  voluntary_ctxt_switches=18  user time=2.612000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00051a, PSN 0x85c806, GID ::
+   remote address: LID 0x0002, QPN 0x00051b, PSN 0x89189e, GID ::
+ 7998537728 bytes in 2.61 seconds = 24541.12 Mbit/sec
+ 1907 iters in 2.61 seconds = 1367.27 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=2.608000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00051b, PSN 0x89189e, GID ::
+   remote address: LID 0x0001, QPN 0x00051a, PSN 0x85c806, GID ::
+ 7998537728 bytes in 2.61 seconds = 24542.88 Mbit/sec
+ 1907 iters in 2.61 seconds = 1367.18 usec/iter
+
+Test generated 40 mlx4 interrupts (271811156 -> 271811196)
+
+===============================================================================
+Testing using use_events=1 message_size=2097152 num_exchanges=1907 mtu=4096
+
+Server  voluntary_ctxt_switches=3834  user time=0.028000  system time=0.076000
+   local address:  LID 0x0001, QPN 0x00051c, PSN 0xc0a3bd, GID ::
+   remote address: LID 0x0002, QPN 0x00051d, PSN 0xb0dac2, GID ::
+ 7998537728 bytes in 2.88 seconds = 22184.76 Mbit/sec
+ 1907 iters in 2.88 seconds = 1512.50 usec/iter
+
+Client  voluntary_ctxt_switches=3829  user time=0.016000  system time=0.120000
+   local address:  LID 0x0002, QPN 0x00051d, PSN 0xb0dac2, GID ::
+   remote address: LID 0x0001, QPN 0x00051c, PSN 0xc0a3bd, GID ::
+ 7998537728 bytes in 2.88 seconds = 22187.01 Mbit/sec
+ 1907 iters in 2.88 seconds = 1512.35 usec/iter
+
+Test generated 3841 mlx4 interrupts (271811196 -> 271815037)
+
+===============================================================================
+Testing using use_events=0 message_size=4194304 num_exchanges=1000 mtu=1024
+
+Server  voluntary_ctxt_switches=20  user time=2.740000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00051e, PSN 0x361cd8, GID ::
+   remote address: LID 0x0002, QPN 0x00051f, PSN 0x89ad81, GID ::
+ 8388608000 bytes in 2.74 seconds = 24506.71 Mbit/sec
+ 1000 iters in 2.74 seconds = 2738.39 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=2.740000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00051f, PSN 0x89ad81, GID ::
+   remote address: LID 0x0001, QPN 0x00051e, PSN 0x361cd8, GID ::
+ 8388608000 bytes in 2.74 seconds = 24507.69 Mbit/sec
+ 1000 iters in 2.74 seconds = 2738.28 usec/iter
+
+Test generated 30 mlx4 interrupts (271815037 -> 271815067)
+
+===============================================================================
+Testing using use_events=1 message_size=4194304 num_exchanges=1000 mtu=1024
+
+Server  voluntary_ctxt_switches=2018  user time=0.008000  system time=0.036000
+   local address:  LID 0x0001, QPN 0x000520, PSN 0x38fc82, GID ::
+   remote address: LID 0x0002, QPN 0x000521, PSN 0xefe6ce, GID ::
+ 8388608000 bytes in 2.92 seconds = 22999.53 Mbit/sec
+ 1000 iters in 2.92 seconds = 2917.84 usec/iter
+
+Client  voluntary_ctxt_switches=2017  user time=0.000000  system time=0.076000
+   local address:  LID 0x0002, QPN 0x000521, PSN 0xefe6ce, GID ::
+   remote address: LID 0x0001, QPN 0x000520, PSN 0x38fc82, GID ::
+ 8388608000 bytes in 2.92 seconds = 23000.30 Mbit/sec
+ 1000 iters in 2.92 seconds = 2917.74 usec/iter
+
+Test generated 2027 mlx4 interrupts (271815067 -> 271817094)
+
+===============================================================================
+Testing using use_events=0 message_size=4194304 num_exchanges=1000 mtu=2048
+
+Server  voluntary_ctxt_switches=20  user time=2.728000  system time=0.004000
+   local address:  LID 0x0001, QPN 0x000522, PSN 0xc942b9, GID ::
+   remote address: LID 0x0002, QPN 0x000523, PSN 0xe386a9, GID ::
+ 8388608000 bytes in 2.73 seconds = 24604.65 Mbit/sec
+ 1000 iters in 2.73 seconds = 2727.49 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=2.728000  system time=0.004000
+   local address:  LID 0x0002, QPN 0x000523, PSN 0xe386a9, GID ::
+   remote address: LID 0x0001, QPN 0x000522, PSN 0xc942b9, GID ::
+ 8388608000 bytes in 2.73 seconds = 24605.19 Mbit/sec
+ 1000 iters in 2.73 seconds = 2727.43 usec/iter
+
+Test generated 40 mlx4 interrupts (271817094 -> 271817134)
+
+===============================================================================
+Testing using use_events=1 message_size=4194304 num_exchanges=1000 mtu=2048
+
+Server  voluntary_ctxt_switches=2018  user time=0.008000  system time=0.052000
+   local address:  LID 0x0001, QPN 0x000524, PSN 0xe6ef7f, GID ::
+   remote address: LID 0x0002, QPN 0x000525, PSN 0x648d12, GID ::
+ 8388608000 bytes in 2.89 seconds = 23220.98 Mbit/sec
+ 1000 iters in 2.89 seconds = 2890.01 usec/iter
+
+Client  voluntary_ctxt_switches=2017  user time=0.032000  system time=0.032000
+   local address:  LID 0x0002, QPN 0x000525, PSN 0x648d12, GID ::
+   remote address: LID 0x0001, QPN 0x000524, PSN 0xe6ef7f, GID ::
+ 8388608000 bytes in 2.89 seconds = 23222.50 Mbit/sec
+ 1000 iters in 2.89 seconds = 2889.82 usec/iter
+
+Test generated 2027 mlx4 interrupts (271817134 -> 271819161)
+
+===============================================================================
+Testing using use_events=0 message_size=4194304 num_exchanges=1000 mtu=4096
+
+Server  voluntary_ctxt_switches=18  user time=2.736000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000526, PSN 0x9202d2, GID ::
+   remote address: LID 0x0002, QPN 0x000527, PSN 0x72fa09, GID ::
+ 8388608000 bytes in 2.73 seconds = 24570.72 Mbit/sec
+ 1000 iters in 2.73 seconds = 2731.25 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=2.736000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x000527, PSN 0x72fa09, GID ::
+   remote address: LID 0x0001, QPN 0x000526, PSN 0x9202d2, GID ::
+ 8388608000 bytes in 2.73 seconds = 24571.99 Mbit/sec
+ 1000 iters in 2.73 seconds = 2731.11 usec/iter
+
+Test generated 30 mlx4 interrupts (271819161 -> 271819191)
+
+===============================================================================
+Testing using use_events=1 message_size=4194304 num_exchanges=1000 mtu=4096
+
+Server  voluntary_ctxt_switches=2020  user time=0.008000  system time=0.056000
+   local address:  LID 0x0001, QPN 0x000528, PSN 0xa2f8e2, GID ::
+   remote address: LID 0x0002, QPN 0x000529, PSN 0x70d686, GID ::
+ 8388608000 bytes in 2.89 seconds = 23185.82 Mbit/sec
+ 1000 iters in 2.89 seconds = 2894.39 usec/iter
+
+Client  voluntary_ctxt_switches=2015  user time=0.000000  system time=0.064000
+   local address:  LID 0x0002, QPN 0x000529, PSN 0x70d686, GID ::
+   remote address: LID 0x0001, QPN 0x000528, PSN 0xa2f8e2, GID ::
+ 8388608000 bytes in 2.89 seconds = 23186.62 Mbit/sec
+ 1000 iters in 2.89 seconds = 2894.29 usec/iter
+
+Test generated 2037 mlx4 interrupts (271819191 -> 271821228)
+
+===============================================================================
+Testing using use_events=0 message_size=8388608 num_exchanges=1000 mtu=1024
+
+Server  voluntary_ctxt_switches=18  user time=5.936000  system time=0.004000
+   local address:  LID 0x0001, QPN 0x00052a, PSN 0x7bf2e5, GID ::
+   remote address: LID 0x0002, QPN 0x00052b, PSN 0xad2a2c, GID ::
+ 16777216000 bytes in 5.94 seconds = 22608.22 Mbit/sec
+ 1000 iters in 5.94 seconds = 5936.68 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=5.940000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00052b, PSN 0xad2a2c, GID ::
+   remote address: LID 0x0001, QPN 0x00052a, PSN 0x7bf2e5, GID ::
+ 16777216000 bytes in 5.94 seconds = 22608.32 Mbit/sec
+ 1000 iters in 5.94 seconds = 5936.65 usec/iter
+
+Test generated 28 mlx4 interrupts (271821228 -> 271821256)
+
+===============================================================================
+Testing using use_events=1 message_size=8388608 num_exchanges=1000 mtu=1024
+
+Server  voluntary_ctxt_switches=2020  user time=0.024000  system time=0.028000
+   local address:  LID 0x0001, QPN 0x00052c, PSN 0xe64578, GID ::
+   remote address: LID 0x0002, QPN 0x00052d, PSN 0xde3006, GID ::
+ 16777216000 bytes in 6.24 seconds = 21506.59 Mbit/sec
+ 1000 iters in 6.24 seconds = 6240.77 usec/iter
+
+Client  voluntary_ctxt_switches=2015  user time=0.016000  system time=0.060000
+   local address:  LID 0x0002, QPN 0x00052d, PSN 0xde3006, GID ::
+   remote address: LID 0x0001, QPN 0x00052c, PSN 0xe64578, GID ::
+ 16777216000 bytes in 6.24 seconds = 21506.90 Mbit/sec
+ 1000 iters in 6.24 seconds = 6240.68 usec/iter
+
+Test generated 2037 mlx4 interrupts (271821256 -> 271823293)
+
+===============================================================================
+Testing using use_events=0 message_size=8388608 num_exchanges=1000 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=5.932000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x00052e, PSN 0xc3be56, GID ::
+   remote address: LID 0x0002, QPN 0x00052f, PSN 0xf8cf62, GID ::
+ 16777216000 bytes in 5.93 seconds = 22636.17 Mbit/sec
+ 1000 iters in 5.93 seconds = 5929.35 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=5.924000  system time=0.008000
+   local address:  LID 0x0002, QPN 0x00052f, PSN 0xf8cf62, GID ::
+   remote address: LID 0x0001, QPN 0x00052e, PSN 0xc3be56, GID ::
+ 16777216000 bytes in 5.93 seconds = 22636.92 Mbit/sec
+ 1000 iters in 5.93 seconds = 5929.15 usec/iter
+
+Test generated 29 mlx4 interrupts (271823293 -> 271823322)
+
+===============================================================================
+Testing using use_events=1 message_size=8388608 num_exchanges=1000 mtu=2048
+
+Server  voluntary_ctxt_switches=2018  user time=0.016000  system time=0.028000
+   local address:  LID 0x0001, QPN 0x000530, PSN 0x15f42a, GID ::
+   remote address: LID 0x0002, QPN 0x000531, PSN 0x9b4546, GID ::
+ 16777216000 bytes in 6.21 seconds = 21618.60 Mbit/sec
+ 1000 iters in 6.21 seconds = 6208.44 usec/iter
+
+Client  voluntary_ctxt_switches=2017  user time=0.000000  system time=0.084000
+   local address:  LID 0x0002, QPN 0x000531, PSN 0x9b4546, GID ::
+   remote address: LID 0x0001, QPN 0x000530, PSN 0x15f42a, GID ::
+ 16777216000 bytes in 6.21 seconds = 21618.77 Mbit/sec
+ 1000 iters in 6.21 seconds = 6208.39 usec/iter
+
+Test generated 2038 mlx4 interrupts (271823322 -> 271825360)
+
+===============================================================================
+Testing using use_events=0 message_size=8388608 num_exchanges=1000 mtu=4096
+
+Server  voluntary_ctxt_switches=20  user time=5.916000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000532, PSN 0x12fefe, GID ::
+   remote address: LID 0x0002, QPN 0x000533, PSN 0xd57698, GID ::
+ 16777216000 bytes in 5.91 seconds = 22695.72 Mbit/sec
+ 1000 iters in 5.91 seconds = 5913.79 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=5.916000  system time=0.004000
+   local address:  LID 0x0002, QPN 0x000533, PSN 0xd57698, GID ::
+   remote address: LID 0x0001, QPN 0x000532, PSN 0x12fefe, GID ::
+ 16777216000 bytes in 5.91 seconds = 22696.43 Mbit/sec
+ 1000 iters in 5.91 seconds = 5913.60 usec/iter
+
+Test generated 38 mlx4 interrupts (271825360 -> 271825398)
+
+===============================================================================
+Testing using use_events=1 message_size=8388608 num_exchanges=1000 mtu=4096
+
+Server  voluntary_ctxt_switches=2020  user time=0.028000  system time=0.056000
+   local address:  LID 0x0001, QPN 0x000534, PSN 0x62d2fc, GID ::
+   remote address: LID 0x0002, QPN 0x000535, PSN 0xebfddd, GID ::
+ 16777216000 bytes in 6.20 seconds = 21631.27 Mbit/sec
+ 1000 iters in 6.20 seconds = 6204.80 usec/iter
+
+Client  voluntary_ctxt_switches=2015  user time=0.000000  system time=0.056000
+   local address:  LID 0x0002, QPN 0x000535, PSN 0xebfddd, GID ::
+   remote address: LID 0x0001, QPN 0x000534, PSN 0x62d2fc, GID ::
+ 16777216000 bytes in 6.20 seconds = 21631.77 Mbit/sec
+ 1000 iters in 6.20 seconds = 6204.66 usec/iter
+
+Test generated 2027 mlx4 interrupts (271825398 -> 271827425)
+
+===============================================================================
+Testing using use_events=0 message_size=16777216 num_exchanges=1000 mtu=1024
+
+Server  voluntary_ctxt_switches=18  user time=11.888000  system time=0.000000
+   local address:  LID 0x0001, QPN 0x000536, PSN 0xcd7416, GID ::
+   remote address: LID 0x0002, QPN 0x000537, PSN 0x1d523e, GID ::
+ 33554432000 bytes in 11.88 seconds = 22588.01 Mbit/sec
+ 1000 iters in 11.88 seconds = 11883.98 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=11.884000  system time=0.004000
+   local address:  LID 0x0002, QPN 0x000537, PSN 0x1d523e, GID ::
+   remote address: LID 0x0001, QPN 0x000536, PSN 0xcd7416, GID ::
+ 33554432000 bytes in 11.88 seconds = 22588.21 Mbit/sec
+ 1000 iters in 11.88 seconds = 11883.87 usec/iter
+
+Test generated 39 mlx4 interrupts (271827425 -> 271827464)
+
+===============================================================================
+Testing using use_events=1 message_size=16777216 num_exchanges=1000 mtu=1024
+
+Server  voluntary_ctxt_switches=2020  user time=0.020000  system time=0.076000
+   local address:  LID 0x0001, QPN 0x000538, PSN 0x389433, GID ::
+   remote address: LID 0x0002, QPN 0x000539, PSN 0x15d8e9, GID ::
+ 33554432000 bytes in 12.39 seconds = 21671.05 Mbit/sec
+ 1000 iters in 12.39 seconds = 12386.82 usec/iter
+
+Client  voluntary_ctxt_switches=2015  user time=0.016000  system time=0.064000
+   local address:  LID 0x0002, QPN 0x000539, PSN 0x15d8e9, GID ::
+   remote address: LID 0x0001, QPN 0x000538, PSN 0x389433, GID ::
+ 33554432000 bytes in 12.39 seconds = 21671.12 Mbit/sec
+ 1000 iters in 12.39 seconds = 12386.78 usec/iter
+
+Test generated 2051 mlx4 interrupts (271827464 -> 271829515)
+
+===============================================================================
+Testing using use_events=0 message_size=16777216 num_exchanges=1000 mtu=2048
+
+Server  voluntary_ctxt_switches=18  user time=11.876000  system time=0.004000
+   local address:  LID 0x0001, QPN 0x00053a, PSN 0xd94e88, GID ::
+   remote address: LID 0x0002, QPN 0x00053b, PSN 0x43f9cc, GID ::
+ 33554432000 bytes in 11.87 seconds = 22605.39 Mbit/sec
+ 1000 iters in 11.87 seconds = 11874.84 usec/iter
+
+Client  voluntary_ctxt_switches=17  user time=11.880000  system time=0.000000
+   local address:  LID 0x0002, QPN 0x00053b, PSN 0x43f9cc, GID ::
+   remote address: LID 0x0001, QPN 0x00053a, PSN 0xd94e88, GID ::
+ 33554432000 bytes in 11.87 seconds = 22605.60 Mbit/sec
+ 1000 iters in 11.87 seconds = 11874.73 usec/iter
+
+Test generated 42 mlx4 interrupts (271829515 -> 271829557)
+
+===============================================================================
+Testing using use_events=1 message_size=16777216 num_exchanges=1000 mtu=2048
+
+Server  voluntary_ctxt_switches=2018  user time=0.020000  system time=0.072000
+   local address:  LID 0x0001, QPN 0x00053c, PSN 0x9fc6b8, GID ::
+   remote address: LID 0x0002, QPN 0x00053d, PSN 0x97d88a, GID ::
+ 33554432000 bytes in 12.26 seconds = 21886.33 Mbit/sec
+ 1000 iters in 12.26 seconds = 12264.98 usec/iter
+
+Client  voluntary_ctxt_switches=2017  user time=0.024000  system time=0.068000
+   local address:  LID 0x0002, QPN 0x00053d, PSN 0x97d88a, GID ::
+   remote address: LID 0x0001, QPN 0x00053c, PSN 0x9fc6b8, GID ::
+ 33554432000 bytes in 12.26 seconds = 21886.52 Mbit/sec
+ 1000 iters in 12.26 seconds = 12264.88 usec/iter
+
+Test generated 2038 mlx4 interrupts (271829557 -> 271831595)
+
+===============================================================================
+Testing using use_events=0 message_size=16777216 num_exchanges=1000 mtu=4096
+
+Server  voluntary_ctxt_switches=20  user time=11.904000  system time=0.008000
+   local address:  LID 0x0001, QPN 0x00053e, PSN 0x4bfaf9, GID ::
+   remote address: LID 0x0002, QPN 0x00053f, PSN 0xd17358, GID ::
+ 33554432000 bytes in 11.91 seconds = 22546.06 Mbit/sec
+ 1000 iters in 11.91 seconds = 11906.09 usec/iter
+
+Client  voluntary_ctxt_switches=15  user time=11.904000  system time=0.008000
+   local address:  LID 0x0002, QPN 0x00053f, PSN 0xd17358, GID ::
+   remote address: LID 0x0001, QPN 0x00053e, PSN 0x4bfaf9, GID ::
+ 33554432000 bytes in 11.91 seconds = 22546.33 Mbit/sec
+ 1000 iters in 11.91 seconds = 11905.95 usec/iter
+
+Test generated 40 mlx4 interrupts (271831595 -> 271831635)
+
+===============================================================================
+Testing using use_events=1 message_size=16777216 num_exchanges=1000 mtu=4096
+
+Server  voluntary_ctxt_switches=2020  user time=0.016000  system time=0.068000
+   local address:  LID 0x0001, QPN 0x000540, PSN 0x35b7a0, GID ::
+   remote address: LID 0x0002, QPN 0x000541, PSN 0x48968d, GID ::
+ 33554432000 bytes in 12.21 seconds = 21979.12 Mbit/sec
+ 1000 iters in 12.21 seconds = 12213.20 usec/iter
+
+Client  voluntary_ctxt_switches=2015  user time=0.000000  system time=0.052000
+   local address:  LID 0x0002, QPN 0x000541, PSN 0x48968d, GID ::
+   remote address: LID 0x0001, QPN 0x000540, PSN 0x35b7a0, GID ::
+ 33554432000 bytes in 12.21 seconds = 21979.54 Mbit/sec
+ 1000 iters in 12.21 seconds = 12212.97 usec/iter
+
+Test generated 2038 mlx4 interrupts (271831635 -> 271833673)
+
+===============================================================================
