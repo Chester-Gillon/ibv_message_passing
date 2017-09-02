@@ -1,0 +1,95 @@
+Results from running on a Ubuntu 16.04 LTS system, with Kernel 4.4.0-92-generic and a single NUMA memory node
+shows that set_mempolicy() is per thread since each thread is able to set and keep it's own mempolicy:
+
+$ test_multithreaded_mempolicy/Release/test_multithreaded_mempolicy 
+Num NUMA nodes = 1
+Iteration 0:
+  Thread 0 set mempolicy mode=MPOL_DEFAULT
+  Thread 1 set mempolicy mode=MPOL_BIND nodemask=1
+  Thread 2 set mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 3 set mempolicy mode=MPOL_PREFERRED nodemask=1
+  Thread 0 get mempolicy mode=MPOL_DEFAULT
+  Thread 1 get mempolicy mode=MPOL_BIND nodemask=1
+  Thread 2 get mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 3 get mempolicy mode=MPOL_PREFERRED nodemask=1
+Iteration 1:
+  Thread 0 set mempolicy mode=MPOL_BIND nodemask=1
+  Thread 1 set mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 2 set mempolicy mode=MPOL_PREFERRED nodemask=1
+  Thread 3 set mempolicy mode=MPOL_DEFAULT
+  Thread 0 get mempolicy mode=MPOL_BIND nodemask=1
+  Thread 1 get mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 2 get mempolicy mode=MPOL_PREFERRED nodemask=1
+  Thread 3 get mempolicy mode=MPOL_DEFAULT
+Iteration 2:
+  Thread 0 set mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 1 set mempolicy mode=MPOL_PREFERRED nodemask=1
+  Thread 2 set mempolicy mode=MPOL_DEFAULT
+  Thread 3 set mempolicy mode=MPOL_BIND nodemask=1
+  Thread 0 get mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 1 get mempolicy mode=MPOL_PREFERRED nodemask=1
+  Thread 2 get mempolicy mode=MPOL_DEFAULT
+  Thread 3 get mempolicy mode=MPOL_BIND nodemask=1
+Iteration 3:
+  Thread 0 set mempolicy mode=MPOL_PREFERRED nodemask=1
+  Thread 1 set mempolicy mode=MPOL_DEFAULT
+  Thread 2 set mempolicy mode=MPOL_BIND nodemask=1
+  Thread 3 set mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 0 get mempolicy mode=MPOL_PREFERRED nodemask=1
+  Thread 1 get mempolicy mode=MPOL_DEFAULT
+  Thread 2 get mempolicy mode=MPOL_BIND nodemask=1
+  Thread 3 get mempolicy mode=MPOL_INTERLEAVE nodemask=1
+Iteration 4:
+  Thread 0 set mempolicy mode=MPOL_DEFAULT
+  Thread 1 set mempolicy mode=MPOL_BIND nodemask=1
+  Thread 2 set mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 3 set mempolicy mode=MPOL_PREFERRED nodemask=1
+  Thread 0 get mempolicy mode=MPOL_DEFAULT
+  Thread 1 get mempolicy mode=MPOL_BIND nodemask=1
+  Thread 2 get mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 3 get mempolicy mode=MPOL_PREFERRED nodemask=1
+Iteration 5:
+  Thread 0 set mempolicy mode=MPOL_BIND nodemask=1
+  Thread 1 set mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 2 set mempolicy mode=MPOL_PREFERRED nodemask=1
+  Thread 3 set mempolicy mode=MPOL_DEFAULT
+  Thread 0 get mempolicy mode=MPOL_BIND nodemask=1
+  Thread 1 get mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 2 get mempolicy mode=MPOL_PREFERRED nodemask=1
+  Thread 3 get mempolicy mode=MPOL_DEFAULT
+Iteration 6:
+  Thread 0 set mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 1 set mempolicy mode=MPOL_PREFERRED nodemask=1
+  Thread 2 set mempolicy mode=MPOL_DEFAULT
+  Thread 3 set mempolicy mode=MPOL_BIND nodemask=1
+  Thread 0 get mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 1 get mempolicy mode=MPOL_PREFERRED nodemask=1
+  Thread 2 get mempolicy mode=MPOL_DEFAULT
+  Thread 3 get mempolicy mode=MPOL_BIND nodemask=1
+Iteration 7:
+  Thread 0 set mempolicy mode=MPOL_PREFERRED nodemask=1
+  Thread 1 set mempolicy mode=MPOL_DEFAULT
+  Thread 2 set mempolicy mode=MPOL_BIND nodemask=1
+  Thread 3 set mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 0 get mempolicy mode=MPOL_PREFERRED nodemask=1
+  Thread 1 get mempolicy mode=MPOL_DEFAULT
+  Thread 2 get mempolicy mode=MPOL_BIND nodemask=1
+  Thread 3 get mempolicy mode=MPOL_INTERLEAVE nodemask=1
+Iteration 8:
+  Thread 0 set mempolicy mode=MPOL_DEFAULT
+  Thread 1 set mempolicy mode=MPOL_BIND nodemask=1
+  Thread 2 set mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 3 set mempolicy mode=MPOL_PREFERRED nodemask=1
+  Thread 0 get mempolicy mode=MPOL_DEFAULT
+  Thread 1 get mempolicy mode=MPOL_BIND nodemask=1
+  Thread 2 get mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 3 get mempolicy mode=MPOL_PREFERRED nodemask=1
+Iteration 9:
+  Thread 0 set mempolicy mode=MPOL_BIND nodemask=1
+  Thread 1 set mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 2 set mempolicy mode=MPOL_PREFERRED nodemask=1
+  Thread 3 set mempolicy mode=MPOL_DEFAULT
+  Thread 0 get mempolicy mode=MPOL_BIND nodemask=1
+  Thread 1 get mempolicy mode=MPOL_INTERLEAVE nodemask=1
+  Thread 2 get mempolicy mode=MPOL_PREFERRED nodemask=1
+  Thread 3 get mempolicy mode=MPOL_DEFAULT
