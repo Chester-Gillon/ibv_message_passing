@@ -1,9 +1,12 @@
 /*
- * @file ibv_rc_pingpong_measurements_main.c
+ * @file ibv_pingpong_measurements_main.c
  * @date 27 Aug 2017
  * @author Chester Gillon
- * @brief Run the ibv_rc_pingpong example program under different combinations of message sizes and polling/blocking measuring the throughput
- * @details Runs the ibv_rc_pingpong as the server and client on the same PC, assuming a dual port Infiniband adapter with port 1 looped to port 2.
+ * @details Run the ibv_rc_pingpong and ibv_uc_pingpong example program under different
+ *          combinations of message sizes and polling/blocking measuring the throughput
+ *
+ *          Runs ibv_rc_pingpong/ibc_uc_pingpong as the server and client on the same PC,
+ *          assuming a dual port Infiniband adapter with port 1 looped to port 2.
  */
 
 #include <stdlib.h>
@@ -47,6 +50,9 @@ static const bool use_events_options[NUM_USE_EVENTS_OPTIONS] =
 /** Defines the options used to perform one pingpong test */
 typedef struct
 {
+    /** If true a reliable Infiniband connection is tested by running the ibv_rc_pingpoing program
+     *  If false an unreliable Infiniband connection is tested by running the ibv_uc_pingpoing program */
+    bool rc_connection;
     /** If true use events, if false poll */
     bool use_events;
     /** The message size in bytes tested */
@@ -57,7 +63,7 @@ typedef struct
     unsigned int mtu;
 } pingpong_options;
 
-/** Used to collect the standard output or standard error from one ibv_rc_pingpong process */
+/** Used to collect the standard output or standard error from one ibv_rc_pingpong/ibv_uc_pingpong process */
 typedef struct
 {
     /** The file descriptor written by the process */
@@ -74,7 +80,7 @@ typedef struct
     char **lines;
 } process_output;
 
-/** The state of one ibv_rc_pingpong process */
+/** The state of one ibv_rc_pingpong/ibv_uc_pingpong process */
 typedef enum
 {
     /** The process has not yet been created */
@@ -85,7 +91,7 @@ typedef enum
     PROCESS_REAPED
 } pingpong_process_state;
 
-/** Contains the context for one ibv_rc_pingpong process */
+/** Contains the context for one ibv_rc_pingpong/ibv_uc_pingpong process */
 #define MAX_PROCESS_ARGS 15
 typedef struct
 {
@@ -178,7 +184,7 @@ static void free_pingpong_process_results (pingpong_process *const process)
 
 /**
  * @brief Read the total number of interrupts which have been delivered to the Mellanox mlx4 driver.
- * @details This is used to find under which conditions ibv_rc_pingpong causes interrupts to be generated.
+ * @details This is used to find under which conditions ibv_rc_pingpong/ibv_uc_pingpong causes interrupts to be generated.
  * @param[out] total_mlx4_interrupts The total number of interrupts delivered to the Mellanox mlx4 driver.
  * @return Returns true if total_interrupts is valid, or false if didn't find the Mellanox mlx4 driver in the list of interrupts
  */
@@ -316,7 +322,7 @@ static void install_sigchld_handler (void)
 }
 
 /**
- * @brief Abort the test if an ibv_rc_pingpong process indicates it as exited with an error status
+ * @brief Abort the test if an ibv_rc_pingpong/ibv_uc_pingpong process indicates it as exited with an error status
  * @param[in] process The process to check for failure
  */
 static void abort_on_process_failure (const pingpong_process *const process)
@@ -346,7 +352,7 @@ static void abort_on_process_failure (const pingpong_process *const process)
 }
 
 /**
- * @brief Determine if an ibv_rc_pingpong process has exited with a successful completion status.
+ * @brief Determine if an ibv_rc_pingpong/ibv_uc_pingpong process has exited with a successful completion status.
  * @param[in] process The process to check for success
  * @return Returns true the process has exited with a successful completion status.
  *         Returns false if failed, or has not yet exited
@@ -359,8 +365,8 @@ static bool process_successful_completion (const pingpong_process *const process
 
 /**
  * @brief Called from a Glib callback to check if the current test has passed or failed
- * @details Abort the program if a ibv_rc_pingpong process has failed.
- *          Cause the Glib main loop to exit when both server and client ibv_rc_pingpong processes have successfully completed.
+ * @details Abort the program if a ibv_rc_pingpong/ibv_uc_pingpong process has failed.
+ *          Cause the Glib main loop to exit when both server and client ibv_rc_pingpong/ibv_uc_pingpong processes have successfully completed.
  *          Also spawns the client process once the server is ready for a connection.
  */
 static void check_for_test_pass_or_failure (void)
@@ -508,10 +514,10 @@ static void initialise_process_output (process_output *const output, const int f
 }
 
 /**
- * @brief Spawn a ibv_rc_pingpong process
+ * @brief Spawn a ibv_rc_pingpong/ibv_uc_pingpong process
  * @details The process is spawned via the stdbuf command to set line buffering. This is so that can read the
  *          output of the server process to detect when the server is ready to accept the client.
- * @param[in] options The test options to be passed to the ibv_rc_pingpong process via command line options
+ * @param[in] options The test options to be passed to the ibv_rc_pingpong/ibv_uc_pingpong process via command line options
  * @param[in] is_server If true spawning the server, if false the client
  * @param[out] process Initialised with the information for the spawned process
  */
@@ -529,7 +535,7 @@ static void spawn_pingpong (const pingpong_options *const options, const bool is
     process->argv[argc++] = g_strdup_printf ("stdbuf");
     process->argv[argc++] = g_strdup_printf ("-oL");
     process->argv[argc++] = g_strdup_printf ("-eL");
-    process->argv[argc++] = g_strdup_printf ("ibv_rc_pingpong");
+    process->argv[argc++] = g_strdup_printf (options->rc_connection ? "ibv_rc_pingpong" : "ibv_uc_pingpong");
     if (!is_server)
     {
         /* The client and server are both running on the local machine */
@@ -591,7 +597,8 @@ static void report_process_test_details (FILE *const details_file, const pingpon
 static void report_test_details (const pingpong_options *const options, FILE *const details_file,
                                  const pingpong_test_context *const results)
 {
-    fprintf (details_file, "Testing using use_events=%d message_size=%u num_exchanges=%u mtu=%u\n",
+    fprintf (details_file, "Testing %s using use_events=%d message_size=%u num_exchanges=%u mtu=%u\n",
+             options->rc_connection ? "ibv_rc_pingpong" : "ibv_uc_pingpong",
              options->use_events, options->message_size, options->num_exchanges, options->mtu);
     report_process_test_details (details_file, &results->server_process);
     report_process_test_details (details_file, &results->client_process);
@@ -617,7 +624,7 @@ static void report_process_test_summary (FILE *const summary_file, const pingpon
     bool found_mbits_per_sec;
     char *mbits_per_sec = NULL;
 
-    /* Report the Mbit/sec value using the same text was from the standard output of the ibv_rc_pingpong process */
+    /* Report the Mbit/sec value using the same text was from the standard output of the ibv_rc_pingpong/ibv_uc_pingpong process */
     found_mbits_per_sec = false;
     for (line_index = 0; !found_mbits_per_sec && (line_index < process->standard_output.num_lines); line_index++)
     {
@@ -649,7 +656,8 @@ static void report_process_test_summary (FILE *const summary_file, const pingpon
 static void report_test_summary (const pingpong_options *const options, FILE *const summary_file,
                                  const pingpong_test_context *const results)
 {
-    fprintf (summary_file,"%d,%u,%u,%u,",
+    fprintf (summary_file,"%s,%d,%u,%u,%u,",
+             options->rc_connection ? "ibv_rc_pingpong" : "ibv_uc_pingpong",
              options->use_events, options->message_size, options->num_exchanges, options->mtu);
     if (results->interrupt_counts_valid)
     {
@@ -665,7 +673,7 @@ static void report_test_summary (const pingpong_options *const options, FILE *co
 }
 
 /**
- * @details Run the ibv_rc_pingpong server and client processes for one set of options, and report the
+ * @details Run the ibv_rc_pingpong/ibv_uc_pingpong server and client processes for one set of options, and report the
  *          detailed and summary test results
  * @param[in] options The test options used
  * @param[in] details_file Where to write the detailed results to
@@ -694,7 +702,7 @@ static void test_loopback (const pingpong_options *const options, FILE *const de
     current_test.options = *options;
     spawn_pingpong (options, true, &current_test.server_process);
 
-    /* Wait for the server and client ibv_rc_pingpong processes to run to completion */
+    /* Wait for the server and client ibv_rc_pingpong/ibv_uc_pingpong processes to run to completion */
     main_loop = g_main_loop_new (NULL, FALSE);
     g_main_loop_run (main_loop);
     g_main_loop_unref (main_loop);
@@ -727,7 +735,7 @@ int main (int argc, char *argv[])
         exit (EXIT_FAILURE);
     }
 
-    sprintf (details_pathname, "%s/ibv_rc_pingpong_measurements_detail.txt", results_dir);
+    sprintf (details_pathname, "%s/ibv_pingpong_measurements_detail.txt", results_dir);
     details_file = fopen (details_pathname, "w");
     if (details_file == NULL)
     {
@@ -735,14 +743,14 @@ int main (int argc, char *argv[])
         exit (EXIT_FAILURE);
     }
 
-    sprintf (summary_pathname, "%s/ibv_rc_pingpong_measurements_summary.csv", results_dir);
+    sprintf (summary_pathname, "%s/ibv_pingpong_measurements_summary.csv", results_dir);
     summary_file = fopen (summary_pathname, "w");
     if (summary_file == NULL)
     {
         fprintf (stderr, "Failed to create %s\n", summary_pathname);
         exit (EXIT_FAILURE);
     }
-    fprintf (summary_file, "use_events,message_size,num_exchanges,MTU,Num mlx4 interrupts,");
+    fprintf (summary_file, "Program,use_events,message_size,num_exchanges,MTU,Num mlx4 interrupts,");
     fprintf (summary_file, "Server Mbit/sec,Server voluntary_ctxt_switches,Server user time,Server system time,");
     fprintf (summary_file, "Server Mbit/sec,Client voluntary_ctxt_switches,Client user time,Client system time\n");
 
@@ -766,6 +774,9 @@ int main (int argc, char *argv[])
             for (use_events_option_index = 0; use_events_option_index < NUM_USE_EVENTS_OPTIONS; use_events_option_index++)
             {
                 options.use_events = use_events_options[use_events_option_index];
+                options.rc_connection = false;
+                test_loopback (&options, details_file, summary_file);
+                options.rc_connection = true;
                 test_loopback (&options, details_file, summary_file);
             }
         }
