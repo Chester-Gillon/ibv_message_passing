@@ -7,13 +7,14 @@
  */
 
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
 #include <semaphore.h>
+#include <errno.h>
 #include <pthread.h>
+#include <numa.h>
 #include <numaif.h>
-
-#define MAXNODE 64
 
 /** The different memory policies which are tested, in terms of if the polices are accepted and remembered
  *  rather than testing actual allocations. */
@@ -47,6 +48,90 @@ typedef struct
 
 /** The number of NUMA memory nodes */
 static unsigned int num_nodes;
+
+/**
+ * @brief Obtain and display the current mempolicy for the calling thread
+ * @todo On a single NUMA node CentOS 6.7 system get_mempolicy() returned EINVAL
+ *       when an attempt is made to read the nodemask for the current mempolicy,
+ *       in which case this function displays the current nodemask as unknown via "???"
+ * @param[in] is_main_true True if being called from the program main thread
+ * @param[in] thread_index If is_main_thread is false, the index of which test thread is called from
+ */
+static void display_current_mempolicy (const bool is_main_thread, const unsigned int thread_index)
+{
+    int rc;
+    int mode;
+    unsigned long nodemask;
+    bool nodemask_valid;
+
+    nodemask = 0;
+    rc = get_mempolicy (&mode, &nodemask, numa_max_possible_node(), NULL, 0);
+    nodemask_valid = rc == 0;
+    if ((rc != 0) && (errno = EINVAL))
+    {
+        rc = get_mempolicy (&mode, NULL, numa_max_possible_node(), NULL, 0);
+    }
+    if (rc == 0)
+    {
+        if (is_main_thread)
+        {
+            printf ("  Main thread get mempolicy ");
+        }
+        else
+        {
+            printf ("  Thread %u get mempolicy ", thread_index);
+        }
+        switch (mode)
+        {
+        case MPOL_DEFAULT:
+            printf ("mode=MPOL_DEFAULT");
+            break;
+
+        case MPOL_BIND:
+            if (nodemask_valid)
+            {
+                printf ("mode=MPOL_BIND nodemask=%lu", nodemask);
+            }
+            else
+            {
+                printf ("mode=MPOL_BIND nodemask=???");
+            }
+            break;
+
+        case MPOL_INTERLEAVE:
+            if (nodemask_valid)
+            {
+                printf ("mode=MPOL_INTERLEAVE nodemask=%lu", nodemask);
+            }
+            else
+            {
+                printf ("mode=MPOL_INTERLEAVE nodemask=???");
+            }
+            break;
+
+        case MPOL_PREFERRED:
+            if (nodemask_valid)
+            {
+                printf ("mode=MPOL_PREFERRED nodemask=%lu", nodemask);
+            }
+            else
+            {
+                printf ("mode=MPOL_PREFERRED nodemask=???");
+            }
+            break;
+
+        default:
+            printf ("unknown mode %d", mode);
+            break;
+        }
+        printf ("\n");
+    }
+    else
+    {
+        perror ("get_mempolicy failed\n");
+        exit (EXIT_FAILURE);
+    }
+}
 
 /**
  * @brief The test thread used to set / get its mempolicy under when instructed by the main thread
@@ -89,7 +174,7 @@ static void *mempolicy_thread (void *const arg)
         {
             nodemask = 0;
         }
-        rc = set_mempolicy (mode, &nodemask, MAXNODE);
+        rc = set_mempolicy (mode, (nodemask != 0) ? &nodemask : NULL, numa_max_possible_node());
         if (rc == 0)
         {
             printf ("  Thread %u set mempolicy ", context->thread_index);
@@ -115,7 +200,7 @@ static void *mempolicy_thread (void *const arg)
         }
         else
         {
-            fprintf (stderr, "set_mempolicy failed\n");
+            perror ("set_mempolicy failed\n");
             exit (EXIT_FAILURE);
         }
 
@@ -134,39 +219,7 @@ static void *mempolicy_thread (void *const arg)
             exit (EXIT_FAILURE);
         }
 
-        rc = get_mempolicy (&mode, &nodemask, MAXNODE, NULL, 0);
-        if (rc == 0)
-        {
-            printf ("  Thread %u get mempolicy ", context->thread_index);
-            switch (mode)
-            {
-            case MPOL_DEFAULT:
-                printf ("mode=MPOL_DEFAULT");
-                break;
-
-            case MPOL_BIND:
-                printf ("mode=MPOL_BIND nodemask=%lu", nodemask);
-                break;
-
-            case MPOL_INTERLEAVE:
-                printf ("mode=MPOL_INTERLEAVE nodemask=%lu", nodemask);
-                break;
-
-            case MPOL_PREFERRED:
-                printf ("mode=MPOL_PREFERRED nodemask=%lu", nodemask);
-                break;
-
-            default:
-                printf ("unknown mode %d", mode);
-                break;
-            }
-            printf ("\n");
-        }
-        else
-        {
-            fprintf (stderr, "get_mempolicy failed\n");
-            exit (EXIT_FAILURE);
-        }
+        display_current_mempolicy (false, context->thread_index);
 
         rc = sem_post (&context->ready_semaphore);
         if (rc != 0)
@@ -189,27 +242,18 @@ static void *mempolicy_thread (void *const arg)
 int main (int argc, char *argv[])
 {
     int rc;
-    unsigned long allowed_nodes_mask;
-    unsigned int node_number;
     unsigned int thread_index;
     mempolicy_thread_context threads[NUM_MEMPOLICY_THREADS];
     unsigned int iteration;
 
-    /* Get the allowed NUMA nodes mask, and calculate the number of nodes assuming start from zero */
-    rc = get_mempolicy (NULL, &allowed_nodes_mask, MAXNODE, NULL, MPOL_F_MEMS_ALLOWED);
-    if (rc != 0)
+    /* Get the number of NUMA nodes */
+    rc = numa_available ();
+    if (rc == -1)
     {
-        fprintf (stderr, "get_mem_policy failed\b");
+        fprintf (stderr, "NUMA is not available\n");
         exit (EXIT_FAILURE);
     }
-
-    num_nodes = 0;
-    node_number = 0;
-    while ((1u << node_number) & allowed_nodes_mask)
-    {
-        num_nodes++;
-        node_number++;
-    }
+    num_nodes = numa_num_configured_nodes ();
     printf ("Num NUMA nodes = %u\n", num_nodes);
 
     /* Create the test threads, and wait form them to be ready */
@@ -274,6 +318,7 @@ int main (int argc, char *argv[])
         }
 
         /* Tell the threads to readback and display their mempolicy */
+        display_current_mempolicy (true, 0);
         for (thread_index = 0; thread_index < NUM_MEMPOLICY_THREADS; thread_index++)
         {
             mempolicy_thread_context *const thread = &threads[thread_index];
