@@ -8,9 +8,13 @@
 
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <errno.h>
+#include <unistd.h>
 #include <infiniband/verbs.h>
+
+#include "ibv_functional_loopback_test_interface.h"
 
 /** Defines one entry to map an enumeration value to its name */
 #define ENUM_LIST_INIT(enumeration) {enumeration, #enumeration}
@@ -101,14 +105,36 @@ static int num_ibv_devices;
 static struct ibv_device **ibv_device_list;
 
 /** The Infiniband device used for the loopback tests, which is the first device found */
-static struct ibv_context *ibv_loopback_device;
-static struct ibv_device_attr ibv_loopback_device_attributes;
+struct ibv_context *ibv_loopback_device;
+struct ibv_device_attr ibv_loopback_device_attributes;
 
 /** The ports used on the Infiniband device used for the loopback tests */
-#define SOURCE_PORT_NUM      1
-#define DESTINATION_PORT_NUM 2
-#define NUM_TEST_PORTS       2
-static struct ibv_port_attr ibv_loopback_port_attributes[NUM_TEST_PORTS+1];
+struct ibv_port_attr ibv_loopback_port_attributes[NUM_TEST_PORTS+1];
+
+/** The protection domain for the Infiniband device used for the loopback tests */
+struct ibv_pd *ibv_loopback_device_pd;
+
+/**
+ * @brief Perform a page size aligned allocation
+ * @param[in] size The size of the allocated
+ * @return Returns a pointer to page aligned allocation
+ */
+void *page_aligned_alloc (const size_t size)
+{
+    int rc;
+    const size_t page_size = sysconf (_SC_PAGE_SIZE);
+    void *buffer;
+
+    rc = posix_memalign (&buffer, page_size, size);
+    if (rc != 0)
+    {
+        errno = rc;
+        perror ("posix_memalign failed");
+        exit (EXIT_FAILURE);
+    }
+
+    return buffer;
+}
 
 /**
  * @brief Display the name of an enumeration value
@@ -251,6 +277,9 @@ static void display_ibv_port_attributes (const struct ibv_port_attr *const port_
     printf ("\n");
 }
 
+/**
+ * @brief Open the Infiniband device to be used for the loopback tests, including obtaining the port attributes
+ */
 static void open_infiniband_loopback_ports (void)
 {
     int rc;
@@ -305,11 +334,29 @@ static void open_infiniband_loopback_ports (void)
     display_ibv_port_attributes (&ibv_loopback_port_attributes[SOURCE_PORT_NUM]);
     printf ("Attributes of destination port %u:\n", DESTINATION_PORT_NUM);
     display_ibv_port_attributes (&ibv_loopback_port_attributes[DESTINATION_PORT_NUM]);
+
+    /* Create the single protection domain used for all tests */
+    ibv_loopback_device_pd = ibv_alloc_pd (ibv_loopback_device);
+    if (ibv_loopback_device_pd == NULL)
+    {
+        fprintf (stderr, "ibv_alloc_pd failed\n");
+        exit (EXIT_SUCCESS);
+    }
 }
 
+/**
+ * @brief Close the Infiniband device used for the loopback tests
+ */
 static void close_ininiband_loopback_ports (void)
 {
     int rc;
+
+    rc = ibv_dealloc_pd (ibv_loopback_device_pd);
+    if (rc != 0)
+    {
+        perror ("ibv_dealloc_pd failed");
+        exit (EXIT_FAILURE);
+    }
 
     rc = ibv_close_device (ibv_loopback_device);
     if (rc != 0)
@@ -333,6 +380,7 @@ int main (int argc, char *argv[])
     }
 
     open_infiniband_loopback_ports ();
+    test_sender_rdma_write_receiver_passive ();
     close_ininiband_loopback_ports ();
 
     return EXIT_FAILURE;
