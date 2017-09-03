@@ -49,11 +49,15 @@ typedef struct
 /** The number of NUMA memory nodes */
 static unsigned int num_nodes;
 
+/** unsigned long array length for get_mempolicy() call to store the nodemask length
+ *  allocated by the Kernel */
+static int nodemask_array_length;
+
+/** maxnode value for get_mempolicy() for nodemask_array_length */
+static int maxnode;
+
 /**
  * @brief Obtain and display the current mempolicy for the calling thread
- * @todo On a single NUMA node CentOS 6.7 system get_mempolicy() returned EINVAL
- *       when an attempt is made to read the nodemask for the current mempolicy,
- *       in which case this function displays the current nodemask as unknown via "???"
  * @param[in] is_main_true True if being called from the program main thread
  * @param[in] thread_index If is_main_thread is false, the index of which test thread is called from
  */
@@ -61,15 +65,15 @@ static void display_current_mempolicy (const bool is_main_thread, const unsigned
 {
     int rc;
     int mode;
-    unsigned long nodemask;
+    unsigned long *nodemask = calloc (nodemask_array_length, sizeof (unsigned long));
     bool nodemask_valid;
 
-    nodemask = 0;
-    rc = get_mempolicy (&mode, &nodemask, numa_max_possible_node(), NULL, 0);
+    errno = 0;
+    rc = get_mempolicy (&mode, nodemask, maxnode, NULL, 0);
     nodemask_valid = rc == 0;
-    if ((rc != 0) && (errno = EINVAL))
+    if ((rc != 0) && (errno == EINVAL))
     {
-        rc = get_mempolicy (&mode, NULL, numa_max_possible_node(), NULL, 0);
+        rc = get_mempolicy (&mode, NULL, 0, NULL, 0);
     }
     if (rc == 0)
     {
@@ -90,7 +94,7 @@ static void display_current_mempolicy (const bool is_main_thread, const unsigned
         case MPOL_BIND:
             if (nodemask_valid)
             {
-                printf ("mode=MPOL_BIND nodemask=%lu", nodemask);
+                printf ("mode=MPOL_BIND nodemask=%lu", *nodemask);
             }
             else
             {
@@ -101,7 +105,7 @@ static void display_current_mempolicy (const bool is_main_thread, const unsigned
         case MPOL_INTERLEAVE:
             if (nodemask_valid)
             {
-                printf ("mode=MPOL_INTERLEAVE nodemask=%lu", nodemask);
+                printf ("mode=MPOL_INTERLEAVE nodemask=%lu", *nodemask);
             }
             else
             {
@@ -112,7 +116,7 @@ static void display_current_mempolicy (const bool is_main_thread, const unsigned
         case MPOL_PREFERRED:
             if (nodemask_valid)
             {
-                printf ("mode=MPOL_PREFERRED nodemask=%lu", nodemask);
+                printf ("mode=MPOL_PREFERRED nodemask=%lu", *nodemask);
             }
             else
             {
@@ -131,6 +135,8 @@ static void display_current_mempolicy (const bool is_main_thread, const unsigned
         perror ("get_mempolicy failed\n");
         exit (EXIT_FAILURE);
     }
+
+    free (nodemask);
 }
 
 /**
@@ -245,6 +251,7 @@ int main (int argc, char *argv[])
     unsigned int thread_index;
     mempolicy_thread_context threads[NUM_MEMPOLICY_THREADS];
     unsigned int iteration;
+    const int unsigned_long_bits = sizeof (unsigned long) * 8;
 
     /* Get the number of NUMA nodes */
     rc = numa_available ();
@@ -255,6 +262,15 @@ int main (int argc, char *argv[])
     }
     num_nodes = numa_num_configured_nodes ();
     printf ("Num NUMA nodes = %u\n", num_nodes);
+    printf ("numa_max_possible_node=%d\n", numa_max_possible_node ());
+    maxnode = numa_max_possible_node() + 1;
+    nodemask_array_length = (maxnode + unsigned_long_bits - 1) / unsigned_long_bits;
+    if (num_nodes > unsigned_long_bits)
+    {
+        fprintf (stderr, "The number of NUMA nodes exceeds the number of bits in an unsigned long\n");
+        fprintf (stderr, "This program has been written assuming the nodemask can be set in a single unsigned long\n");
+        exit (EXIT_FAILURE);
+    }
 
     /* Create the test threads, and wait form them to be ready */
     memset (threads, 0, sizeof (threads));
