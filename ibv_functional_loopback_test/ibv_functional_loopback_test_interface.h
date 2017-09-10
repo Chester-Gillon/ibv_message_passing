@@ -25,6 +25,9 @@ extern struct ibv_pd *ibv_loopback_device_pd;
 /** The maximum number of data bytes in a message, which doesn't include the message_header */
 #define MAX_MESSAGE_DATA_LEN_BYTES (1 << 24)
 
+/** No need to set a specific Infiniband service level for the tests */
+#define DEFAULT_SERVICE_LEVEL 0
+
 /** The test application header placed at the start of every message sent */
 typedef struct
 {
