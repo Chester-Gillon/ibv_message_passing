@@ -8,9 +8,15 @@
  *            and at run time the receiver determines the size of the received message from a message header.
  *          - The sender uses RDMA_WRITE
  *          - The receiver is passive, polling memory for message receipt
+ *          - The sender uses busy-polling to wait for any previous message transfer to complete
+ *
+ *          Since a single process is used to send messages between a pair of loop-backed ports on a dual port
+ *          Infiniband adapter there is no communication mechanism required to exchange Queue Pair, Memory Region
+ *          or Packet Sequence Number details between the sender and receiver (which are in the same process).
  */
 
 #include <stdlib.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
@@ -50,6 +56,35 @@ typedef struct
     uint32_t freed_sequence_numbers[NUM_MESSAGE_BUFFERS];
 } srwrp_receiver_buffer;
 
+/** Contains the context to manage one sender message buffer */
+typedef struct
+{
+    /** Contains the scatter-gather entries to transfer the message data then header.
+     *  Set at initialisation, and only the size for the message data has to be changed as messages are sent */
+    struct ibv_sge send_sges[NUM_WQES_PER_MESSAGE];
+    /** Contains the work requests to transfer the message data then header.
+     *  Set at initialisation, and do not require modification as messages are sent */
+    struct ibv_send_wr send_wrs[NUM_WQES_PER_MESSAGE];
+    /** The sequence number for the next message to be sent from this buffer */
+    uint32_t next_send_sequence_number;
+    /** Set true when the first message has been sent from the buffer.
+     *  Once set means that before can re-use the buffer to send the next message need to wait for:
+     *  - The receiver to mark the next message as freed.
+     *  - The send work requests to be marked as complete from the message_send_cq */
+    bool buffer_used;
+    /** Defines the state of the freed_sequence_numbers entry for this buffer which in updated by the receiver:
+     *  - message_not_freed_sequence_number: The previous sent message has not yet been freed.
+     *  - message_freed_sequence_number: The previous sent message has been freed.
+     *
+     *  Any other value indicates an error. */
+    uint32_t message_not_freed_sequence_number;
+    uint32_t message_freed_sequence_number;
+    /** Used to check usage of the message buffer:
+     *  - If false in use by the send API functions.
+     *  - If true in use by the application for populating the message contents to be sent */
+    bool owned_by_application;
+} srwrp_message_buffer_send_context;
+
 /** This structure contains the context for the sender of the test messages */
 typedef struct
 {
@@ -63,7 +98,35 @@ typedef struct
     struct ibv_qp *message_send_qp;
     /** The Packet Sequence Number for message_send_qp */
     uint32_t message_send_psn;
+    /** Contains the sender context for each message buffer */
+    srwrp_message_buffer_send_context buffer_contexts[NUM_MESSAGE_BUFFERS];
+    /** Used to pass the send buffers to the application */
+    api_message_buffer buffers[NUM_MESSAGE_BUFFERS];
+    /** The circular buffer index for the next message buffer to pass to the application for populating */
+    uint32_t next_send_buffer_index;
 } srwrp_sender_context;
+
+/** Contains the context to manage one receiver message buffer */
+typedef struct
+{
+    /** The scatter-gather entry to transfer the sequence number of a freed message buffer to the sender.
+     *  Set at initialisation, and doesn't required modification as messages are freed. */
+    struct ibv_sge freed_message_sge;
+    /** The work request to transfer the sequence number of a freed message buffer to the sender.
+     *  Set at initialisation, and doesn't required modification as messages are freed. */
+    struct ibv_send_wr freed_message_wr;
+    /** Defines the sequence numbers which appear in the received message header:
+     *  - message_not_available_sequence_number: A message is not yet available
+     *  -message_available_sequence_number : A message is available
+     *
+     *  Any other value indicates an error */
+    uint32_t message_not_available_sequence_number;
+    uint32_t message_available_sequence_number;
+    /** Used to check usage of the message buffer:
+     *  - If false in use by the receive API functions.
+     *  - If true in use by the application for processing the received message contents */
+    bool owned_by_application;
+} srwrp_message_buffer_receive_context;
 
 /** This structure contains the context for the receiver of the test messages */
 typedef struct
@@ -78,6 +141,10 @@ typedef struct
     struct ibv_qp *freed_sequence_number_qp;
     /** The Packet Sequence Number for freed_sequence_number_qp */
     uint32_t freed_sequence_number_psn;
+    /** Contains the receiver context for each message buffer */
+    srwrp_message_buffer_receive_context buffer_contexts[NUM_MESSAGE_BUFFERS];
+    /** Used to pass the receive buffers to the application */
+    api_message_buffer buffers[NUM_MESSAGE_BUFFERS];
 } srwrp_receiver_context;
 
 /**
@@ -138,7 +205,7 @@ static void srwrp_sender_create_local (srwrp_sender_context *const send_context)
     qp_attr.qp_state = IBV_QPS_INIT;
     qp_attr.pkey_index = 0;
     qp_attr.port_num = SOURCE_PORT_NUM;
-    qp_attr.qp_access_flags = 0;
+    qp_attr.qp_access_flags = IBV_ACCESS_REMOTE_WRITE;
     rc = ibv_modify_qp (send_context->message_send_qp, &qp_attr,
                         IBV_QP_STATE      |
                         IBV_QP_PKEY_INDEX |
@@ -210,7 +277,7 @@ static void srwrp_receiver_create_local (srwrp_receiver_context *const receive_c
     qp_attr.qp_state = IBV_QPS_INIT;
     qp_attr.pkey_index = 0;
     qp_attr.port_num = DESTINATION_PORT_NUM;
-    qp_attr.qp_access_flags = 0;
+    qp_attr.qp_access_flags = IBV_ACCESS_REMOTE_WRITE;
     rc = ibv_modify_qp (receive_context->freed_sequence_number_qp, &qp_attr,
                         IBV_QP_STATE      |
                         IBV_QP_PKEY_INDEX |
@@ -225,8 +292,76 @@ static void srwrp_receiver_create_local (srwrp_receiver_context *const receive_c
 }
 
 /**
+ * @details Perform the initialisation of the context for the sender of test messages for each message buffer
+ *          which may be sent.
+ *          This sets the Infiniband structures for the send operations using the fixed buffer attributes,
+ *          so that only the data size needs to be adjusted as messages are sent.
+ * @param[in,out] send_context The sender context to initialise
+ * @param[in] receive_context The receiver context containing the "remote" memory region
+ */
+static void srwrp_sender_initialise_message_buffers (srwrp_sender_context *const send_context,
+                                                     const srwrp_receiver_context *const receive_context)
+{
+    unsigned int buffer_index;
+
+    for (buffer_index = 0; buffer_index < NUM_MESSAGE_BUFFERS; buffer_index++)
+    {
+        srwrp_message_buffer_send_context *const buffer = &send_context->buffer_contexts[buffer_index];
+        struct ibv_sge *const data_sge = &buffer->send_sges[MESSAGE_DATA_WQE_INDEX];
+        struct ibv_sge *const header_sge = &buffer->send_sges[MESSAGE_HEADER_WQE_INDEX];
+        struct ibv_send_wr *const data_wr = &buffer->send_wrs[MESSAGE_DATA_WQE_INDEX];
+        struct ibv_send_wr *const header_wr = &buffer->send_wrs[MESSAGE_HEADER_WQE_INDEX];
+
+        memset (buffer, 0, sizeof (srwrp_message_buffer_send_context));
+
+        /* Set a scatter-gather entry to transmit the maximum message data size, actual length will be set at run time */
+        data_sge->lkey = send_context->send_mr->lkey;
+        data_sge->addr = (uintptr_t) send_context->send_buffer->transmit_messages[buffer_index].data;
+        data_sge->length =  sizeof (send_context->send_buffer->transmit_messages[buffer_index].data);
+
+        /* Set a scatter-gather entry to transmit the fixed size message header */
+        header_sge->lkey = send_context->send_mr->lkey;
+        header_sge->addr = (uintptr_t) &send_context->send_buffer->transmit_messages[buffer_index].header;
+        header_sge->length = sizeof (send_context->send_buffer->transmit_messages[buffer_index].header);
+
+        /* Set the send work request for the message data */
+        data_wr->wr_id = buffer_index;
+        data_wr->sg_list = data_sge;
+        data_wr->num_sge = 1;
+        data_wr->opcode = IBV_WR_RDMA_WRITE;
+        data_wr->send_flags = IBV_SEND_SIGNALED;
+        data_wr->wr.rdma.rkey = receive_context->receive_mr->rkey;
+        data_wr->wr.rdma.remote_addr = (uintptr_t) receive_context->receive_mr->addr +
+                offsetof (srwrp_receiver_buffer, receive_messages[buffer_index].data);
+
+        /* Set the send work request for the message header */
+        header_wr->wr_id = buffer_index;
+        header_wr->sg_list = header_sge;
+        header_wr->num_sge = 1;
+        header_wr->opcode = IBV_WR_RDMA_WRITE;
+        header_wr->send_flags = IBV_SEND_SIGNALED;
+        header_wr->wr.rdma.rkey = receive_context->receive_mr->rkey;
+        header_wr->wr.rdma.remote_addr = (uintptr_t) receive_context->receive_mr->addr +
+                offsetof (srwrp_receiver_buffer, receive_messages[buffer_index].header);
+
+        /* Initialise the sequence number management */
+        buffer->owned_by_application = false;
+        buffer->next_send_sequence_number = buffer_index + 1;
+        buffer->buffer_used = false;
+        buffer->message_not_freed_sequence_number = 0;
+        buffer->message_freed_sequence_number = buffer_index + 1;
+
+        send_context->buffers[buffer_index].message = &send_context->send_buffer->transmit_messages[buffer_index];
+        send_context->buffers[buffer_index].buffer_index = buffer_index;
+    }
+
+    send_context->next_send_buffer_index = 0;
+}
+
+/**
  * @details Complete the initialisation of the context for the sender of the test messages by:
  *          - Transition the sender Queue Pair, used to send messages, to the Ready To Send State
+ *          - Initialise the message send buffers
  *
  *          This requires the the Queue Pair and memory region for the receive context
  * @param[in,out] send_context The sender context to initialise
@@ -244,7 +379,7 @@ static void srwrp_sender_attach_remote (srwrp_sender_context *const send_context
     qp_attr.path_mtu = ibv_loopback_port_attributes[SOURCE_PORT_NUM].active_mtu;
     qp_attr.dest_qp_num = receive_context->freed_sequence_number_qp->qp_num;
     qp_attr.rq_psn = receive_context->freed_sequence_number_psn;
-    qp_attr.max_dest_rd_atomic = 1;
+    qp_attr.max_dest_rd_atomic = 0;
     qp_attr.min_rnr_timer = 12; /* 0.64 milliseconds delay */
     qp_attr.ah_attr.is_global = false;
     qp_attr.ah_attr.dlid = ibv_loopback_port_attributes[DESTINATION_PORT_NUM].lid;
@@ -269,11 +404,11 @@ static void srwrp_sender_attach_remote (srwrp_sender_context *const send_context
     /* Transition the sender Queue Pair to the Ready to Send state */
     memset (&qp_attr, 0, sizeof (qp_attr));
     qp_attr.qp_state = IBV_QPS_RTS;
-    qp_attr.rq_psn = send_context->message_send_psn;
+    qp_attr.sq_psn = send_context->message_send_psn;
     qp_attr.timeout = 14;
     qp_attr.retry_cnt = 7;
     qp_attr.rnr_retry = 7; /* Infinite */
-    qp_attr.max_rd_atomic = 1;
+    qp_attr.max_rd_atomic = 0;
     rc = ibv_modify_qp (send_context->message_send_qp, &qp_attr,
                         IBV_QP_STATE              |
                         IBV_QP_TIMEOUT            |
@@ -288,11 +423,60 @@ static void srwrp_sender_attach_remote (srwrp_sender_context *const send_context
     }
     verify_qp_state (IBV_QPS_RTS, send_context->message_send_qp, "message_send_qp");
     display_qp_capabilities (send_context->message_send_qp, "message_send_qp");
+
+    srwrp_sender_initialise_message_buffers (send_context, receive_context);
+}
+
+/**
+ * @details Perform the initialisation of the context for the sender of test messages for each message buffer
+ *          which may be sent.
+ *          This sets the Infiniband structures for the send operations using the fixed buffer attributes,
+ *          so that only the data size needs to be adjusted as messages are sent.
+ * @param[in,out] send_context The sender context to initialise
+ * @param[in] receive_context The receiver context containing the "remote" memory region
+ */
+
+/**
+ * @details Perform the initialisation of the context for the receiver of test messages for each message buffer
+ */
+static void srwrp_receiver_initialise_message_buffers (srwrp_receiver_context *const receive_context,
+                                                       const srwrp_sender_context *const send_context)
+{
+    unsigned int buffer_index;
+
+    for (buffer_index = 0; buffer_index < NUM_MESSAGE_BUFFERS; buffer_index++)
+    {
+        srwrp_message_buffer_receive_context *const buffer = &receive_context->buffer_contexts[buffer_index];
+
+        /* Set the scatter-gather entry to transmit the freed message sequence number */
+        buffer->freed_message_sge.lkey = send_context->send_mr->lkey;
+        buffer->freed_message_sge.addr = (uintptr_t) &receive_context->receive_buffer->freed_sequence_numbers[buffer_index];
+        buffer->freed_message_sge.length = sizeof (receive_context->receive_buffer->freed_sequence_numbers[buffer_index]);
+
+        /* Set the work request to transmit the freed message sequence number */
+        buffer->freed_message_wr.wr_id = buffer_index;
+        buffer->freed_message_wr.sg_list = &buffer->freed_message_sge;
+        buffer->freed_message_wr.num_sge = 1;
+        buffer->freed_message_wr.opcode = IBV_WR_RDMA_WRITE;
+        buffer->freed_message_wr.send_flags = IBV_SEND_SIGNALED;
+        buffer->freed_message_wr.wr.rdma.rkey = send_context->send_mr->rkey;
+        buffer->freed_message_wr.wr.rdma.remote_addr = (uintptr_t) send_context->send_mr->addr +
+                offsetof (srwrp_sender_buffer, freed_sequence_numbers[buffer_index]);
+
+        /* Initialise the sequence number management */
+        buffer->owned_by_application = false;
+        buffer->message_not_available_sequence_number = 0;
+        buffer->message_available_sequence_number = buffer_index + 1;
+
+        receive_context->buffers[buffer_index].message = &receive_context->receive_buffer->receive_messages[buffer_index];
+        receive_context->buffers[buffer_index].buffer_index = buffer_index;
+    }
 }
 
 /**
  * @details Complete the initialisation of the context for the receiver of the test messages by:
  *          - Transition the receiver Queue Pair, used to report freed message buffers, to the Ready To Send State
+ *          - Initialise the message receive buffers
  *
  *          This requires the the Queue Pair and memory region for the send context
  * @param[in,out] receive_context The receiver context to initialise
@@ -310,7 +494,7 @@ static void srwrp_receiver_attach_remote (srwrp_receiver_context *const receive_
     qp_attr.path_mtu = ibv_loopback_port_attributes[DESTINATION_PORT_NUM].active_mtu;
     qp_attr.dest_qp_num = send_context->message_send_qp->qp_num;
     qp_attr.rq_psn = send_context->message_send_psn;
-    qp_attr.max_dest_rd_atomic = 1;
+    qp_attr.max_dest_rd_atomic = 0;
     qp_attr.min_rnr_timer = 12; /* 0.64 milliseconds delay */
     qp_attr.ah_attr.is_global = false;
     qp_attr.ah_attr.dlid = ibv_loopback_port_attributes[SOURCE_PORT_NUM].lid;
@@ -335,11 +519,11 @@ static void srwrp_receiver_attach_remote (srwrp_receiver_context *const receive_
     /* Transition the sender Queue Pair to the Ready to Send state */
     memset (&qp_attr, 0, sizeof (qp_attr));
     qp_attr.qp_state = IBV_QPS_RTS;
-    qp_attr.rq_psn = receive_context->freed_sequence_number_psn;
+    qp_attr.sq_psn = receive_context->freed_sequence_number_psn;
     qp_attr.timeout = 14;
     qp_attr.retry_cnt = 7;
     qp_attr.rnr_retry = 7; /* Infinite */
-    qp_attr.max_rd_atomic = 1;
+    qp_attr.max_rd_atomic = 0;
     rc = ibv_modify_qp (receive_context->freed_sequence_number_qp, &qp_attr,
                         IBV_QP_STATE              |
                         IBV_QP_TIMEOUT            |
@@ -354,6 +538,8 @@ static void srwrp_receiver_attach_remote (srwrp_receiver_context *const receive_
     }
     verify_qp_state (IBV_QPS_RTS, receive_context->freed_sequence_number_qp, "freed_sequence_number_qp");
     display_qp_capabilities (receive_context->freed_sequence_number_qp, "freed_sequence_number_qp");
+
+    srwrp_receiver_initialise_message_buffers (receive_context, send_context);
 }
 
 /**
@@ -420,15 +606,143 @@ static void srwrp_receiver_finalise (srwrp_receiver_context *const receive_conte
     free (receive_context->receive_buffer);
 }
 
-void test_sender_rdma_write_receiver_passive (void)
+/**
+ * @brief Allocate and initialise the send and receive contexts to be used to transfer test messages
+ * @param[out] send_context_out The allocated send context
+ * @param[out] receive_context_out The allocated receive context
+ */
+static void srwrp_initialise (api_send_context *const send_context_out, api_receive_context *const receive_context_out)
 {
-    srwrp_sender_context send_context;
-    srwrp_receiver_context receive_context;
+    srwrp_sender_context *const send_context = cache_line_aligned_alloc (sizeof (srwrp_sender_context));
+    srwrp_receiver_context *const receive_context = cache_line_aligned_alloc (sizeof (srwrp_receiver_context));
 
-    srwrp_sender_create_local (&send_context);
-    srwrp_receiver_create_local (&receive_context);
-    srwrp_sender_attach_remote (&send_context, &receive_context);
-    srwrp_receiver_attach_remote (&receive_context, &send_context);
-    srwrp_sender_finalise (&send_context);
-    srwrp_receiver_finalise (&receive_context);
+    srwrp_sender_create_local (send_context);
+    srwrp_receiver_create_local (receive_context);
+    srwrp_sender_attach_remote (send_context, receive_context);
+    srwrp_receiver_attach_remote (receive_context, send_context);
+
+    *send_context_out = (api_send_context) send_context;
+    *receive_context_out = (api_receive_context) receive_context;
+}
+
+/**
+ * @brief Free the sources used for the send and receive contexts used to transfer test messages
+ * @param[in] send_context_in The send context to free the resources for
+ * @param[in] receive_context_in The receive context to free the resources for
+ */
+static void srwrp_finalise (api_send_context send_context_in, api_receive_context receive_context_in)
+{
+    srwrp_sender_context *const send_context = (srwrp_sender_context *) send_context_in;
+    srwrp_receiver_context *const receive_context = (srwrp_receiver_context *) receive_context_in;
+
+    srwrp_sender_finalise (send_context);
+    srwrp_receiver_finalise (receive_context);
+    free (send_context);
+    free (receive_context);
+}
+
+/**
+ * @brief Get a message send buffer to populate
+ * @details If the next message buffer is still in use with a previous message being transferred then waits
+ *          with a busy-poll for the previous message transfer to complete
+ * @param[in,out] send_context_in The send context to get the message buffer for
+ * @return Returns a pointer to a message buffer, for which the message field can be populated with a message to send
+ */
+static api_message_buffer *srwrp_get_send_buffer (api_send_context send_context_in)
+{
+    srwrp_sender_context *const send_context = (srwrp_sender_context *) send_context_in;
+    api_message_buffer *const buffer = &send_context->buffers[send_context->next_send_buffer_index];
+    srwrp_message_buffer_send_context *const buffer_context = &send_context->buffer_contexts[buffer->buffer_index];
+    volatile uint32_t *const freed_sequence_number = &send_context->send_buffer->freed_sequence_numbers[buffer->buffer_index];
+    int num_completions;
+    struct ibv_wc wc;
+    unsigned int wqe_index;
+
+    CHECK_ASSERT (!buffer_context->owned_by_application);
+    if (buffer_context->buffer_used)
+    {
+        /* Wait for receiver to indicate the previous message used by this buffer has been freed */
+        /*@todo
+        while (*freed_sequence_number != buffer_context->message_freed_sequence_number)
+        {
+            CHECK_ASSERT (*freed_sequence_number == buffer_context->message_not_freed_sequence_number);
+        }
+        buffer_context->message_not_freed_sequence_number = buffer_context->message_freed_sequence_number;
+        buffer_context->message_freed_sequence_number = buffer_context->next_send_sequence_number;
+        */
+
+        /* Wait for the previous transmission of the data and header using this buffer to complete.
+         * This isn't expected to have to wait, since the above test has waited for the receiver to
+         * indicate the message has freed which indicates the message must have been sent. */
+        for (wqe_index = 0; wqe_index < NUM_WQES_PER_MESSAGE; wqe_index++)
+        {
+            if (buffer_context->send_sges[wqe_index].length > 0)
+            {
+                do
+                {
+                    num_completions = ibv_poll_cq (send_context->message_send_cq, 1, &wc);
+                } while (num_completions == 0);
+                CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS) && (wc.wr_id == buffer->buffer_index));
+            }
+        }
+    }
+
+    /* Mark the buffer as being prepared by the application, and advance to the next sender buffer index */
+    buffer_context->buffer_used = true;
+    buffer_context->owned_by_application = true;
+    send_context->next_send_buffer_index = (send_context->next_send_buffer_index + 1) % NUM_MESSAGE_BUFFERS;
+
+    return buffer;
+}
+
+/**
+ * @brief Send a message with the content which has been populated by the caller
+ * @details When this function returns the message has been queued for transmission
+ * @param[in,out] send_context_in The send context to send the message on
+ * @param[in,out] buffer The message buffer to send, which was previously returned by get_send_buffer()
+ *                       and which the message to send has been populated by the caller.
+ *                       This function will set the buffer->message.header.sequence_number field
+ */
+static void srwrp_send_message (api_send_context send_context_in, api_message_buffer *const buffer)
+{
+    srwrp_sender_context *const send_context = (srwrp_sender_context *) send_context_in;
+    srwrp_message_buffer_send_context *const buffer_context = &send_context->buffer_contexts[buffer->buffer_index];
+    struct ibv_send_wr *bad_wr = NULL;
+    int rc;
+
+    CHECK_ASSERT ((buffer_context->owned_by_application) &&
+                  (buffer->message->header.message_length <= MAX_MESSAGE_DATA_LEN_BYTES));
+    buffer_context->owned_by_application = false;
+
+    /* Complete the message to be sent */
+    buffer->message->header.sequence_number = buffer_context->next_send_sequence_number;
+    buffer_context->send_sges[MESSAGE_DATA_WQE_INDEX].length = buffer->message->header.message_length;
+
+    /* Start the transfer for the data when a non-zero length
+     * (since a length of zero is interpreted by ibv_post_send() as a maximum length message) */
+    if (buffer_context->send_wrs[MESSAGE_DATA_WQE_INDEX].sg_list->length > 0)
+    {
+        rc =  ibv_post_send (send_context->message_send_qp, &buffer_context->send_wrs[MESSAGE_DATA_WQE_INDEX], &bad_wr);
+        CHECK_ASSERT (rc == 0);
+    }
+
+    /* Start the transfer for the header */
+    rc =  ibv_post_send (send_context->message_send_qp, &buffer_context->send_wrs[MESSAGE_HEADER_WQE_INDEX], &bad_wr);
+    CHECK_ASSERT (rc == 0);
+
+    /* Advance to the next sequence number for this buffer */
+    buffer_context->next_send_sequence_number += NUM_MESSAGE_BUFFERS;
+}
+
+/**
+ * @brief Set the function pointers to transfer messages with the sender using RDMA write and the receive passive
+ * @param[out] functions Contains the functions pointers to the message transfer functions in this source file
+ */
+void sender_rdma_write_receiver_passive_set_functions (message_communication_functions *const functions)
+{
+    functions->description = "sender using RDMA write and the receive passive";
+    functions->initialise = srwrp_initialise;
+    functions->finalise = srwrp_finalise;
+    functions->get_send_buffer = srwrp_get_send_buffer;
+    functions->send_message = srwrp_send_message;
 }

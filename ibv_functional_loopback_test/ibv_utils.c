@@ -154,6 +154,42 @@ void *page_aligned_calloc (const size_t nmemb, const size_t size)
 }
 
 /**
+ * @brief Perform a cache line size aligned allocation
+ * @param[in] size The size of the allocated
+ * @return Returns a pointer to page aligned allocation
+ */
+void *cache_line_aligned_alloc (const size_t size)
+{
+    int rc;
+    void *buffer;
+
+    rc = posix_memalign (&buffer, CACHE_LINE_SIZE_BYTES, size);
+    if (rc != 0)
+    {
+        errno = rc;
+        perror ("posix_memalign failed");
+        exit (EXIT_FAILURE);
+    }
+
+    return buffer;
+}
+
+/**
+ * @brief Perform a cache line size aligned allocation, and zero the allocated memory
+ * @param[in] nmemb Number of elements in the array to allocate
+ * @param[in] size The size of each element in the array to allocate
+ * @return Return a pointer to the zeroed page aligned allocation
+ */
+void *cache_line_aligned_calloc (const size_t nmemb, const size_t size)
+{
+    void *const buffer = cache_line_aligned_alloc (nmemb * size);
+
+    memset (buffer, 0, size);
+
+    return buffer;
+}
+
+/**
  * @brief Display the name of an enumeration value
  * @param[in] enum_value The enumeration value to display the name for
  * @param[in] enum_list The list of enumeration values to names
@@ -354,4 +390,18 @@ void verify_qp_state (const enum ibv_qp_state expected_state, struct ibv_qp *con
 uint32_t get_random_psn (void)
 {
     return lrand48 () & 0xffffff;
+}
+
+/**
+ * @brief Abort the program if an assertion check fails
+ * @param[in] assertion If not true a programming error has been detected
+ * @param[in] message Displayed if the assertion check fails
+ */
+void check_assert (const bool assertion, const char *message)
+{
+    if (!assertion)
+    {
+        printf ("Assertion failed: %s\n", message);
+        exit (EXIT_FAILURE);
+    }
 }

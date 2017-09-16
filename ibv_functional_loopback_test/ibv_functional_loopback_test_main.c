@@ -121,9 +121,86 @@ static void close_ininiband_loopback_ports (void)
     ibv_free_device_list (ibv_device_list);
 }
 
+static void increasing_message_size_test (const message_communication_functions *const comms_functions,
+                                          api_send_context send_context, api_receive_context receive_context,
+                                          const uint32_t num_overlapped_messages)
+{
+    const uint32_t data_length_increment_words = 4095;
+    uint32_t next_data_length_bytes = 0;
+    uint32_t next_test_pattern_value = 0;
+    uint32_t data_lengths_bytes[NUM_MESSAGE_BUFFERS] = {0};
+    uint32_t data_lengths_words[NUM_MESSAGE_BUFFERS] = {0};
+    uint32_t test_pattern_start_values[NUM_MESSAGE_BUFFERS] = {0};
+    api_message_buffer *send_buffers[NUM_MESSAGE_BUFFERS] = {0};
+    unsigned int num_messages_in_iteration;
+    unsigned int message_index;
+    unsigned int test_pattern_index;
+
+    while (next_data_length_bytes < MAX_MESSAGE_DATA_LEN_BYTES)
+    {
+        /* Determine the number of sizes of messages to be used for the next iteration */
+        num_messages_in_iteration = 0;
+        while ((next_data_length_bytes < MAX_MESSAGE_DATA_LEN_BYTES) && (num_messages_in_iteration < NUM_MESSAGE_BUFFERS))
+        {
+            data_lengths_bytes[num_messages_in_iteration] = next_data_length_bytes;
+            data_lengths_words[num_messages_in_iteration] = next_data_length_bytes / sizeof (uint32_t);
+            test_pattern_start_values[num_messages_in_iteration] = next_test_pattern_value;
+            next_test_pattern_value += data_length_increment_words;
+            next_data_length_bytes += (data_length_increment_words * sizeof (uint32_t));
+            if (next_data_length_bytes > MAX_MESSAGE_DATA_LEN_BYTES)
+            {
+                next_data_length_bytes = MAX_MESSAGE_DATA_LEN_BYTES;
+            }
+            num_messages_in_iteration++;
+        }
+
+        /* Get the message send buffers */
+        for (message_index = 0; message_index < num_messages_in_iteration; message_index++)
+        {
+            send_buffers[message_index] = comms_functions->get_send_buffer (send_context);
+        }
+
+        /* Populate the test messages to be sent */
+        for (message_index = 0; message_index < num_messages_in_iteration; message_index++)
+        {
+            api_message_buffer *const buffer = send_buffers[message_index];
+
+            buffer->message->header.message_length = data_lengths_bytes[message_index];
+            buffer->message->header.message_id = test_pattern_start_values[message_index];
+            buffer->message->header.source_instance = test_pattern_start_values[message_index];
+            for (test_pattern_index = 0; test_pattern_index < data_lengths_words[message_index]; test_pattern_index++)
+            {
+                buffer->message->data[test_pattern_index] = test_pattern_start_values[message_index] + test_pattern_index;
+            }
+        }
+
+        /* Queue the test messages for transmission */
+        for (message_index = 0; message_index < num_messages_in_iteration; message_index++)
+        {
+            comms_functions->send_message (send_context, send_buffers[message_index]);
+        }
+    }
+
+}
+
+/**
+ * @brief Perform a series of message transfer test using one type of Infiniband communication method
+ * @param[in] comms_functions The communication functions used to perform the message transfer tests
+ */
+static void test_message_transfers (const message_communication_functions *const comms_functions)
+{
+    api_send_context send_context;
+    api_receive_context receive_context;
+
+    comms_functions->initialise (&send_context, &receive_context);
+    increasing_message_size_test (comms_functions, send_context, receive_context, NUM_MESSAGE_BUFFERS);
+    comms_functions->finalise (send_context, receive_context);
+}
+
 int main (int argc, char *argv[])
 {
     int rc;
+    message_communication_functions comms_functions;
 
     /* Add protection against fork() being called */
     rc = ibv_fork_init ();
@@ -137,7 +214,10 @@ int main (int argc, char *argv[])
     srand48 (getpid() * time(NULL));
 
     open_infiniband_loopback_ports ();
-    test_sender_rdma_write_receiver_passive ();
+
+    sender_rdma_write_receiver_passive_set_functions (&comms_functions);
+    test_message_transfers (&comms_functions);
+
     close_ininiband_loopback_ports ();
 
     return EXIT_FAILURE;

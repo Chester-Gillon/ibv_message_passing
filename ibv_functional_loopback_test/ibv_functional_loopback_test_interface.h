@@ -54,7 +54,62 @@ typedef struct
  *  In conjunction with MAX_MESSAGE_DATA_LEN_BYTES this requires approximately 512 Mbytes for the transmit and receive buffers. */
 #define NUM_MESSAGE_BUFFERS 32
 
-void *page_aligned_alloc (const size_t size);
-void test_sender_rdma_write_receiver_passive (void);
+/** Defines one message buffer which sent/received by the test application.
+ *  The test application de-references the message pointer.
+ *  The send/receive API functions are responsible for setting the message pointer and the buffer_index */
+typedef struct
+{
+    /** Points at the message content which is to be sent or has been received */
+    test_message *message;
+    /** The message index into the circular buffer of messages */
+    uint32_t buffer_index;
+} api_message_buffer;
+
+/** Opaque points for send and receive contexts used in message communication APIs to get type checking
+ *  without details of the actual implementation method. */
+typedef struct send_context_void *api_send_context;
+typedef struct receive_context_void *api_receive_context;
+
+/** Contains a set of function pointers used to transfer test messages for a given implementation method. */
+typedef struct
+{
+    /** Describes communication method used by the function pointers */
+    const char *description;
+
+    /**
+     * @brief Allocate and initialise the send and receive contexts to be used to transfer test messages
+     * @param[out] send_context_out The allocated send context
+     * @param[out] receive_context_out The allocated receive context
+     */
+    void (*initialise) (api_send_context *const send_context_out, api_receive_context *const receive_context_out);
+
+    /**
+     * @brief Free the sources used for the send and receive contexts used to transfer test messages
+     * @param[in] send_context_in The send context to free the resources for
+     * @param[in] receive_context_in The receive context to free the resources for
+     */
+    void (*finalise) (api_send_context send_context_in, api_receive_context receive_context_in);
+
+    /**
+     * @brief Get a message send buffer to populate
+     * @details If the next message buffer is still in use with a previous message being transferred then waits
+     *          with a busy-poll for the previous message transfer to complete
+     * @param[in,out] send_context_in The send context to get the message buffer for
+     * @return Returns a pointer to a message buffer, for which the message field can be populated with a message to send
+     */
+    api_message_buffer *(*get_send_buffer) (api_send_context send_context_in);
+
+    /**
+     * @brief Send a message with the content which has been populated by the caller
+     * @details When this function returns the message has been queued for transmission
+     * @param[in,out] send_context_in The send context to send the message on
+     * @param[in,out] buffer The message buffer to send, which was previously returned by get_send_buffer()
+     *                       and which the message to send has been populated by the caller.
+     *                       This function will set the buffer->message.header.sequence_number field
+     */
+    void (*send_message) (api_send_context send_context_in, api_message_buffer *const buffer);
+} message_communication_functions;
+
+void sender_rdma_write_receiver_passive_set_functions (message_communication_functions *const functions);
 
 #endif /* IBV_FUNCTIONAL_LOOPBACK_TEST_INTERFACE_H_ */
