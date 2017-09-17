@@ -65,7 +65,7 @@ typedef struct
     uint32_t buffer_index;
 } api_message_buffer;
 
-/** Opaque points for send and receive contexts used in message communication APIs to get type checking
+/** Opaque pointers for send and receive contexts used in message communication APIs to get type checking
  *  without details of the actual implementation method. */
 typedef struct send_context_void *api_send_context;
 typedef struct receive_context_void *api_receive_context;

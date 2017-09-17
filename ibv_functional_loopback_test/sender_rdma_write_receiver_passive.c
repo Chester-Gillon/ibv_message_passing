@@ -644,7 +644,10 @@ static void srwrp_receiver_await_buffer_wr_completion (srwrp_receiver_context *c
 
     while (buffer_context->freed_message_wr_outstanding)
     {
-        num_completions = ibv_poll_cq (receive_context->freed_sequence_number_cq, 1, &wc);
+        do
+        {
+            num_completions = ibv_poll_cq (receive_context->freed_sequence_number_cq, 1, &wc);
+        } while (num_completions == 0);
         CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS) && (wc.wr_id < NUM_MESSAGE_BUFFERS));
         completed_context = &receive_context->buffer_contexts[wc.wr_id];
         CHECK_ASSERT (completed_context->freed_message_wr_outstanding);
