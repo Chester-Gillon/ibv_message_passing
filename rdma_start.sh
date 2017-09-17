@@ -17,3 +17,5 @@ sudo modprobe iw_cxgb4
 sudo modprobe iw_nes
 sudo modprobe iw_c2
 
+# Give the user permission to access the performance counters
+sudo chmod 666 /dev/infiniband/umad?

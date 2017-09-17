@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
+#include <sys/resource.h>
 #include <infiniband/verbs.h>
 
 #include "ibv_utils.h"
@@ -231,10 +232,17 @@ static void increasing_message_size_test (const message_communication_functions 
  */
 static void test_message_transfers (const message_communication_functions *const comms_functions)
 {
+    infiniband_statistics_collection initialisation_stats;
+    infiniband_statistics_collection message_test_stats;
     api_send_context send_context;
     api_receive_context receive_context;
 
+    printf ("\nTesting using %s\n", comms_functions->description);
+    get_infiniband_statistics_before_test (&initialisation_stats);
     comms_functions->initialise (&send_context, &receive_context);
+    get_infiniband_statistics_after_test (&initialisation_stats);
+
+    get_infiniband_statistics_before_test (&message_test_stats);
 
     /* Test message transfers with differing number of overlapped messages per test iteration,
      * to exercise the buffer management logic. */
@@ -242,7 +250,12 @@ static void test_message_transfers (const message_communication_functions *const
     increasing_message_size_test (comms_functions, send_context, receive_context, (NUM_MESSAGE_BUFFERS / 2) + 1);
     increasing_message_size_test (comms_functions, send_context, receive_context, NUM_MESSAGE_BUFFERS);
 
+    get_infiniband_statistics_after_test (&message_test_stats);
+
     comms_functions->finalise (send_context, receive_context);
+
+    display_infiniband_statistics (&initialisation_stats, "initialisation of Infiniband communications");
+    display_infiniband_statistics (&message_test_stats, "Infiniband message transfers");
 }
 
 int main (int argc, char *argv[])

@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <sys/resource.h>
 
 #include <infiniband/verbs.h>
 
@@ -404,4 +405,139 @@ void check_assert (const bool assertion, const char *message)
         printf ("Assertion failed: %s\n", message);
         exit (EXIT_FAILURE);
     }
+}
+
+/**
+ * @brief Read the total number of interrupts which have been delivered to the Mellanox mlx4 driver.
+ * @details This is used to determine if the Infiniband message passing tests cause interrupts to be generated.
+ * @return Returns The total number of interrupts delivered to the Mellanox mlx4 driver.
+ */
+static uint64_t get_total_mlx4_interrupts (void)
+{
+    const char *whitespace_delim = " \t";
+    bool results_valid = false;
+    FILE *interrupts_file;
+    uint64_t total_mlx4_interrupts;
+    char line[1024];
+    unsigned int num_cpus;
+    int cpu;
+    char *saveptr;
+    char *token;
+    unsigned long current_interrupt_id_total;
+    bool total_valid;
+    unsigned int cpu_index;
+    unsigned long interrupt_count;
+    char junk;
+
+    total_mlx4_interrupts = 0;
+    interrupts_file = fopen ("/proc/interrupts", "r");
+    if (interrupts_file != NULL)
+    {
+        /* Parse the first line of /proc/interrupts to obtain the number of CPUs */
+        num_cpus = 0;
+        if (fgets (line, sizeof (line), interrupts_file) != NULL)
+        {
+            saveptr = NULL;
+            token = strtok_r (line, whitespace_delim, &saveptr);
+            while ((token != NULL) && (sscanf (token, "CPU%d", &cpu) == 1))
+            {
+                num_cpus++;
+                token = strtok_r (NULL, whitespace_delim, &saveptr);
+            }
+        }
+
+        if (num_cpus > 0)
+        {
+            while (fgets (line, sizeof (line), interrupts_file) != NULL)
+            {
+                /* Skip the interrupt ID */
+                saveptr = NULL;
+                token = strtok_r (line, whitespace_delim, &saveptr);
+
+                /* Sum the number of interrupts delivered to all CPUs for this interrupt ID */
+                current_interrupt_id_total = 0;
+                total_valid = true;
+                for (cpu_index = 0; total_valid && (cpu_index < num_cpus); cpu_index++)
+                {
+                    token = strtok_r (NULL, whitespace_delim, &saveptr);
+                    total_valid = (token != NULL) && (sscanf (token, "%lu%c", &interrupt_count, &junk) == 1);
+                    if (total_valid)
+                    {
+                        current_interrupt_id_total += interrupt_count;
+                    }
+                }
+
+                /* saveptr is the remainder of the line after the interrupt counts; which contains multiple white space
+                 * delimited fields containing a description of the interrupt and the attached driver. */
+                if (total_valid && (strstr (saveptr, "mlx4") != NULL))
+                {
+                    /* This interrupt ID is serviced by the mlx4 driver */
+                    total_mlx4_interrupts += current_interrupt_id_total;
+                    results_valid = true;
+                }
+            }
+        }
+        fclose (interrupts_file);
+    }
+
+    if (!results_valid)
+    {
+        fprintf (stderr, "Failed to get count of mlx4 interrupts\n");
+        exit (EXIT_FAILURE);
+    }
+
+    return total_mlx4_interrupts;
+}
+
+/**
+ * @brief Sample the Infiniband statistics before a test
+ * @param[in,out] stats Where to store the sampled statistics
+ */
+void get_infiniband_statistics_before_test (infiniband_statistics_collection *const stats)
+{
+    int rc;
+
+    stats->before.total_mlx4_interrupts = get_total_mlx4_interrupts ();
+
+    /* Sample usage last since previous sample collection may have generated context switches */
+    rc = getrusage (RUSAGE_SELF, &stats->before.usage);
+    CHECK_ASSERT (rc == 0);
+}
+
+/**
+ * @brief Sample the Infiniband statistics after a test
+ * @param[in,out] stats Where to store the sampled statistics
+ */
+void get_infiniband_statistics_after_test (infiniband_statistics_collection *const stats)
+{
+    int rc;
+
+    /* Sample usage first since following sample collection may generate context switches */
+    rc = getrusage (RUSAGE_SELF, &stats->after.usage);
+    CHECK_ASSERT (rc == 0);
+
+    stats->after.total_mlx4_interrupts = get_total_mlx4_interrupts ();
+}
+
+/**
+ * @brief Display the change in the Infiniband statistics during a test
+ * @param[in] stats Contains the sampled statistics to display
+ * @param[in] description Output as a description of the test for which the statistics apply
+ */
+void display_infiniband_statistics (const infiniband_statistics_collection *const stats, const char *description)
+{
+    printf ("Changes to statistics for %s:\n", description);
+    printf ("  Num voluntary context switches = %ld (%ld -> %ld)\n",
+            stats->after.usage.ru_nvcsw - stats->before.usage.ru_nvcsw,
+            stats->before.usage.ru_nvcsw, stats->after.usage.ru_nvcsw);
+    printf ("  Num page reclaims = %ld (%ld -> %ld)\n",
+            stats->after.usage.ru_minflt - stats->before.usage.ru_minflt,
+            stats->before.usage.ru_minflt, stats->after.usage.ru_minflt);
+    printf ("  Num page faults = %ld (%ld -> %ld)\n",
+            stats->after.usage.ru_majflt - stats->before.usage.ru_majflt,
+            stats->before.usage.ru_majflt, stats->after.usage.ru_majflt);
+    printf ("  Num mlx4 interrupts = %lu (%lu -> %lu)\n",
+            stats->after.total_mlx4_interrupts - stats->before.total_mlx4_interrupts,
+            stats->before.total_mlx4_interrupts, stats->after.total_mlx4_interrupts);
+    printf ("\n");
 }

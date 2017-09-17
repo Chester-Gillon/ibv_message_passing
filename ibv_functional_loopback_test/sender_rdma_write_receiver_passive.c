@@ -22,6 +22,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <sys/resource.h>
 #include <infiniband/verbs.h>
 
 #include "ibv_utils.h"
@@ -837,7 +838,7 @@ static void srwrp_free_message (api_receive_context receive_context_in, api_mess
  */
 void sender_rdma_write_receiver_passive_set_functions (message_communication_functions *const functions)
 {
-    functions->description = "sender using RDMA write and the receive passive";
+    functions->description = "sender using RDMA write and the receiver passive";
     functions->initialise = srwrp_initialise;
     functions->finalise = srwrp_finalise;
     functions->get_send_buffer = srwrp_get_send_buffer;
