@@ -121,6 +121,22 @@ static void close_ininiband_loopback_ports (void)
     ibv_free_device_list (ibv_device_list);
 }
 
+/**
+ * @details Perform a test of transferring messages of increasing size, from the minimum up to the maximum.
+ *          The sending and reception is performed with a single thread, which queues a number of messages
+ *          for transmission and then waits for reception of the messages.
+ *
+ *          As a result of using a single thread, by the time the sender needs to reuse a message buffer
+ *          the message buffer will have already been freed so doesn't completely demonstrate that flow control
+ *          blocks the sender.
+ *
+ *          The messages contain an incrementing test pattern which is checked on receipt.
+ * @param[in] comms_functions Contains pointers to the message send and receive functions to be tested
+ * @param[in,out] send_context The send context to send the messages on
+ * @param[in,out] receive_context The receive context to receive the messages on
+ * @param[in] num_overlapped_messages The number of messages which are sent / received in each test iteration.
+ *                                    Valid range is 1..NUM_MESSAGE_BUFFERS
+ */
 static void increasing_message_size_test (const message_communication_functions *const comms_functions,
                                           api_send_context send_context, api_receive_context receive_context,
                                           const uint32_t num_overlapped_messages)
@@ -132,6 +148,7 @@ static void increasing_message_size_test (const message_communication_functions 
     uint32_t data_lengths_words[NUM_MESSAGE_BUFFERS] = {0};
     uint32_t test_pattern_start_values[NUM_MESSAGE_BUFFERS] = {0};
     api_message_buffer *send_buffers[NUM_MESSAGE_BUFFERS] = {0};
+    api_message_buffer *receive_buffers[NUM_MESSAGE_BUFFERS] = {0};
     unsigned int num_messages_in_iteration;
     unsigned int message_index;
     unsigned int test_pattern_index;
@@ -140,7 +157,7 @@ static void increasing_message_size_test (const message_communication_functions 
     {
         /* Determine the number of sizes of messages to be used for the next iteration */
         num_messages_in_iteration = 0;
-        while ((next_data_length_bytes < MAX_MESSAGE_DATA_LEN_BYTES) && (num_messages_in_iteration < NUM_MESSAGE_BUFFERS))
+        while ((next_data_length_bytes < MAX_MESSAGE_DATA_LEN_BYTES) && (num_messages_in_iteration < num_overlapped_messages))
         {
             data_lengths_bytes[num_messages_in_iteration] = next_data_length_bytes;
             data_lengths_words[num_messages_in_iteration] = next_data_length_bytes / sizeof (uint32_t);
@@ -163,14 +180,14 @@ static void increasing_message_size_test (const message_communication_functions 
         /* Populate the test messages to be sent */
         for (message_index = 0; message_index < num_messages_in_iteration; message_index++)
         {
-            api_message_buffer *const buffer = send_buffers[message_index];
+            test_message *const message = send_buffers[message_index]->message;
 
-            buffer->message->header.message_length = data_lengths_bytes[message_index];
-            buffer->message->header.message_id = test_pattern_start_values[message_index];
-            buffer->message->header.source_instance = test_pattern_start_values[message_index];
+            message->header.message_length = data_lengths_bytes[message_index];
+            message->header.message_id = test_pattern_start_values[message_index];
+            message->header.source_instance = test_pattern_start_values[message_index];
             for (test_pattern_index = 0; test_pattern_index < data_lengths_words[message_index]; test_pattern_index++)
             {
-                buffer->message->data[test_pattern_index] = test_pattern_start_values[message_index] + test_pattern_index;
+                message->data[test_pattern_index] = test_pattern_start_values[message_index] + test_pattern_index;
             }
         }
 
@@ -179,8 +196,33 @@ static void increasing_message_size_test (const message_communication_functions 
         {
             comms_functions->send_message (send_context, send_buffers[message_index]);
         }
-    }
 
+        /* Wait for the test messages to be received via the external loopback */
+        for (message_index = 0; message_index < num_messages_in_iteration; message_index++)
+        {
+            receive_buffers[message_index] = comms_functions->await_message (receive_context);
+        }
+
+        /* Verify the contents of the received messages */
+        for (message_index = 0; message_index < num_messages_in_iteration; message_index++)
+        {
+            const test_message *const message = receive_buffers[message_index]->message;
+
+            CHECK_ASSERT ((message->header.message_length == data_lengths_bytes[message_index]) &&
+                          (message->header.message_id == test_pattern_start_values[message_index]) &&
+                          (message->header.source_instance == test_pattern_start_values[message_index]));
+            for (test_pattern_index = 0; test_pattern_index < data_lengths_words[message_index]; test_pattern_index++)
+            {
+                CHECK_ASSERT (message->data[test_pattern_index] == test_pattern_start_values[message_index] + test_pattern_index);
+            }
+        }
+
+        /* Free the received messages */
+        for (message_index = 0; message_index < num_messages_in_iteration; message_index++)
+        {
+            comms_functions->free_message (receive_context, receive_buffers[message_index]);
+        }
+    }
 }
 
 /**
@@ -193,7 +235,13 @@ static void test_message_transfers (const message_communication_functions *const
     api_receive_context receive_context;
 
     comms_functions->initialise (&send_context, &receive_context);
+
+    /* Test message transfers with differing number of overlapped messages per test iteration,
+     * to exercise the buffer management logic. */
+    increasing_message_size_test (comms_functions, send_context, receive_context, 1);
+    increasing_message_size_test (comms_functions, send_context, receive_context, (NUM_MESSAGE_BUFFERS / 2) + 1);
     increasing_message_size_test (comms_functions, send_context, receive_context, NUM_MESSAGE_BUFFERS);
+
     comms_functions->finalise (send_context, receive_context);
 }
 
@@ -220,5 +268,5 @@ int main (int argc, char *argv[])
 
     close_ininiband_loopback_ports ();
 
-    return EXIT_FAILURE;
+    return EXIT_SUCCESS;
 }

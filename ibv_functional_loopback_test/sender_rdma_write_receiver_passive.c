@@ -115,6 +115,9 @@ typedef struct
     /** The work request to transfer the sequence number of a freed message buffer to the sender.
      *  Set at initialisation, and doesn't required modification as messages are freed. */
     struct ibv_send_wr freed_message_wr;
+    /** Set true once the freed sequence number has been sent, which means have to wait for the transfer to
+     *  complete before reusing it. */
+    bool freed_message_sent;
     /** Defines the sequence numbers which appear in the received message header:
      *  - message_not_available_sequence_number: A message is not yet available
      *  -message_available_sequence_number : A message is available
@@ -145,6 +148,8 @@ typedef struct
     srwrp_message_buffer_receive_context buffer_contexts[NUM_MESSAGE_BUFFERS];
     /** Used to pass the receive buffers to the application */
     api_message_buffer buffers[NUM_MESSAGE_BUFFERS];
+    /** The circular buffer index for the next message message to check for message receipt */
+    uint32_t next_receive_buffer_index;
 } srwrp_receiver_context;
 
 /**
@@ -449,7 +454,7 @@ static void srwrp_receiver_initialise_message_buffers (srwrp_receiver_context *c
         srwrp_message_buffer_receive_context *const buffer = &receive_context->buffer_contexts[buffer_index];
 
         /* Set the scatter-gather entry to transmit the freed message sequence number */
-        buffer->freed_message_sge.lkey = send_context->send_mr->lkey;
+        buffer->freed_message_sge.lkey = receive_context->receive_mr->lkey;
         buffer->freed_message_sge.addr = (uintptr_t) &receive_context->receive_buffer->freed_sequence_numbers[buffer_index];
         buffer->freed_message_sge.length = sizeof (receive_context->receive_buffer->freed_sequence_numbers[buffer_index]);
 
@@ -462,6 +467,7 @@ static void srwrp_receiver_initialise_message_buffers (srwrp_receiver_context *c
         buffer->freed_message_wr.wr.rdma.rkey = send_context->send_mr->rkey;
         buffer->freed_message_wr.wr.rdma.remote_addr = (uintptr_t) send_context->send_mr->addr +
                 offsetof (srwrp_sender_buffer, freed_sequence_numbers[buffer_index]);
+        buffer->freed_message_sent = false;
 
         /* Initialise the sequence number management */
         buffer->owned_by_application = false;
@@ -471,6 +477,8 @@ static void srwrp_receiver_initialise_message_buffers (srwrp_receiver_context *c
         receive_context->buffers[buffer_index].message = &receive_context->receive_buffer->receive_messages[buffer_index];
         receive_context->buffers[buffer_index].buffer_index = buffer_index;
     }
+
+    receive_context->next_receive_buffer_index = 0;
 }
 
 /**
@@ -643,8 +651,8 @@ static void srwrp_finalise (api_send_context send_context_in, api_receive_contex
 
 /**
  * @brief Get a message send buffer to populate
- * @details If the next message buffer is still in use with a previous message being transferred then waits
- *          with a busy-poll for the previous message transfer to complete
+ * @details If the next message buffer is still in use, then waits with a busy-poll for the receiver to indicate
+ *          the message has been freed (which also implies the previous send has completed).
  * @param[in,out] send_context_in The send context to get the message buffer for
  * @return Returns a pointer to a message buffer, for which the message field can be populated with a message to send
  */
@@ -653,7 +661,8 @@ static api_message_buffer *srwrp_get_send_buffer (api_send_context send_context_
     srwrp_sender_context *const send_context = (srwrp_sender_context *) send_context_in;
     api_message_buffer *const buffer = &send_context->buffers[send_context->next_send_buffer_index];
     srwrp_message_buffer_send_context *const buffer_context = &send_context->buffer_contexts[buffer->buffer_index];
-    volatile uint32_t *const freed_sequence_number = &send_context->send_buffer->freed_sequence_numbers[buffer->buffer_index];
+    const volatile uint32_t *const freed_sequence_number =
+            &send_context->send_buffer->freed_sequence_numbers[buffer->buffer_index];
     int num_completions;
     struct ibv_wc wc;
     unsigned int wqe_index;
@@ -661,15 +670,24 @@ static api_message_buffer *srwrp_get_send_buffer (api_send_context send_context_
     CHECK_ASSERT (!buffer_context->owned_by_application);
     if (buffer_context->buffer_used)
     {
+        bool message_freed = false;
+
         /* Wait for receiver to indicate the previous message used by this buffer has been freed */
-        /*@todo
-        while (*freed_sequence_number != buffer_context->message_freed_sequence_number)
+        do
         {
-            CHECK_ASSERT (*freed_sequence_number == buffer_context->message_not_freed_sequence_number);
-        }
+            const uint32_t sampled_sequence_number = *freed_sequence_number;
+
+            if (sampled_sequence_number == buffer_context->message_freed_sequence_number)
+            {
+                message_freed = true;
+            }
+            else
+            {
+                CHECK_ASSERT (sampled_sequence_number == buffer_context->message_not_freed_sequence_number);
+            }
+        } while (!message_freed);
         buffer_context->message_not_freed_sequence_number = buffer_context->message_freed_sequence_number;
         buffer_context->message_freed_sequence_number = buffer_context->next_send_sequence_number;
-        */
 
         /* Wait for the previous transmission of the data and header using this buffer to complete.
          * This isn't expected to have to wait, since the above test has waited for the receiver to
@@ -735,6 +753,85 @@ static void srwrp_send_message (api_send_context send_context_in, api_message_bu
 }
 
 /**
+ * @brief Wait for a message to be received, using a busy-poll
+ * @details The contents of the received message remains valid until the returned buffer is freed by a
+ *          call to free_message(). Flow control prevents a received message from being overwritten until freed
+ * @param[in,out] receive_context_in The receive context to receive the message on
+ * @return Returns a pointer to the received message buffer
+ */
+static api_message_buffer *srwrp_await_message (api_receive_context receive_context_in)
+{
+    srwrp_receiver_context *const receive_context = (srwrp_receiver_context *) receive_context_in;
+    const uint32_t buffer_index = receive_context->next_receive_buffer_index;
+    srwrp_message_buffer_receive_context *const buffer_context = &receive_context->buffer_contexts[buffer_index];
+    const volatile uint32_t *const receive_sequence_number =
+            &receive_context->receive_buffer->receive_messages[buffer_index].header.sequence_number;
+    bool message_available = false;
+
+    /* Wait for the sequence number to indicate the next message is available */
+    do
+    {
+        const uint32_t sampled_sequence_number = *receive_sequence_number;
+
+        if (sampled_sequence_number == buffer_context->message_available_sequence_number)
+        {
+            message_available = true;
+        }
+        else
+        {
+            CHECK_ASSERT (sampled_sequence_number == buffer_context->message_not_available_sequence_number);
+        }
+    } while (!message_available);
+
+    /* Advance to the next expected receive buffer */
+    receive_context->next_receive_buffer_index = (receive_context->next_receive_buffer_index + 1) % NUM_MESSAGE_BUFFERS;
+
+    /* Return the received message */
+    buffer_context->owned_by_application = true;
+    return &receive_context->buffers[buffer_index];
+}
+
+/**
+ * @brief Mark a receive message buffer after the received message has been freed
+ * @details This implements flow control by indicating to sender that the buffer is now free for another message
+ * @param[in,out] receive_context_in The receive context to free the message for
+ * @param[in,out] buffer The received message buffer to free
+ */
+static void srwrp_free_message (api_receive_context receive_context_in, api_message_buffer *const buffer)
+{
+    srwrp_receiver_context *const receive_context = (srwrp_receiver_context *) receive_context_in;
+    srwrp_message_buffer_receive_context *const buffer_context = &receive_context->buffer_contexts[buffer->buffer_index];
+    int num_completions;
+    struct ibv_wc wc;
+    struct ibv_send_wr *bad_wr = NULL;
+    int rc;
+
+    CHECK_ASSERT (buffer_context->owned_by_application);
+
+    if (buffer_context->freed_message_sent)
+    {
+        /* Wait for the previous transmission of the freed sequence number to complete */
+        do
+        {
+            num_completions = ibv_poll_cq (receive_context->freed_sequence_number_cq, 1, &wc);
+        } while (num_completions == 0);
+        CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS) && (wc.wr_id == buffer->buffer_index));
+    }
+
+    /* Transmit the freed sequence number to the sender, to indicate the buffer can be reused */
+    receive_context->receive_buffer->freed_sequence_numbers[buffer->buffer_index] =
+            buffer_context->message_available_sequence_number;
+    rc = ibv_post_send (receive_context->freed_sequence_number_qp, &buffer_context->freed_message_wr, &bad_wr);
+    CHECK_ASSERT (rc == 0);
+    buffer_context->freed_message_sent = true;
+
+    /* Advance to the next expected sequence number */
+    buffer_context->message_not_available_sequence_number = buffer_context->message_available_sequence_number;
+    buffer_context->message_available_sequence_number += NUM_MESSAGE_BUFFERS;
+    buffer_context->owned_by_application = false;
+}
+
+/**
  * @brief Set the function pointers to transfer messages with the sender using RDMA write and the receive passive
  * @param[out] functions Contains the functions pointers to the message transfer functions in this source file
  */
@@ -745,4 +842,6 @@ void sender_rdma_write_receiver_passive_set_functions (message_communication_fun
     functions->finalise = srwrp_finalise;
     functions->get_send_buffer = srwrp_get_send_buffer;
     functions->send_message = srwrp_send_message;
+    functions->await_message = srwrp_await_message;
+    functions->free_message = srwrp_free_message;
 }

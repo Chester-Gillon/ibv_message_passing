@@ -92,8 +92,8 @@ typedef struct
 
     /**
      * @brief Get a message send buffer to populate
-     * @details If the next message buffer is still in use with a previous message being transferred then waits
-     *          with a busy-poll for the previous message transfer to complete
+     * @details If the next message buffer is still in use, then waits with a busy-poll for the receiver to indicate
+     *          the message has been freed (which also implies the previous send has completed).
      * @param[in,out] send_context_in The send context to get the message buffer for
      * @return Returns a pointer to a message buffer, for which the message field can be populated with a message to send
      */
@@ -108,6 +108,23 @@ typedef struct
      *                       This function will set the buffer->message.header.sequence_number field
      */
     void (*send_message) (api_send_context send_context_in, api_message_buffer *const buffer);
+
+    /**
+     * @brief Wait for a message to be received, using a busy-poll
+     * @details The contents of the received message remains valid until the returned buffer is freed by a
+     *          call to free_message(). Flow control prevents a received message from being overwritten until freed
+     * @param[in,out] receive_context_in The receive context to receive the message on
+     * @return Returns a pointer to the received message buffer
+     */
+    api_message_buffer *(*await_message) (api_receive_context receive_context_in);
+
+    /**
+     * @brief Mark a receive message buffer after the received message has been freed
+     * @details This implements flow control by indicating to sender that the buffer is now free for another message
+     * @param[in,out] receive_context_in The receive context to free the message for
+     * @param[in,out] buffer The received message buffer to free
+     */
+    void (*free_message) (api_receive_context receive_context_in, api_message_buffer *const buffer);
 } message_communication_functions;
 
 void sender_rdma_write_receiver_passive_set_functions (message_communication_functions *const functions);
