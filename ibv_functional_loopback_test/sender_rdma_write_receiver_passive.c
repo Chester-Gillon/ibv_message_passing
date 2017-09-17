@@ -66,13 +66,14 @@ typedef struct
     /** Contains the work requests to transfer the message data then header.
      *  Set at initialisation, and do not require modification as messages are sent */
     struct ibv_send_wr send_wrs[NUM_WQES_PER_MESSAGE];
+    /** When true the send_wrds[] requests for this message buffer have been posted, and must be removed
+     *  from the completion queue before the buffer can be reused.
+     *  The send_wrs[MESSAGE_DATA_WQE_INDEX] isn't used when data length is zero. */
+    bool outstanding_wrs[NUM_WQES_PER_MESSAGE];
     /** The sequence number for the next message to be sent from this buffer */
     uint32_t next_send_sequence_number;
-    /** Set true when the first message has been sent from the buffer.
-     *  Once set means that before can re-use the buffer to send the next message need to wait for:
-     *  - The receiver to mark the next message as freed.
-     *  - The send work requests to be marked as complete from the message_send_cq */
-    bool buffer_used;
+    /** Set true when srwrp_get_send_buffer() needs to wait for the message buffer to be freed before it can be reused */
+    bool await_buffer_freed;
     /** Defines the state of the freed_sequence_numbers entry for this buffer which in updated by the receiver:
      *  - message_not_freed_sequence_number: The previous sent message has not yet been freed.
      *  - message_freed_sequence_number: The previous sent message has been freed.
@@ -118,7 +119,9 @@ typedef struct
     struct ibv_send_wr freed_message_wr;
     /** Set true once the freed sequence number has been sent, which means have to wait for the transfer to
      *  complete before reusing it. */
-    bool freed_message_sent;
+    /** When true the freed_message_wr for this message buffer has been posted, and must be removed from the
+     *  completion queue before the next freed sequence number can be sent. */
+    bool freed_message_wr_outstanding;
     /** Defines the sequence numbers which appear in the received message header:
      *  - message_not_available_sequence_number: A message is not yet available
      *  -message_available_sequence_number : A message is available
@@ -330,7 +333,8 @@ static void srwrp_sender_initialise_message_buffers (srwrp_sender_context *const
         header_sge->addr = (uintptr_t) &send_context->send_buffer->transmit_messages[buffer_index].header;
         header_sge->length = sizeof (send_context->send_buffer->transmit_messages[buffer_index].header);
 
-        /* Set the send work request for the message data */
+        /* Set the send work request for the message data.
+         * The wr_id is set to the buffer_index to handle calls to srwrp_send_message() out-of-order */
         data_wr->wr_id = buffer_index;
         data_wr->sg_list = data_sge;
         data_wr->num_sge = 1;
@@ -339,6 +343,7 @@ static void srwrp_sender_initialise_message_buffers (srwrp_sender_context *const
         data_wr->wr.rdma.rkey = receive_context->receive_mr->rkey;
         data_wr->wr.rdma.remote_addr = (uintptr_t) receive_context->receive_mr->addr +
                 offsetof (srwrp_receiver_buffer, receive_messages[buffer_index].data);
+        buffer->outstanding_wrs[MESSAGE_DATA_WQE_INDEX] = false;
 
         /* Set the send work request for the message header */
         header_wr->wr_id = buffer_index;
@@ -349,11 +354,12 @@ static void srwrp_sender_initialise_message_buffers (srwrp_sender_context *const
         header_wr->wr.rdma.rkey = receive_context->receive_mr->rkey;
         header_wr->wr.rdma.remote_addr = (uintptr_t) receive_context->receive_mr->addr +
                 offsetof (srwrp_receiver_buffer, receive_messages[buffer_index].header);
+        buffer->outstanding_wrs[MESSAGE_HEADER_WQE_INDEX] = false;
 
         /* Initialise the sequence number management */
+        buffer->await_buffer_freed = false;
         buffer->owned_by_application = false;
         buffer->next_send_sequence_number = buffer_index + 1;
-        buffer->buffer_used = false;
         buffer->message_not_freed_sequence_number = 0;
         buffer->message_freed_sequence_number = buffer_index + 1;
 
@@ -468,7 +474,7 @@ static void srwrp_receiver_initialise_message_buffers (srwrp_receiver_context *c
         buffer->freed_message_wr.wr.rdma.rkey = send_context->send_mr->rkey;
         buffer->freed_message_wr.wr.rdma.remote_addr = (uintptr_t) send_context->send_mr->addr +
                 offsetof (srwrp_sender_buffer, freed_sequence_numbers[buffer_index]);
-        buffer->freed_message_sent = false;
+        buffer->freed_message_wr_outstanding = false;
 
         /* Initialise the sequence number management */
         buffer->owned_by_application = false;
@@ -664,16 +670,36 @@ static api_message_buffer *srwrp_get_send_buffer (api_send_context send_context_
     srwrp_message_buffer_send_context *const buffer_context = &send_context->buffer_contexts[buffer->buffer_index];
     const volatile uint32_t *const freed_sequence_number =
             &send_context->send_buffer->freed_sequence_numbers[buffer->buffer_index];
+    srwrp_message_buffer_send_context *completed_context;
     int num_completions;
     struct ibv_wc wc;
     unsigned int wqe_index;
 
     CHECK_ASSERT (!buffer_context->owned_by_application);
-    if (buffer_context->buffer_used)
+
+    /* Wait for the previous transmission of the data and header using this buffer to complete.
+     * This involves waiting for a completion, and using the wr_id to identify which buffer the transmission has completed for.
+     * This allows for srwrp_send_message() being called out-of-order with respect to the order the buffers were obtained. */
+    while (buffer_context->outstanding_wrs[MESSAGE_HEADER_WQE_INDEX])
+    {
+        do
+        {
+            num_completions = ibv_poll_cq (send_context->message_send_cq, 1, &wc);
+        } while (num_completions == 0);
+        CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS) && (wc.wr_id < NUM_MESSAGE_BUFFERS));
+
+        completed_context = &send_context->buffer_contexts[wc.wr_id];
+        wqe_index = (completed_context->outstanding_wrs[MESSAGE_DATA_WQE_INDEX]) ?
+                MESSAGE_DATA_WQE_INDEX : MESSAGE_HEADER_WQE_INDEX;
+        CHECK_ASSERT (buffer_context->outstanding_wrs[wqe_index]);
+        completed_context->outstanding_wrs[wqe_index] = false;
+    }
+
+    /* Wait for receiver to indicate the previous message used by this buffer has been freed */
+    if (buffer_context->await_buffer_freed)
     {
         bool message_freed = false;
 
-        /* Wait for receiver to indicate the previous message used by this buffer has been freed */
         do
         {
             const uint32_t sampled_sequence_number = *freed_sequence_number;
@@ -689,25 +715,10 @@ static api_message_buffer *srwrp_get_send_buffer (api_send_context send_context_
         } while (!message_freed);
         buffer_context->message_not_freed_sequence_number = buffer_context->message_freed_sequence_number;
         buffer_context->message_freed_sequence_number = buffer_context->next_send_sequence_number;
-
-        /* Wait for the previous transmission of the data and header using this buffer to complete.
-         * This isn't expected to have to wait, since the above test has waited for the receiver to
-         * indicate the message has freed which indicates the message must have been sent. */
-        for (wqe_index = 0; wqe_index < NUM_WQES_PER_MESSAGE; wqe_index++)
-        {
-            if (buffer_context->send_sges[wqe_index].length > 0)
-            {
-                do
-                {
-                    num_completions = ibv_poll_cq (send_context->message_send_cq, 1, &wc);
-                } while (num_completions == 0);
-                CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS) && (wc.wr_id == buffer->buffer_index));
-            }
-        }
+        buffer_context->await_buffer_freed = false;
     }
 
     /* Mark the buffer as being prepared by the application, and advance to the next sender buffer index */
-    buffer_context->buffer_used = true;
     buffer_context->owned_by_application = true;
     send_context->next_send_buffer_index = (send_context->next_send_buffer_index + 1) % NUM_MESSAGE_BUFFERS;
 
@@ -743,11 +754,14 @@ static void srwrp_send_message (api_send_context send_context_in, api_message_bu
     {
         rc =  ibv_post_send (send_context->message_send_qp, &buffer_context->send_wrs[MESSAGE_DATA_WQE_INDEX], &bad_wr);
         CHECK_ASSERT (rc == 0);
+        buffer_context->outstanding_wrs[MESSAGE_DATA_WQE_INDEX] = true;
     }
 
     /* Start the transfer for the header */
     rc =  ibv_post_send (send_context->message_send_qp, &buffer_context->send_wrs[MESSAGE_HEADER_WQE_INDEX], &bad_wr);
     CHECK_ASSERT (rc == 0);
+    buffer_context->outstanding_wrs[MESSAGE_HEADER_WQE_INDEX] = true;
+    buffer_context->await_buffer_freed = true;
 
     /* Advance to the next sequence number for this buffer */
     buffer_context->next_send_sequence_number += NUM_MESSAGE_BUFFERS;
@@ -802,6 +816,7 @@ static void srwrp_free_message (api_receive_context receive_context_in, api_mess
 {
     srwrp_receiver_context *const receive_context = (srwrp_receiver_context *) receive_context_in;
     srwrp_message_buffer_receive_context *const buffer_context = &receive_context->buffer_contexts[buffer->buffer_index];
+    srwrp_message_buffer_receive_context *completed_context;
     int num_completions;
     struct ibv_wc wc;
     struct ibv_send_wr *bad_wr = NULL;
@@ -809,14 +824,16 @@ static void srwrp_free_message (api_receive_context receive_context_in, api_mess
 
     CHECK_ASSERT (buffer_context->owned_by_application);
 
-    if (buffer_context->freed_message_sent)
+    /* Wait for the previous transmission of the freed sequence number to complete.
+    * This involves waiting for a completion, and using the wr_id to identify which buffer the transmission has completed for.
+    * This allows for srwrp_free_message() being called out-of-order with respect to the order the buffers were obtained. */
+    while (buffer_context->freed_message_wr_outstanding)
     {
-        /* Wait for the previous transmission of the freed sequence number to complete */
-        do
-        {
-            num_completions = ibv_poll_cq (receive_context->freed_sequence_number_cq, 1, &wc);
-        } while (num_completions == 0);
-        CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS) && (wc.wr_id == buffer->buffer_index));
+        num_completions = ibv_poll_cq (receive_context->freed_sequence_number_cq, 1, &wc);
+        CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS) && (wc.wr_id < NUM_MESSAGE_BUFFERS));
+        completed_context = &receive_context->buffer_contexts[wc.wr_id];
+        CHECK_ASSERT (completed_context->freed_message_wr_outstanding);
+        completed_context->freed_message_wr_outstanding = false;
     }
 
     /* Transmit the freed sequence number to the sender, to indicate the buffer can be reused */
@@ -824,7 +841,7 @@ static void srwrp_free_message (api_receive_context receive_context_in, api_mess
             buffer_context->message_available_sequence_number;
     rc = ibv_post_send (receive_context->freed_sequence_number_qp, &buffer_context->freed_message_wr, &bad_wr);
     CHECK_ASSERT (rc == 0);
-    buffer_context->freed_message_sent = true;
+    buffer_context->freed_message_wr_outstanding = true;
 
     /* Advance to the next expected sequence number */
     buffer_context->message_not_available_sequence_number = buffer_context->message_available_sequence_number;

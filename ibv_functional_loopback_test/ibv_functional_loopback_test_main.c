@@ -132,6 +132,10 @@ static void close_ininiband_loopback_ports (void)
  *          blocks the sender.
  *
  *          The messages contain an incrementing test pattern which is checked on receipt.
+ *
+ *          When num_overlapped_messages is greater than one the order of calls is adjusted to test:
+ *          a) send_message() being called in a different order to the buffers were obtained with get_send_buffer().
+ *          b) free_message() being called in a different order to the buffers were received with await_message().
  * @param[in] comms_functions Contains pointers to the message send and receive functions to be tested
  * @param[in,out] send_context The send context to send the messages on
  * @param[in,out] receive_context The receive context to receive the messages on
@@ -142,7 +146,7 @@ static void increasing_message_size_test (const message_communication_functions 
                                           api_send_context send_context, api_receive_context receive_context,
                                           const uint32_t num_overlapped_messages)
 {
-    const uint32_t data_length_increment_words = 4095;
+    const uint32_t data_length_increment_words = 32767;
     uint32_t next_data_length_bytes = 0;
     uint32_t next_test_pattern_value = 0;
     uint32_t data_lengths_bytes[NUM_MESSAGE_BUFFERS] = {0};
@@ -153,6 +157,8 @@ static void increasing_message_size_test (const message_communication_functions 
     unsigned int num_messages_in_iteration;
     unsigned int message_index;
     unsigned int test_pattern_index;
+    unsigned int send_order_offset = 0;
+    unsigned int free_order_offset = 1;
 
     while (next_data_length_bytes < MAX_MESSAGE_DATA_LEN_BYTES)
     {
@@ -195,8 +201,11 @@ static void increasing_message_size_test (const message_communication_functions 
         /* Queue the test messages for transmission */
         for (message_index = 0; message_index < num_messages_in_iteration; message_index++)
         {
-            comms_functions->send_message (send_context, send_buffers[message_index]);
+            const unsigned int selected_index = (message_index + send_order_offset) % num_messages_in_iteration;
+
+            comms_functions->send_message (send_context, send_buffers[selected_index]);
         }
+        send_order_offset++;
 
         /* Wait for the test messages to be received via the external loopback */
         for (message_index = 0; message_index < num_messages_in_iteration; message_index++)
@@ -221,8 +230,11 @@ static void increasing_message_size_test (const message_communication_functions 
         /* Free the received messages */
         for (message_index = 0; message_index < num_messages_in_iteration; message_index++)
         {
-            comms_functions->free_message (receive_context, receive_buffers[message_index]);
+            const unsigned int selected_index = (message_index + free_order_offset) % num_messages_in_iteration;
+
+            comms_functions->free_message (receive_context, receive_buffers[selected_index]);
         }
+        free_order_offset++;
     }
 }
 
