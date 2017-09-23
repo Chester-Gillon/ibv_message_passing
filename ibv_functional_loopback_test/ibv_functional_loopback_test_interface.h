@@ -23,7 +23,8 @@ extern struct ibv_port_attr ibv_loopback_port_attributes[NUM_TEST_PORTS+1];
 extern struct ibv_pd *ibv_loopback_device_pd;
 
 /** The maximum number of data bytes in a message, which doesn't include the message_header */
-#define MAX_MESSAGE_DATA_LEN_BYTES (1 << 24)
+#define MAX_MESSAGE_DATA_LEN_LOG2N 24
+#define MAX_MESSAGE_DATA_LEN_BYTES (1 << MAX_MESSAGE_DATA_LEN_LOG2N)
 
 /** No need to set a specific Infiniband service level for the tests */
 #define DEFAULT_SERVICE_LEVEL 0

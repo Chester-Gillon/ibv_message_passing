@@ -1,0 +1,172 @@
+Results when not set CPU frequency and opensm running
+=====================================================
+
+$ ibv_functional_loopback_test/Release/ibv_functional_loopback_test 
+Attributes of device mlx4_0:
+ num_comp_vectors=8 fw_ver=2.9.1000
+ node_guid=0x8c504b0003c90200 sys_image_guid=0x8f504b0003c90200
+ max_mr_size=18446744073709551615 page_size_cap=4294966784 vendor_id=0x2c9 vendor_part_id=0x673c hw_ver=176
+ max_qp=131000 max_qp_wr=16351 max_sge=32 max_sge_rd=30
+device_cap_flags=IBV_DEVICE_BAD_PKEY_CNTR|IBV_DEVICE_BAD_QKEY_CNTR|IBV_DEVICE_AUTO_PATH_MIG|IBV_DEVICE_CHANGE_PHY_PORT|IBV_DEVICE_UD_AV_PORT_ENFORCE|IBV_DEVICE_PORT_ACTIVE_EVENT|IBV_DEVICE_SYS_IMAGE_GUID|IBV_DEVICE_RC_RNR_NAK_GEN|BIT15|IBV_DEVICE_IP_CSUM|BIT19|IBV_DEVICE_XRC|BIT21|BIT22|BIT26
+ max_cq=65408 max_cqe=4194303 max_mr=524272 max_pd=32764
+ max_qp_rd_atom=16 max_ee_rd_atom=0 max_res_rd_atom=2096000 max_qp_init_rd_atom=128
+ max_ee_init_rd_atom=0 atomic_cap=IBV_ATOMIC_HCA
+ max_ee=0 max_rdd=0 max_mw=0 max_raw_ipv6_qp=0 max_raw_ethy_qp=0
+ max_mcast_grp=8192 max_mcast_qp_attach=248 max_total_mcast_qp_attach=2031616
+ max_ah=0 max_fmr=0 max_map_per_fmr=8191 max_srq=65472 max_srq_wr=16383
+ max_srq_sge=31 max_pkeys=128 local_ca_ack_delay=15 phys_port_cnt=2
+Attributes of source port 1:
+ state=IBV_PORT_ACTIVE max_mtu=IBV_MTU_4096 active_mtu=IBV_MTU_4096
+ gid_tbl_len=128 port_cap_flags=0x251086a max_msg_sz=1073741824
+ bad_pkey_cntr=0 qkey_viol_cntr=0 pkey_tbl_len=128 lid=1 sm_lid=1
+ lmc=0 max_vl_num=3 sm_sl=0 subnet_timeout=18 init_type_reply=0
+ active_width=2 active_speed=4 phys_state=5 link_layer=IBV_LINK_LAYER_INFINIBAND
+Attributes of destination port 2:
+ state=IBV_PORT_ACTIVE max_mtu=IBV_MTU_4096 active_mtu=IBV_MTU_4096
+ gid_tbl_len=128 port_cap_flags=0x2510868 max_msg_sz=1073741824
+ bad_pkey_cntr=0 qkey_viol_cntr=0 pkey_tbl_len=128 lid=2 sm_lid=1
+ lmc=0 max_vl_num=3 sm_sl=0 subnet_timeout=18 init_type_reply=0
+ active_width=2 active_speed=4 phys_state=5 link_layer=IBV_LINK_LAYER_INFINIBAND
+
+Testing using sender using RDMA write and the receiver passive
+message_send_qp capabilities: max_send_wr=95 max_recv_wr=1 max_send_sge=2 max_recv_sge=1 max_inline_data=28
+freed_sequence_number_qp capabilities: max_send_wr=95 max_recv_wr=1 max_send_sge=2 max_recv_sge=1 max_inline_data=28
+Changes to statistics for initialisation of Infiniband communications:
+  Num voluntary context switches = 38 (10 -> 48)
+  Num page reclaims = 1553 (125 -> 1678)
+  Num page faults = 0 (0 -> 0)
+  Num mlx4 interrupts = 38 (11592 -> 11630)
+
+Changes to statistics for Infiniband single thread message transfers:
+  Num voluntary context switches = 0 (48 -> 48)
+  Num page reclaims = 0 (1678 -> 1678)
+  Num page faults = 0 (0 -> 0)
+  Num mlx4 interrupts = 12 (11630 -> 11642)
+
+Changes to statistics for Infiniband multi-threaded message transfers:
+  Num voluntary context switches = 84 (48 -> 132)
+  Num page reclaims = 0 (1678 -> 1678)
+  Num page faults = 0 (0 -> 0)
+  Num mlx4 interrupts = 24 (11642 -> 11666)
+
+
+Test duration (secs)  Data length (bytes)  Total messages received  Total data bytes received  Messages per sec  Data bytes per sec  Rx thread free delay (us)  Tx thread max get send buffer (us)  
+            0.999999                    0                  1789535                          0           1789537                   0                         10                                  54  
+            1.009866                   16                    94033                    1504528             93114             1489830                      10000                                9999  
+            1.000002                    0                  1770833                          0           1770830                   0  
+            1.000015                    1                  1531319                    1531319           1531296             1531296  
+            1.000014                    2                  1531338                    3062676           1531316             3062632  
+            1.000008                    4                  1533482                    6133928           1533470             6133879  
+            1.000016                    8                  1531567                   12252536           1531543            12252340  
+            1.000016                   16                  1530322                   24485152           1530297            24484752  
+            1.000014                   32                  1520215                   48646880           1520194            48646196  
+            1.000014                   64                  1500503                   96032192           1500482            96030873  
+            1.000016                  128                  1476850                  189036800           1476827           189033865  
+            1.000015                  256                  1447640                  370595840           1447619           370590356  
+            1.000018                  512                  1280418                  655574016           1280395           655562023  
+            1.000029                 1024                  1012245                 1036538880           1012216          1036509131  
+            1.000032                 2048                   749000                 1533952000            748976          1533902486  
+            1.000064                 4096                   491566                 2013454336            491535          2013326371  
+            1.000099                 8192                   310890                 2546810880            310859          2546560034  
+            1.000205                16384                   155052                 2540371968            155020          2539851095  
+            1.000426                32768                    73630                 2412707840             73599          2411681127  
+            1.000828                65536                    38441                 2519269376             38409          2517185106  
+            1.001606               131072                    19944                 2614099968             19912          2609907269  
+            1.003202               262144                    10268                 2691694592             10235          2683102118  
+            1.006196               524288                     5220                 2736783360              5188          2719930610  
+            1.012416              1048576                     2644                 2772434944              2612          2738434495  
+            1.025031              2097152                     1343                 2816475136              1310          2747696997  
+            1.050030              4194304                      689                 2889875456               656          2752183102  
+            1.099133              8388608                      361                 3028287488               328          2755159310  
+            1.197996             16777216                      197                 3305111552               164          2758866930  
+
+
+Results when not set CPU frequency and opensm stopped
+=====================================================
+
+$ !1976
+sudo kill -STOP `pgrep opensm`
+[sudo] password for mr_halfword: 
+
+[1]+  Stopped                 sudo opensm
+mr_halfword@Sandy-Ubuntu:~/ibv_message_passing$ ibv_functional_loopback_test/Release/ibv_functional_loopback_test 
+Attributes of device mlx4_0:
+ num_comp_vectors=8 fw_ver=2.9.1000
+ node_guid=0x8c504b0003c90200 sys_image_guid=0x8f504b0003c90200
+ max_mr_size=18446744073709551615 page_size_cap=4294966784 vendor_id=0x2c9 vendor_part_id=0x673c hw_ver=176
+ max_qp=131000 max_qp_wr=16351 max_sge=32 max_sge_rd=30
+device_cap_flags=IBV_DEVICE_BAD_PKEY_CNTR|IBV_DEVICE_BAD_QKEY_CNTR|IBV_DEVICE_AUTO_PATH_MIG|IBV_DEVICE_CHANGE_PHY_PORT|IBV_DEVICE_UD_AV_PORT_ENFORCE|IBV_DEVICE_PORT_ACTIVE_EVENT|IBV_DEVICE_SYS_IMAGE_GUID|IBV_DEVICE_RC_RNR_NAK_GEN|BIT15|IBV_DEVICE_IP_CSUM|BIT19|IBV_DEVICE_XRC|BIT21|BIT22|BIT26
+ max_cq=65408 max_cqe=4194303 max_mr=524272 max_pd=32764
+ max_qp_rd_atom=16 max_ee_rd_atom=0 max_res_rd_atom=2096000 max_qp_init_rd_atom=128
+ max_ee_init_rd_atom=0 atomic_cap=IBV_ATOMIC_HCA
+ max_ee=0 max_rdd=0 max_mw=0 max_raw_ipv6_qp=0 max_raw_ethy_qp=0
+ max_mcast_grp=8192 max_mcast_qp_attach=248 max_total_mcast_qp_attach=2031616
+ max_ah=0 max_fmr=0 max_map_per_fmr=8191 max_srq=65472 max_srq_wr=16383
+ max_srq_sge=31 max_pkeys=128 local_ca_ack_delay=15 phys_port_cnt=2
+Attributes of source port 1:
+ state=IBV_PORT_ACTIVE max_mtu=IBV_MTU_4096 active_mtu=IBV_MTU_4096
+ gid_tbl_len=128 port_cap_flags=0x251086a max_msg_sz=1073741824
+ bad_pkey_cntr=0 qkey_viol_cntr=0 pkey_tbl_len=128 lid=1 sm_lid=1
+ lmc=0 max_vl_num=3 sm_sl=0 subnet_timeout=18 init_type_reply=0
+ active_width=2 active_speed=4 phys_state=5 link_layer=IBV_LINK_LAYER_INFINIBAND
+Attributes of destination port 2:
+ state=IBV_PORT_ACTIVE max_mtu=IBV_MTU_4096 active_mtu=IBV_MTU_4096
+ gid_tbl_len=128 port_cap_flags=0x2510868 max_msg_sz=1073741824
+ bad_pkey_cntr=0 qkey_viol_cntr=0 pkey_tbl_len=128 lid=2 sm_lid=1
+ lmc=0 max_vl_num=3 sm_sl=0 subnet_timeout=18 init_type_reply=0
+ active_width=2 active_speed=4 phys_state=5 link_layer=IBV_LINK_LAYER_INFINIBAND
+
+Testing using sender using RDMA write and the receiver passive
+message_send_qp capabilities: max_send_wr=95 max_recv_wr=1 max_send_sge=2 max_recv_sge=1 max_inline_data=28
+freed_sequence_number_qp capabilities: max_send_wr=95 max_recv_wr=1 max_send_sge=2 max_recv_sge=1 max_inline_data=28
+Changes to statistics for initialisation of Infiniband communications:
+  Num voluntary context switches = 38 (10 -> 48)
+  Num page reclaims = 1553 (123 -> 1676)
+  Num page faults = 0 (0 -> 0)
+  Num mlx4 interrupts = 38 (12625 -> 12663)
+
+Changes to statistics for Infiniband single thread message transfers:
+  Num voluntary context switches = 0 (48 -> 48)
+  Num page reclaims = 0 (1676 -> 1676)
+  Num page faults = 0 (0 -> 0)
+  Num mlx4 interrupts = 0 (12663 -> 12663)
+
+Changes to statistics for Infiniband multi-threaded message transfers:
+  Num voluntary context switches = 84 (48 -> 132)
+  Num page reclaims = 0 (1676 -> 1676)
+  Num page faults = 0 (0 -> 0)
+  Num mlx4 interrupts = 0 (12663 -> 12663)
+
+
+Test duration (secs)  Data length (bytes)  Total messages received  Total data bytes received  Messages per sec  Data bytes per sec  Rx thread free delay (us)  Tx thread max get send buffer (us)  
+            0.999998                    0                  1786849                          0           1786852                   0                         10                                  25  
+            1.000013                   16                    93768                    1500288             93767             1500269                      10000                                9999  
+            1.000005                    0                  1772512                          0           1772503                   0  
+            1.000014                    1                  1526265                    1526265           1526244             1526244  
+            1.000014                    2                  1527432                    3054864           1527411             3054822  
+            1.000014                    4                  1527141                    6108564           1527119             6108477  
+            1.000017                    8                  1526669                   12213352           1526643            12213144  
+            1.000015                   16                  1525657                   24410512           1525634            24410148  
+            1.000015                   32                  1517714                   48566848           1517691            48566113  
+            1.000014                   64                  1496912                   95802368           1496891            95801056  
+            1.000015                  128                  1470800                  188262400           1470777           188259502  
+            1.000016                  256                  1439567                  368529152           1439544           368523287  
+            1.000019                  512                  1271227                  650868224           1271203           650855888  
+            1.000026                 1024                  1020962                 1045465088           1020935          1045437604  
+            1.000034                 2048                   754446                 1545105408            754420          1545052632  
+            1.000055                 4096                   493487                 2021322752            493460          2021210739  
+            1.000100                 8192                   307299                 2517393408            307268          2517142774  
+            1.000205                16384                   150781                 2470395904            150750          2469890787  
+            1.000421                32768                    73546                 2409955328             73515          2408940658  
+            1.000833                65536                    38523                 2524643328             38491          2522541698  
+            1.001602               131072                    19955                 2615541760             19923          2611357198  
+            1.003211               262144                    10271                 2692481024             10238          2683862104  
+            1.006240               524288                     5222                 2737831936              5190          2720853762  
+            1.012400              1048576                     2645                 2773483520              2613          2739512248  
+            1.024890              2097152                     1343                 2816475136              1310          2748076322  
+            1.050058              4194304                      689                 2889875456               656          2752109812  
+            1.099148              8388608                      361                 3028287488               328          2755123398  
+            1.198181             16777216                      197                 3305111552               164          2758441661  
+
+This shows that opensm is stopped running the number of mlx4 interrupts during the message transfer tests changes
+from a few tens to zero. i.e. the message transfer tests are not causing any mlx4 interrupts themselves.

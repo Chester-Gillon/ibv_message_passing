@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
@@ -138,6 +139,21 @@ typedef struct
     /** The results from the receiver thread */
     receiver_thread_results receiver_results;
 } message_thread_results;
+
+/** The different tests which are run for the message tests using thread */
+typedef enum
+{
+    /** Send test messages with the receiver inserting short delays of microseconds between freeing messages */
+    THREAD_TEST_SHORT_FREE_DELAY,
+    /** Send test messages with the receiver inserting long delays of milliseconds between freeing messages */
+    THREAD_TEST_LONG_FREE_DELAY,
+    /** Send header-only messages with zero data bytes */
+    THREAD_TEST_ZERO_DATA_BYTES,
+    /** Send messages the number of message bytes increasing in powers of two from one to the maximum */
+    THREAD_TEST_LOG2N_MIN_DATA_BYTES,
+    THREAD_TEST_LOG2N_MAX_DATA_BYTES = THREAD_TEST_LOG2N_MIN_DATA_BYTES + MAX_MESSAGE_DATA_LEN_LOG2N,
+    THREAD_NUM_TESTS
+} thread_test_type;
 
 /**
  * @brief Open the Infiniband device to be used for the loopback tests, including obtaining the port attributes
@@ -582,6 +598,109 @@ static void perform_message_thread_test (sender_thread_context *const send_threa
 }
 
 /**
+ * @brief Initialise the definition of the tests to be performed by the message sender and receiver threads
+ * @param[out] thread_test_definitions The test definitions which have been initialised
+ */
+static void initialise_message_thread_tests (thread_test_definition thread_test_definitions[THREAD_NUM_TESTS])
+{
+    int test_index;
+
+    memset (thread_test_definitions, 0, sizeof (thread_test_definition) * THREAD_NUM_TESTS);
+    for (test_index = 0; test_index < THREAD_NUM_TESTS; test_index++)
+    {
+        thread_test_definition *const definition = &thread_test_definitions[test_index];
+
+        switch (test_index)
+        {
+        case THREAD_TEST_SHORT_FREE_DELAY:
+            definition->data_length_bytes = 0;
+            definition->test_duration_seconds = 1;
+            definition->receive_thread_free_delay_ns = 10000; /* 10 microseconds */
+            definition->receive_thread_free_delay_interval = 1000;
+            break;
+
+        case THREAD_TEST_LONG_FREE_DELAY:
+            definition->data_length_bytes = 16;
+            definition->test_duration_seconds = 1;
+            definition->receive_thread_free_delay_ns = 10000000; /* 10 milliseconds */
+            definition->receive_thread_free_delay_interval = 1000;
+            break;
+
+        case THREAD_TEST_ZERO_DATA_BYTES:
+            definition->data_length_bytes = 0;
+            definition->test_duration_seconds = 1;
+            definition->receive_thread_free_delay_ns = 0;
+            definition->receive_thread_free_delay_interval = 0;
+            break;
+
+        default:
+            definition->data_length_bytes = 1u << (test_index - THREAD_TEST_LOG2N_MIN_DATA_BYTES);
+            definition->test_duration_seconds = 1;
+            definition->receive_thread_free_delay_ns = 0;
+            definition->receive_thread_free_delay_interval = 0;
+            break;
+        }
+    }
+}
+
+/**
+ * @brief Write the results for the message sender and receiver threads to standard out in tabular form
+ * @param[in] thread_test_results Contains the test results to report
+ */
+static void report_message_thread_test_results (const message_thread_results thread_test_results[THREAD_NUM_TESTS])
+{
+    const char *column_headers[] =
+    {
+        "Test duration (secs)",
+        "Data length (bytes)",
+        "Total messages received",
+        "Total data bytes received",
+        "Messages per sec",
+        "Data bytes per sec",
+        "Rx thread free delay (us)",
+        "Tx thread max get send buffer (us)"
+    };
+    const int num_cols = sizeof(column_headers) / sizeof (column_headers[0]);
+    int col_index;
+    int test_index;
+
+    /* Write column headers */
+    printf ("\n");
+    for (col_index = 0; col_index < num_cols; col_index++)
+    {
+        printf ("%s  ", column_headers[col_index]);
+    }
+    printf ("\n");
+
+    /* Write the test results */
+    for (test_index = 0; test_index < THREAD_NUM_TESTS; test_index++)
+    {
+        const message_thread_results *const results = &thread_test_results[test_index];
+        const double test_duration_secs =
+                get_elapsed_ns (&results->sender_results.time_first_message_queued,
+                                &results->receiver_results.time_last_message_freed) / 1E9;
+        const double messages_per_sec = (double) results->receiver_results.total_messages_received / test_duration_secs;
+        const double bytes_per_sec = (double) results->receiver_results.total_data_bytes_received / test_duration_secs;
+
+        col_index = 0;
+        printf ("%*.6f  ", (int) strlen (column_headers[col_index++]), test_duration_secs);
+        printf ("%*u  ", (int) strlen (column_headers[col_index++]), results->test_definition.data_length_bytes);
+        printf ("%*lu  ", (int) strlen (column_headers[col_index++]), results->receiver_results.total_messages_received);
+        printf ("%*lu  ", (int) strlen (column_headers[col_index++]), results->receiver_results.total_data_bytes_received);
+        printf ("%*.0f  ", (int) strlen (column_headers[col_index++]), messages_per_sec);
+        printf ("%*.0f  ", (int) strlen (column_headers[col_index++]), bytes_per_sec);
+        if (results->test_definition.receive_thread_free_delay_ns > 0)
+        {
+            printf ("%*lu  ", (int) strlen (column_headers[col_index++]),
+                    results->test_definition.receive_thread_free_delay_ns / 1000);
+            printf ("%*lu  ", (int) strlen (column_headers[col_index++]),
+                    results->sender_results.max_get_send_buffer_duration_ns / 1000);
+        }
+        printf ("\n");
+    }
+}
+
+/**
  * @details Perform a test of transferring messages of increasing size, from the minimum up to the maximum.
  *          The sending and reception is performed with a single thread, which queues a number of messages
  *          for transmission and then waits for reception of the messages.
@@ -705,15 +824,18 @@ static void test_message_transfers (const message_communication_functions *const
 {
     infiniband_statistics_collection initialisation_stats;
     infiniband_statistics_collection single_thread_message_test_stats;
+    infiniband_statistics_collection multi_threaded_message_test_stats;
     api_send_context send_context;
     api_receive_context receive_context;
     sender_thread_context *const send_thread = create_message_sender_thread (comms_functions);
     receiver_thread_context *const receive_thread = create_message_receiver_thread (comms_functions);
-    thread_test_definition test_definition;
-    message_thread_results test_results;
+    thread_test_definition thread_test_definitions[THREAD_NUM_TESTS];
+    message_thread_results thread_test_results[THREAD_NUM_TESTS];
+    int test_index;
 
     /* Initialise */
     printf ("\nTesting using %s\n", comms_functions->description);
+    initialise_message_thread_tests (thread_test_definitions);
     get_infiniband_statistics_before_test (&initialisation_stats);
     comms_functions->initialise (&send_context, &receive_context);
     get_infiniband_statistics_after_test (&initialisation_stats);
@@ -721,21 +843,24 @@ static void test_message_transfers (const message_communication_functions *const
     receive_thread->receive_context = receive_context;
 
     /* Test message transfers with differing number of overlapped messages per test iteration,
-     * to exercise the buffer management logic. */
+     * to exercise the buffer management logic.
+     * As these tests are performed in the calling thread context there should be zero voluntary context switches */
     get_infiniband_statistics_before_test (&single_thread_message_test_stats);
     increasing_message_size_test (comms_functions, send_context, receive_context, 1);
     increasing_message_size_test (comms_functions, send_context, receive_context, (NUM_MESSAGE_BUFFERS / 2) + 1);
     increasing_message_size_test (comms_functions, send_context, receive_context, NUM_MESSAGE_BUFFERS);
     get_infiniband_statistics_after_test (&single_thread_message_test_stats);
 
-    test_definition.test_duration_seconds = 1;
-    test_definition.data_length_bytes = 0;
-    test_definition.receive_thread_free_delay_ns = 10000;
-    test_definition.receive_thread_free_delay_interval = 1000;
-    perform_message_thread_test (send_thread, receive_thread, &test_definition, &test_results);
-
-    test_definition.data_length_bytes = 4;
-    perform_message_thread_test (send_thread, receive_thread, &test_definition, &test_results);
+    /* Test message transfers using a send and receive thread.
+     * For each test there will be some voluntary context switches as semaphores are used to synchronise
+     * the main, send and receive threads. */
+    get_infiniband_statistics_before_test (&multi_threaded_message_test_stats);
+    for (test_index = 0; test_index < THREAD_NUM_TESTS; test_index++)
+    {
+        perform_message_thread_test (send_thread, receive_thread,
+                                     &thread_test_definitions[test_index], &thread_test_results[test_index]);
+    }
+    get_infiniband_statistics_after_test (&multi_threaded_message_test_stats);
 
     /* Free resources */
     terminate_test_threads (send_thread, receive_thread);
@@ -744,6 +869,8 @@ static void test_message_transfers (const message_communication_functions *const
     /* Display results. Left until the end to avoid unnecessary context switches during the test */
     display_infiniband_statistics (&initialisation_stats, "initialisation of Infiniband communications");
     display_infiniband_statistics (&single_thread_message_test_stats, "Infiniband single thread message transfers");
+    display_infiniband_statistics (&multi_threaded_message_test_stats, "Infiniband multi-threaded message transfers");
+    report_message_thread_test_results (thread_test_results);
 }
 
 int main (int argc, char *argv[])
