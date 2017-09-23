@@ -891,7 +891,10 @@ int main (int argc, char *argv[])
 
     open_infiniband_loopback_ports ();
 
+    /* Perform tests with different message passing implementations, in terms of the Infiniband opcodes used */
     sender_rdma_write_receiver_passive_set_functions (&comms_functions);
+    test_message_transfers (&comms_functions);
+    sender_rdma_write_with_imm_receiver_poll_cq_set_functions (&comms_functions);
     test_message_transfers (&comms_functions);
 
     close_ininiband_loopback_ports ();

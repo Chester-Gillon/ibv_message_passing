@@ -241,7 +241,7 @@ static void srwrp_receiver_create_local (srwrp_receiver_context *const receive_c
 
     memset (receive_context, 0, sizeof (srwrp_receiver_context));
 
-    /* Create and register the memory for the send buffers */
+    /* Create and register the memory for the receive buffers */
     receive_context->receive_buffer = page_aligned_calloc (1, sizeof (srwrp_receiver_buffer));
 
     receive_context->receive_mr = ibv_reg_mr (ibv_loopback_device_pd, receive_context->receive_buffer, sizeof (srwrp_receiver_buffer),
@@ -338,6 +338,7 @@ static void srwrp_sender_initialise_message_buffers (srwrp_sender_context *const
         data_wr->wr_id = buffer_index;
         data_wr->sg_list = data_sge;
         data_wr->num_sge = 1;
+        data_wr->next = NULL;
         data_wr->opcode = IBV_WR_RDMA_WRITE;
         data_wr->send_flags = IBV_SEND_SIGNALED;
         data_wr->wr.rdma.rkey = receive_context->receive_mr->rkey;
@@ -349,6 +350,7 @@ static void srwrp_sender_initialise_message_buffers (srwrp_sender_context *const
         header_wr->wr_id = buffer_index;
         header_wr->sg_list = header_sge;
         header_wr->num_sge = 1;
+        header_wr->next = NULL;
         header_wr->opcode = IBV_WR_RDMA_WRITE;
         header_wr->send_flags = IBV_SEND_SIGNALED;
         header_wr->wr.rdma.rkey = receive_context->receive_mr->rkey;
@@ -440,16 +442,11 @@ static void srwrp_sender_attach_remote (srwrp_sender_context *const send_context
 }
 
 /**
- * @details Perform the initialisation of the context for the sender of test messages for each message buffer
- *          which may be sent.
- *          This sets the Infiniband structures for the send operations using the fixed buffer attributes,
- *          so that only the data size needs to be adjusted as messages are sent.
- * @param[in,out] send_context The sender context to initialise
- * @param[in] receive_context The receiver context containing the "remote" memory region
- */
-
-/**
  * @details Perform the initialisation of the context for the receiver of test messages for each message buffer
+ *          which may be received.
+ *          This sets the Infiniband structures for the freed sequence number send operations using the fixed buffer attributes.
+ * @param[in,out] send_context The receiver context to initialise
+ * @param[in] receive_context The sender context containing the "remote" memory region
  */
 static void srwrp_receiver_initialise_message_buffers (srwrp_receiver_context *const receive_context,
                                                        const srwrp_sender_context *const send_context)
@@ -469,6 +466,7 @@ static void srwrp_receiver_initialise_message_buffers (srwrp_receiver_context *c
         buffer->freed_message_wr.wr_id = buffer_index;
         buffer->freed_message_wr.sg_list = &buffer->freed_message_sge;
         buffer->freed_message_wr.num_sge = 1;
+        buffer->freed_message_wr.next = NULL;
         buffer->freed_message_wr.opcode = IBV_WR_RDMA_WRITE;
         buffer->freed_message_wr.send_flags = IBV_SEND_SIGNALED;
         buffer->freed_message_wr.wr.rdma.rkey = send_context->send_mr->rkey;

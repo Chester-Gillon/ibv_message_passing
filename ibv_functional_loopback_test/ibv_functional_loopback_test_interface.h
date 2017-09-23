@@ -129,5 +129,6 @@ typedef struct
 } message_communication_functions;
 
 void sender_rdma_write_receiver_passive_set_functions (message_communication_functions *const functions);
+void sender_rdma_write_with_imm_receiver_poll_cq_set_functions (message_communication_functions *const functions);
 
 #endif /* IBV_FUNCTIONAL_LOOPBACK_TEST_INTERFACE_H_ */

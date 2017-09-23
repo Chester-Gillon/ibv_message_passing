@@ -342,7 +342,7 @@ void display_qp_capabilities (struct ibv_qp *const qp, const char *qp_name)
     struct ibv_qp_attr attr;
     struct ibv_qp_init_attr init_attr;
 
-    rc = ibv_query_qp (qp, &attr, IBV_QP_STATE, &init_attr);
+    rc = ibv_query_qp (qp, &attr, IBV_QP_STATE | IBV_QP_CAP, &init_attr);
     if (rc != 0)
     {
         perror ("ibv_query_qp failed");
