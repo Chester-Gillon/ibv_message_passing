@@ -12,6 +12,8 @@
  *
  *          Attempts to optimise the message rate include:
  *          - Sending inline data when the size allows.
+ *          - Signalling completion one in every NUM_MESSAGE_BUFFERS when possible.
+ *          - Chaining the data and header work requests.
  *
  *          Since a single process is used to send messages between a pair of loop-backed ports on a dual port
  *          Infiniband adapter there is no communication mechanism required to exchange Queue Pair, Memory Region
@@ -69,10 +71,6 @@ typedef struct
     /** Contains the work requests to transfer the message data then header.
      *  Set at initialisation, and do not require modification as messages are sent */
     struct ibv_send_wr send_wrs[NUM_WQES_PER_MESSAGE];
-    /** When true the send_wrds[] requests for this message buffer have been posted, and must be removed
-     *  from the completion queue before the buffer can be reused.
-     *  The send_wrs[MESSAGE_DATA_WQE_INDEX] isn't used when data length is zero. */
-    bool outstanding_wrs[NUM_WQES_PER_MESSAGE];
     /** The sequence number for the next message to be sent from this buffer */
     uint32_t next_send_sequence_number;
     /** Set true when srwrp_get_send_buffer() needs to wait for the message buffer to be freed before it can be reused */
@@ -111,6 +109,8 @@ typedef struct
     api_message_buffer buffers[NUM_MESSAGE_BUFFERS];
     /** The circular buffer index for the next message buffer to pass to the application for populating */
     uint32_t next_send_buffer_index;
+    /** Used to control only signalling message send completion on one in every NUM_MESSAGE_BUFFERS messages */
+    uint32_t message_send_cq_pacing;
 } srwrp_sender_context;
 
 /** Contains the context to manage one receiver message buffer */
@@ -122,11 +122,6 @@ typedef struct
     /** The work request to transfer the sequence number of a freed message buffer to the sender.
      *  Set at initialisation, and doesn't required modification as messages are freed. */
     struct ibv_send_wr freed_message_wr;
-    /** Set true once the freed sequence number has been sent, which means have to wait for the transfer to
-     *  complete before reusing it. */
-    /** When true the freed_message_wr for this message buffer has been posted, and must be removed from the
-     *  completion queue before the next freed sequence number can be sent. */
-    bool freed_message_wr_outstanding;
     /** Defines the sequence numbers which appear in the received message header:
      *  - message_not_available_sequence_number: A message is not yet available
      *  -message_available_sequence_number : A message is available
@@ -161,6 +156,8 @@ typedef struct
     api_message_buffer buffers[NUM_MESSAGE_BUFFERS];
     /** The circular buffer index for the next message message to check for message receipt */
     uint32_t next_receive_buffer_index;
+    /** Used to control only signalling freed sequence number send completion on one in NUM_MESSAGE_BUFFERS messages */
+    uint32_t freed_sequence_number_cq_pacing;
 } srwrp_receiver_context;
 
 /**
@@ -187,9 +184,13 @@ static void srwrp_sender_create_local (srwrp_sender_context *const send_context)
         exit (EXIT_FAILURE);
     }
 
-    /* Create the queues used by the sender */
+    /* Create the queues used by the sender.
+     * The rationale for the queue sizes are that only one in every NUM_MESSAGE_BUFFERS is signalled for send completion so:
+     * - The completion queue only need one entry.
+     * - The Queue Pair requires twice the number of work-requests than buffers to prevent the work queue from filling up
+     *   as far as ibv_post_send() is concerned. */
     memset (&qp_init_attr, 0, sizeof (qp_init_attr));
-    send_context->message_send_cq = ibv_create_cq (ibv_loopback_device, TOTAL_MESSAGE_SEND_QUEUE_SIZE, NULL, NULL, 0);
+    send_context->message_send_cq = ibv_create_cq (ibv_loopback_device, 1, NULL, NULL, 0);
     if (send_context->message_send_cq == NULL)
     {
         perror ("ibv_create_cq send failed");
@@ -200,13 +201,13 @@ static void srwrp_sender_create_local (srwrp_sender_context *const send_context)
     qp_init_attr.send_cq = send_context->message_send_cq;
     qp_init_attr.recv_cq = send_context->message_send_cq; /* Not used, but need to prevent ibv_create_qp failing */
     qp_init_attr.srq = NULL;
-    qp_init_attr.cap.max_send_wr = TOTAL_MESSAGE_SEND_QUEUE_SIZE;
+    qp_init_attr.cap.max_send_wr = 2 * TOTAL_MESSAGE_SEND_QUEUE_SIZE;
     qp_init_attr.cap.max_send_sge = 1;
     qp_init_attr.cap.max_recv_wr = 0;
     qp_init_attr.cap.max_recv_sge = 0;
     qp_init_attr.cap.max_inline_data = 0;
     qp_init_attr.qp_type = IBV_QPT_RC;
-    qp_init_attr.sq_sig_all = true;
+    qp_init_attr.sq_sig_all = false;
     send_context->message_send_qp = ibv_create_qp (ibv_loopback_device_pd, &qp_init_attr);
     if (send_context->message_send_qp == NULL)
     {
@@ -260,9 +261,13 @@ static void srwrp_receiver_create_local (srwrp_receiver_context *const receive_c
         exit (EXIT_FAILURE);
     }
 
-    /* Create the queues used by the receiver */
+    /* Create the queues used by the receiver.
+     * The rationale for the queue sizes are that only one in every NUM_MESSAGE_BUFFERS is signalled for send completion so:
+     * - The completion queue only need one entry.
+     * - The Queue Pair requires twice the number of work-requests than buffers to prevent the work queue from filling up
+     *   as far as ibv_post_send() is concerned. */
     memset (&qp_init_attr, 0, sizeof (qp_init_attr));
-    receive_context->freed_sequence_number_cq = ibv_create_cq (ibv_loopback_device, NUM_MESSAGE_BUFFERS, NULL, NULL, 0);
+    receive_context->freed_sequence_number_cq = ibv_create_cq (ibv_loopback_device, 1, NULL, NULL, 0);
     if (receive_context->freed_sequence_number_cq == NULL)
     {
         perror ("ibv_create_cq receive failed");
@@ -273,13 +278,13 @@ static void srwrp_receiver_create_local (srwrp_receiver_context *const receive_c
     qp_init_attr.send_cq = receive_context->freed_sequence_number_cq;
     qp_init_attr.recv_cq = receive_context->freed_sequence_number_cq; /* Not used, but need to prevent ibv_create_qp failing */
     qp_init_attr.srq = NULL;
-    qp_init_attr.cap.max_send_wr = NUM_MESSAGE_BUFFERS;
+    qp_init_attr.cap.max_send_wr = 2 * NUM_MESSAGE_BUFFERS;
     qp_init_attr.cap.max_send_sge = 1;
     qp_init_attr.cap.max_recv_wr = 0;
     qp_init_attr.cap.max_recv_sge = 0;
     qp_init_attr.cap.max_inline_data = 0;
     qp_init_attr.qp_type = IBV_QPT_RC;
-    qp_init_attr.sq_sig_all = true;
+    qp_init_attr.sq_sig_all = false;
     receive_context->freed_sequence_number_qp = ibv_create_qp (ibv_loopback_device_pd, &qp_init_attr);
     if (receive_context->freed_sequence_number_qp == NULL)
     {
@@ -343,17 +348,17 @@ static void srwrp_sender_initialise_message_buffers (srwrp_sender_context *const
         header_sge->length = sizeof (send_context->send_buffer->transmit_messages[buffer_index].header);
 
         /* Set the send work request for the message data.
-         * The wr_id is set to the buffer_index to handle calls to srwrp_send_message() out-of-order */
+         * The next pointer is set to the header work-request, so that a ibv_post_send() on the the data_wr
+         * sends the data followed by the header. */
         data_wr->wr_id = buffer_index;
         data_wr->sg_list = data_sge;
         data_wr->num_sge = 1;
-        data_wr->next = NULL;
+        data_wr->next = header_wr;
         data_wr->opcode = IBV_WR_RDMA_WRITE;
-        data_wr->send_flags = IBV_SEND_SIGNALED;
+        data_wr->send_flags = 0;
         data_wr->wr.rdma.rkey = receive_context->receive_mr->rkey;
         data_wr->wr.rdma.remote_addr = (uintptr_t) receive_context->receive_mr->addr +
                 offsetof (srwrp_receiver_buffer, receive_messages[buffer_index].data);
-        buffer->outstanding_wrs[MESSAGE_DATA_WQE_INDEX] = false;
 
         /* Set the send work request for the message header */
         header_wr->wr_id = buffer_index;
@@ -361,7 +366,7 @@ static void srwrp_sender_initialise_message_buffers (srwrp_sender_context *const
         header_wr->num_sge = 1;
         header_wr->next = NULL;
         header_wr->opcode = IBV_WR_RDMA_WRITE;
-        header_wr->send_flags = IBV_SEND_SIGNALED;
+        header_wr->send_flags = 0;
         if (sizeof (message_header) <= send_context->message_send_qp_max_inline_data)
         {
             header_wr->send_flags |= IBV_SEND_INLINE;
@@ -369,7 +374,6 @@ static void srwrp_sender_initialise_message_buffers (srwrp_sender_context *const
         header_wr->wr.rdma.rkey = receive_context->receive_mr->rkey;
         header_wr->wr.rdma.remote_addr = (uintptr_t) receive_context->receive_mr->addr +
                 offsetof (srwrp_receiver_buffer, receive_messages[buffer_index].header);
-        buffer->outstanding_wrs[MESSAGE_HEADER_WQE_INDEX] = false;
 
         /* Initialise the sequence number management */
         buffer->await_buffer_freed = false;
@@ -383,6 +387,7 @@ static void srwrp_sender_initialise_message_buffers (srwrp_sender_context *const
     }
 
     send_context->next_send_buffer_index = 0;
+    send_context->message_send_cq_pacing = 0;
 }
 
 /**
@@ -481,7 +486,7 @@ static void srwrp_receiver_initialise_message_buffers (srwrp_receiver_context *c
         buffer->freed_message_wr.num_sge = 1;
         buffer->freed_message_wr.next = NULL;
         buffer->freed_message_wr.opcode = IBV_WR_RDMA_WRITE;
-        buffer->freed_message_wr.send_flags = IBV_SEND_SIGNALED;
+        buffer->freed_message_wr.send_flags = 0;
         if (sizeof (uint32_t) <= receive_context->freed_sequence_number_qp_max_inline_data)
         {
             buffer->freed_message_wr.send_flags |= IBV_SEND_INLINE;
@@ -489,7 +494,6 @@ static void srwrp_receiver_initialise_message_buffers (srwrp_receiver_context *c
         buffer->freed_message_wr.wr.rdma.rkey = send_context->send_mr->rkey;
         buffer->freed_message_wr.wr.rdma.remote_addr = (uintptr_t) send_context->send_mr->addr +
                 offsetof (srwrp_sender_buffer, freed_sequence_numbers[buffer_index]);
-        buffer->freed_message_wr_outstanding = false;
 
         /* Initialise the sequence number management */
         buffer->owned_by_application = false;
@@ -501,6 +505,7 @@ static void srwrp_receiver_initialise_message_buffers (srwrp_receiver_context *c
     }
 
     receive_context->next_receive_buffer_index = 0;
+    receive_context->freed_sequence_number_cq_pacing = 0;
 }
 
 /**
@@ -573,50 +578,12 @@ static void srwrp_receiver_attach_remote (srwrp_receiver_context *const receive_
 }
 
 /**
- * @brief Wait for the previous transmission of the data and header using a send buffer to complete.
- * @details This involves waiting for a completion, and using the wr_id to identify which buffer the transmission has completed for.
- *          This allows for srwrp_send_message() being called out-of-order with respect to the order the buffers were obtained.
- * @param[in,out] send_context The context for wait for the send work requests to complete
- * @param[in] buffer_index Which message buffer to wait for the completion
- */
-static void srwrp_sender_await_buffer_wr_completion (srwrp_sender_context *const send_context, const unsigned int buffer_index)
-{
-    srwrp_message_buffer_send_context *const buffer_context = &send_context->buffer_contexts[buffer_index];
-    srwrp_message_buffer_send_context *completed_context;
-    int num_completions;
-    struct ibv_wc wc;
-    unsigned int wqe_index;
-
-    while (buffer_context->outstanding_wrs[MESSAGE_HEADER_WQE_INDEX])
-    {
-        do
-        {
-            num_completions = ibv_poll_cq (send_context->message_send_cq, 1, &wc);
-        } while (num_completions == 0);
-        CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS) && (wc.wr_id < NUM_MESSAGE_BUFFERS));
-
-        completed_context = &send_context->buffer_contexts[wc.wr_id];
-        wqe_index = (completed_context->outstanding_wrs[MESSAGE_DATA_WQE_INDEX]) ?
-                MESSAGE_DATA_WQE_INDEX : MESSAGE_HEADER_WQE_INDEX;
-        CHECK_ASSERT (buffer_context->outstanding_wrs[wqe_index]);
-        completed_context->outstanding_wrs[wqe_index] = false;
-    }
-}
-
-/**
  * @brief Free the resources used for the context of a message sender
  * @param[in,out] send_context The context to free the resources for
  */
 static void srwrp_sender_finalise (srwrp_sender_context *const send_context)
 {
-    unsigned int buffer_index;
     int rc;
-
-    /* Empty the completion queue of any outstanding work requests */
-    for (buffer_index = 0; buffer_index < NUM_MESSAGE_BUFFERS; buffer_index++)
-    {
-        srwrp_sender_await_buffer_wr_completion (send_context, buffer_index);
-    }
 
     /* Destroy the queues */
     rc = ibv_destroy_qp (send_context->message_send_qp);
@@ -643,47 +610,12 @@ static void srwrp_sender_finalise (srwrp_sender_context *const send_context)
 }
 
 /**
- * @brief Wait for the previous transmission of the freed sequence number to complete for a receive message buffer
- * @details This involves waiting for a completion, and using the wr_id to identify which buffer the transmission has completed for.
- *          This allows for srwrp_free_message() being called out-of-order with respect to the order the buffers were obtained.
- * @param[in,out] receive_context The receive context to wait for the receive work requests to complete
- * @param[in] buffer_index Which message buffer to wait for completion
- */
-static void srwrp_receiver_await_buffer_wr_completion (srwrp_receiver_context *const receive_context,
-                                                       const unsigned int buffer_index)
-{
-    srwrp_message_buffer_receive_context *const buffer_context = &receive_context->buffer_contexts[buffer_index];
-    srwrp_message_buffer_receive_context *completed_context;
-    int num_completions;
-    struct ibv_wc wc;
-
-    while (buffer_context->freed_message_wr_outstanding)
-    {
-        do
-        {
-            num_completions = ibv_poll_cq (receive_context->freed_sequence_number_cq, 1, &wc);
-        } while (num_completions == 0);
-        CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS) && (wc.wr_id < NUM_MESSAGE_BUFFERS));
-        completed_context = &receive_context->buffer_contexts[wc.wr_id];
-        CHECK_ASSERT (completed_context->freed_message_wr_outstanding);
-        completed_context->freed_message_wr_outstanding = false;
-    }
-}
-
-/**
  * @brief Free the resources used for the context of a message receiver
  * @param[in,out] receive_context The context to free the resources for
  */
 static void srwrp_receiver_finalise (srwrp_receiver_context *const receive_context)
 {
-    unsigned int buffer_index;
     int rc;
-
-    /* Empty the completion queue of any outstanding work requests */
-    for (buffer_index = 0; buffer_index < NUM_MESSAGE_BUFFERS; buffer_index++)
-    {
-        srwrp_receiver_await_buffer_wr_completion (receive_context, buffer_index);
-    }
 
     /* Destroy the queues */
     rc = ibv_destroy_qp (receive_context->freed_sequence_number_qp);
@@ -761,9 +693,6 @@ static api_message_buffer *srwrp_get_send_buffer (api_send_context send_context_
 
     CHECK_ASSERT (!buffer_context->owned_by_application);
 
-    /* Wait for the previous transmission of the data and header using this buffer to complete */
-    srwrp_sender_await_buffer_wr_completion (send_context, buffer->buffer_index);
-
     /* Wait for receiver to indicate the previous message used by this buffer has been freed */
     if (buffer_context->await_buffer_freed)
     {
@@ -816,11 +745,33 @@ static void srwrp_send_message (api_send_context send_context_in, api_message_bu
     /* Complete the message to be sent */
     buffer->message->header.sequence_number = buffer_context->next_send_sequence_number;
     buffer_context->send_sges[MESSAGE_DATA_WQE_INDEX].length = buffer->message->header.message_length;
+    if (send_context->message_send_cq_pacing == 0)
+    {
+        buffer_context->send_wrs[MESSAGE_HEADER_WQE_INDEX].send_flags |= IBV_SEND_SIGNALED;
+    }
+    else
+    {
+        buffer_context->send_wrs[MESSAGE_HEADER_WQE_INDEX].send_flags &= ~IBV_SEND_SIGNALED;
+    }
+    send_context->message_send_cq_pacing++;
 
-    /* Start the transfer for the data when a non-zero length
-     * (since a length of zero is interpreted by ibv_post_send() as a maximum length message) */
+    /* Wait for the message send work request completion, which is signalled on one message in every NUM_MESSAGE_BUFFERS */
+    if (send_context->message_send_cq_pacing == NUM_MESSAGE_BUFFERS)
+    {
+        struct ibv_wc wc;
+        int num_completions;
+
+        do
+        {
+            num_completions = ibv_poll_cq (send_context->message_send_cq, 1, &wc);
+        } while (num_completions == 0);
+        CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS));
+        send_context->message_send_cq_pacing = 0;
+    }
+
     if (buffer_context->send_wrs[MESSAGE_DATA_WQE_INDEX].sg_list->length > 0)
     {
+        /* Start the transfer for the data followed by the header */
         if (buffer_context->send_wrs[MESSAGE_DATA_WQE_INDEX].sg_list->length <= send_context->message_send_qp_max_inline_data)
         {
             buffer_context->send_wrs[MESSAGE_DATA_WQE_INDEX].send_flags |= IBV_SEND_INLINE;
@@ -831,13 +782,14 @@ static void srwrp_send_message (api_send_context send_context_in, api_message_bu
         }
         rc =  ibv_post_send (send_context->message_send_qp, &buffer_context->send_wrs[MESSAGE_DATA_WQE_INDEX], &bad_wr);
         CHECK_ASSERT (rc == 0);
-        buffer_context->outstanding_wrs[MESSAGE_DATA_WQE_INDEX] = true;
+    }
+    else
+    {
+        /* Start the transfer for the header */
+        rc =  ibv_post_send (send_context->message_send_qp, &buffer_context->send_wrs[MESSAGE_HEADER_WQE_INDEX], &bad_wr);
+        CHECK_ASSERT (rc == 0);
     }
 
-    /* Start the transfer for the header */
-    rc =  ibv_post_send (send_context->message_send_qp, &buffer_context->send_wrs[MESSAGE_HEADER_WQE_INDEX], &bad_wr);
-    CHECK_ASSERT (rc == 0);
-    buffer_context->outstanding_wrs[MESSAGE_HEADER_WQE_INDEX] = true;
     buffer_context->await_buffer_freed = true;
 
     /* Advance to the next sequence number for this buffer */
@@ -898,15 +850,34 @@ static void srwrp_free_message (api_receive_context receive_context_in, api_mess
 
     CHECK_ASSERT (buffer_context->owned_by_application);
 
-    /* Wait for the previous transmission of the freed sequence number to complete */
-    srwrp_receiver_await_buffer_wr_completion (receive_context, buffer->buffer_index);
+    /* Wait for the freed buffer send work request completion, which is signalled on one message in every NUM_MESSAGE_BUFFERS */
+    if (receive_context->freed_sequence_number_cq_pacing == NUM_MESSAGE_BUFFERS)
+    {
+        int num_completions;
+        struct ibv_wc wc;
+
+        do
+        {
+            num_completions = ibv_poll_cq (receive_context->freed_sequence_number_cq, 1, &wc);
+        } while (num_completions == 0);
+        CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS));
+        receive_context->freed_sequence_number_cq_pacing = 0;
+    }
 
     /* Transmit the freed sequence number to the sender, to indicate the buffer can be reused */
     receive_context->receive_buffer->freed_sequence_numbers[buffer->buffer_index] =
             buffer_context->message_available_sequence_number;
+    if (receive_context->freed_sequence_number_cq_pacing == 0)
+    {
+        buffer_context->freed_message_wr.send_flags |= IBV_SEND_SIGNALED;
+    }
+    else
+    {
+        buffer_context->freed_message_wr.send_flags &= ~IBV_SEND_SIGNALED;
+    }
+    receive_context->freed_sequence_number_cq_pacing++;
     rc = ibv_post_send (receive_context->freed_sequence_number_qp, &buffer_context->freed_message_wr, &bad_wr);
     CHECK_ASSERT (rc == 0);
-    buffer_context->freed_message_wr_outstanding = true;
 
     /* Advance to the next expected sequence number */
     buffer_context->message_not_available_sequence_number = buffer_context->message_available_sequence_number;

@@ -185,7 +185,12 @@ static void srwirpcq_sender_create_local (srwirpcq_sender_context *const send_co
 
     /* Create the queues used by the sender.
      * The message send Completion Queue is only signalled for one buffer out of NUM_MESSAGE_BUFFERS as an optimisation.
-     * The freed message Completion Queue is signalled for each buffer to detect as soon as a buffer is freed */
+     * The freed message Completion Queue is signalled for each buffer to detect as soon as a buffer is freed.
+     *
+     * The rationale for the queue sizes are that only one in every NUM_MESSAGE_BUFFERS is signalled for send completion so:
+     * - The completion queue only need one entry.
+     * - The Queue Pair requires twice the number of work-requests than buffers to prevent the work queue from filling up
+     *   as far as ibv_post_send() is concerned. */
     memset (&qp_init_attr, 0, sizeof (qp_init_attr));
     send_context->message_send_cq = ibv_create_cq (ibv_loopback_device, 1, NULL, NULL, 0);
     if (send_context->message_send_cq == NULL)
@@ -205,7 +210,7 @@ static void srwirpcq_sender_create_local (srwirpcq_sender_context *const send_co
     qp_init_attr.send_cq = send_context->message_send_cq;
     qp_init_attr.recv_cq = send_context->freed_message_cq;
     qp_init_attr.srq = NULL;
-    qp_init_attr.cap.max_send_wr = NUM_MESSAGE_BUFFERS;
+    qp_init_attr.cap.max_send_wr = 2 * NUM_MESSAGE_BUFFERS;
     qp_init_attr.cap.max_send_sge = 1;
     qp_init_attr.cap.max_recv_wr = NUM_MESSAGE_BUFFERS;
     qp_init_attr.cap.max_recv_sge = 0;
@@ -267,7 +272,12 @@ static void srwirpcq_receiver_create_local (srwirpcq_receiver_context *const rec
 
     /* Create the queues used by the receiver
      * The message available Completion Queue is signalled for each buffer to detect as soon as a message is available.
-     * The freed buffer Completion Queue is only signalled for one buffer out of NUM_MESSAGE_BUFFERS as an optimisation. */
+     * The freed buffer Completion Queue is only signalled for one buffer out of NUM_MESSAGE_BUFFERS as an optimisation.
+     *
+     * The rationale for the queue sizes are that only one in every NUM_MESSAGE_BUFFERS is signalled for send completion so:
+     * - The completion queue only need one entry.
+     * - The Queue Pair requires twice the number of work-requests than buffers to prevent the work queue from filling up
+     *   as far as ibv_post_send() is concerned. */
     memset (&qp_init_attr, 0, sizeof (qp_init_attr));
     receive_context->message_available_cq = ibv_create_cq (ibv_loopback_device, NUM_MESSAGE_BUFFERS, NULL, NULL, 0);
     if (receive_context->message_available_cq == NULL)
@@ -287,7 +297,7 @@ static void srwirpcq_receiver_create_local (srwirpcq_receiver_context *const rec
     qp_init_attr.send_cq = receive_context->freed_buffer_cq;
     qp_init_attr.recv_cq = receive_context->message_available_cq;
     qp_init_attr.srq = NULL;
-    qp_init_attr.cap.max_send_wr = NUM_MESSAGE_BUFFERS;
+    qp_init_attr.cap.max_send_wr = 2 * NUM_MESSAGE_BUFFERS;
     qp_init_attr.cap.max_send_sge = 1;
     qp_init_attr.cap.max_recv_wr = NUM_MESSAGE_BUFFERS;
     qp_init_attr.cap.max_recv_sge = 0;
