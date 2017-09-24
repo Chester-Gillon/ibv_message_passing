@@ -39,6 +39,7 @@ uint32_t get_random_psn (void);
 void get_infiniband_statistics_before_test (infiniband_statistics_collection *const stats);
 void get_infiniband_statistics_after_test (infiniband_statistics_collection *const stats);
 void display_infiniband_statistics (const infiniband_statistics_collection *const stats, const char *description);
+void display_current_cpu_frequencies (void);
 void check_assert (const bool assertion, const char *message);
 #define CHECK_ASSERT(assertion) check_assert(assertion,#assertion)
 

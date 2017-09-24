@@ -867,6 +867,7 @@ static void test_message_transfers (const message_communication_functions *const
     get_infiniband_statistics_after_test (&multi_threaded_message_test_stats);
 
     /* Free resources */
+    display_current_cpu_frequencies ();
     terminate_test_threads (send_thread, receive_thread);
     comms_functions->finalise (send_context, receive_context);
 

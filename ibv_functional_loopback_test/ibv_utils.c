@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <limits.h>
 #include <unistd.h>
 #include <sys/resource.h>
 
@@ -562,5 +563,41 @@ void display_infiniband_statistics (const infiniband_statistics_collection *cons
     printf ("  Num mlx4 interrupts = %lu (%lu -> %lu)\n",
             stats->after.total_mlx4_interrupts - stats->before.total_mlx4_interrupts,
             stats->before.total_mlx4_interrupts, stats->after.total_mlx4_interrupts);
+    printf ("\n");
+}
+
+/**
+ * @brief Display the current CPU frequencies to standard out
+ */
+void display_current_cpu_frequencies (void)
+{
+    const int num_cpus = sysconf (_SC_NPROCESSORS_ONLN);
+    int cpu_index;
+    FILE *cpu_freq_file;
+    char cpu_freq_pathname[PATH_MAX];
+    int cpu_freq_mhz;
+
+    printf ("Current CPU frequencies (MHz) :");
+    for (cpu_index = 0; cpu_index < num_cpus; cpu_index++)
+    {
+        bool read_cpu_freq = false;
+
+        sprintf (cpu_freq_pathname, "/sys/devices/system/cpu/cpu%d/cpufreq/scaling_cur_freq", cpu_index);
+        cpu_freq_file = fopen (cpu_freq_pathname, "r");
+        if (cpu_freq_file != NULL)
+        {
+            read_cpu_freq = fscanf (cpu_freq_file, "%d\n", &cpu_freq_mhz) == 1;
+            fclose (cpu_freq_file);
+        }
+
+        if (read_cpu_freq)
+        {
+            printf ("  %d", cpu_freq_mhz);
+        }
+        else
+        {
+            printf ("  ???");
+        }
+    }
     printf ("\n");
 }
