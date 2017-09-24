@@ -589,3 +589,188 @@ Test duration (secs)  Data length (bytes)  Total messages received  Total data b
             1.098020              8388608                      361                 3028287488               329          2757953212  
             1.197847             16777216                      197                 3305111552               164          2759209538  
 
+
+Results when CPU frequency set to 1.8 GHz
+=========================================
+
+The commited code uses a max data length of 16Mbyte and 32 buffers.
+The code was temporarily changed to reduce the max data length to 1Mbyte and increase the number of buffers to 512 (for same overall memory usage).
+
+With the increase of buffers there was less of reported short message rate between IBV_WR_RDMA_WRITE and IBV_WR_RDMA_WRITE_WITH_IMM/IBV_WR_SEND
+but IBV_WR_RDMA_WRITE still gave the highest message rate.
+
+$ ibv_functional_loopback_test/Release/ibv_functional_loopback_test 
+Attributes of device mlx4_0:
+ num_comp_vectors=8 fw_ver=2.9.1000
+ node_guid=0x8c504b0003c90200 sys_image_guid=0x8f504b0003c90200
+ max_mr_size=18446744073709551615 page_size_cap=4294966784 vendor_id=0x2c9 vendor_part_id=0x673c hw_ver=176
+ max_qp=131000 max_qp_wr=16351 max_sge=32 max_sge_rd=30
+device_cap_flags=IBV_DEVICE_BAD_PKEY_CNTR|IBV_DEVICE_BAD_QKEY_CNTR|IBV_DEVICE_AUTO_PATH_MIG|IBV_DEVICE_CHANGE_PHY_PORT|IBV_DEVICE_UD_AV_PORT_ENFORCE|IBV_DEVICE_PORT_ACTIVE_EVENT|IBV_DEVICE_SYS_IMAGE_GUID|IBV_DEVICE_RC_RNR_NAK_GEN|BIT15|IBV_DEVICE_IP_CSUM|BIT19|IBV_DEVICE_XRC|BIT21|BIT22|BIT26
+ max_cq=65408 max_cqe=4194303 max_mr=524272 max_pd=32764
+ max_qp_rd_atom=16 max_ee_rd_atom=0 max_res_rd_atom=2096000 max_qp_init_rd_atom=128
+ max_ee_init_rd_atom=0 atomic_cap=IBV_ATOMIC_HCA
+ max_ee=0 max_rdd=0 max_mw=0 max_raw_ipv6_qp=0 max_raw_ethy_qp=0
+ max_mcast_grp=8192 max_mcast_qp_attach=248 max_total_mcast_qp_attach=2031616
+ max_ah=0 max_fmr=0 max_map_per_fmr=8191 max_srq=65472 max_srq_wr=16383
+ max_srq_sge=31 max_pkeys=128 local_ca_ack_delay=15 phys_port_cnt=2
+Attributes of source port 1:
+ state=IBV_PORT_ACTIVE max_mtu=IBV_MTU_4096 active_mtu=IBV_MTU_4096
+ gid_tbl_len=128 port_cap_flags=0x251086a max_msg_sz=1073741824
+ bad_pkey_cntr=0 qkey_viol_cntr=0 pkey_tbl_len=128 lid=1 sm_lid=1
+ lmc=0 max_vl_num=3 sm_sl=0 subnet_timeout=18 init_type_reply=0
+ active_width=2 active_speed=4 phys_state=5 link_layer=IBV_LINK_LAYER_INFINIBAND
+Attributes of destination port 2:
+ state=IBV_PORT_ACTIVE max_mtu=IBV_MTU_4096 active_mtu=IBV_MTU_4096
+ gid_tbl_len=128 port_cap_flags=0x2510868 max_msg_sz=1073741824
+ bad_pkey_cntr=0 qkey_viol_cntr=0 pkey_tbl_len=128 lid=2 sm_lid=1
+ lmc=0 max_vl_num=3 sm_sl=0 subnet_timeout=18 init_type_reply=0
+ active_width=2 active_speed=4 phys_state=5 link_layer=IBV_LINK_LAYER_INFINIBAND
+
+Testing using sender using RDMA write and the receiver passive
+message_send_qp capabilities: max_send_wr=4063 max_recv_wr=1 max_send_sge=2 max_recv_sge=1 max_inline_data=28
+freed_sequence_number_qp capabilities: max_send_wr=2015 max_recv_wr=1 max_send_sge=2 max_recv_sge=1 max_inline_data=28
+Current CPU frequencies (MHz) :  1800000  1800000  1800000  1800000
+Changes to statistics for initialisation of Infiniband communications:
+  Num voluntary context switches = 38 (10 -> 48)
+  Num page reclaims = 1719 (124 -> 1843)
+  Num page faults = 0 (0 -> 0)
+  Num mlx4 interrupts = 38 (5401 -> 5439)
+
+Changes to statistics for Infiniband single thread message transfers:
+  Num voluntary context switches = 0 (48 -> 48)
+  Num page reclaims = 3 (1843 -> 1846)
+  Num page faults = 0 (0 -> 0)
+  Num mlx4 interrupts = 0 (5439 -> 5439)
+
+Changes to statistics for Infiniband multi-threaded message transfers:
+  Num voluntary context switches = 72 (48 -> 120)
+  Num page reclaims = 10 (1846 -> 1856)
+  Num page faults = 0 (0 -> 0)
+  Num mlx4 interrupts = 0 (5439 -> 5439)
+
+
+Test duration (secs)  Data length (bytes)  Total messages received  Total data bytes received  Messages per sec  Data bytes per sec  Rx thread free delay (us)  Tx thread max get send buffer (us)  
+            1.000110                    0                  2220939                          0           2220694                   0                         10                                  19  
+            1.004420                   16                    97513                    1560208             97084             1553343                      10000                                9950  
+            1.000102                    0                  2226667                          0           2226439                   0  
+            1.000161                    1                  2086111                    2086111           2085776             2085776  
+            1.000163                    2                  2085944                    4171888           2085604             4171207  
+            1.000162                    4                  2085974                    8343896           2085636             8342543  
+            1.000162                    8                  2084570                   16676560           2084233            16673865  
+            1.000160                   16                  2087650                   33402400           2087316            33397059  
+            1.000249                   32                  1861108                   59555456           1860645            59540649  
+            1.000248                   64                  1847969                  118270016           1847510           118240636  
+            1.000267                  128                  1753594                  224460032           1753126           224400186  
+            1.000293                  256                  1631087                  417558272           1630610           417436080  
+            1.000331                  512                  1456303                  745627136           1455821           745380163  
+            1.000426                 1024                  1181707                 1210067968           1181203          1209552382  
+            1.000601                 2048                   839344                 1718976512            838840          1717943640  
+            1.000947                 4096                   536345                 2196869120            535838          2194791392  
+            1.001617                 8192                   315164                 2581823488            314655          2577656634  
+            1.003302                16384                   155399                 2546057216            154888          2537677510  
+            1.006448                32768                    79963                 2620227584             79451          2603441745  
+            1.012780                65536                    40628                 2662596608             40115          2628998639  
+            1.024804               131072                    21162                 2773745664             20650          2706610254  
+            1.048839               262144                    11007                 2885419008             10494          2751061117  
+            1.096876               524288                     5803                 3042443264              5290          2773735514  
+            1.194262              1048576                     3148                 3300917248              2636          2763981528  
+
+Testing using sender using RDMA write with immediate and the receiver polling the CQ
+sender_qp capabilities: max_send_wr=2015 max_recv_wr=512 max_send_sge=2 max_recv_sge=1 max_inline_data=28
+receiver_qp capabilities: max_send_wr=2015 max_recv_wr=512 max_send_sge=2 max_recv_sge=1 max_inline_data=28
+Current CPU frequencies (MHz) :  1800000  1800000  1800000  1800000
+Changes to statistics for initialisation of Infiniband communications:
+  Num voluntary context switches = 40 (147 -> 187)
+  Num page reclaims = 1663 (1859 -> 3522)
+  Num page faults = 0 (0 -> 0)
+  Num mlx4 interrupts = 40 (5461 -> 5501)
+
+Changes to statistics for Infiniband single thread message transfers:
+  Num voluntary context switches = 0 (187 -> 187)
+  Num page reclaims = 0 (3522 -> 3522)
+  Num page faults = 0 (0 -> 0)
+  Num mlx4 interrupts = 0 (5501 -> 5501)
+
+Changes to statistics for Infiniband multi-threaded message transfers:
+  Num voluntary context switches = 72 (187 -> 259)
+  Num page reclaims = 6 (3522 -> 3528)
+  Num page faults = 0 (0 -> 0)
+  Num mlx4 interrupts = 0 (5501 -> 5501)
+
+
+Test duration (secs)  Data length (bytes)  Total messages received  Total data bytes received  Messages per sec  Data bytes per sec  Rx thread free delay (us)  Tx thread max get send buffer (us)  
+            1.000020                    0                  2032402                          0           2032361                   0                         10                                 135  
+            1.002406                   16                    96513                    1544208             96281             1540502                      10000                                9917  
+            1.000063                    0                  1916348                          0           1916227                   0  
+            1.000218                    1                  1977657                    1977657           1977227             1977227  
+            1.000186                    2                  1990389                    3980778           1990019             3980037  
+            1.000204                    4                  1979364                    7917456           1978959             7915838  
+            1.000203                    8                  1971733                   15773864           1971333            15770664  
+            1.000134                   16                  1911739                   30587824           1911482            30583711  
+            1.000021                   32                  1888156                   60420992           1888116            60419720  
+            1.000190                   64                  1831203                  117196992           1830854           117174676  
+            1.000064                  128                  1709293                  218789504           1709184           218775536  
+            1.000191                  256                  1627377                  416608512           1627066           416528960  
+            1.000359                  512                  1407978                  720884736           1407473           720626116  
+            1.000439                 1024                  1182374                 1210750976           1181855          1210219797  
+            1.000580                 2048                   841138                 1722650624            840651          1721652510  
+            1.000954                 4096                   521658                 2136711168            521161          2134673833  
+            1.001615                 8192                   311885                 2554961920            311382          2550842656  
+            1.003243                16384                   156840                 2569666560            156333          2561360245  
+            1.006507                32768                    78959                 2587328512             78449          2570601541  
+            1.012443                65536                    41580                 2724986880             41069          2691496848  
+            1.024703               131072                    21239                 2783838208             20727          2716725771  
+            1.049199               262144                    10928                 2864709632             10416          2730377672  
+            1.098043               524288                     5733                 3005743104              5221          2737362750  
+            1.196290              1048576                     3120                 3271557120              2608          2734752514  
+
+Testing using sender using send and the receiver using recv
+sender_qp capabilities: max_send_wr=2015 max_recv_wr=512 max_send_sge=2 max_recv_sge=1 max_inline_data=28
+receiver_qp capabilities: max_send_wr=2015 max_recv_wr=512 max_send_sge=2 max_recv_sge=1 max_inline_data=28
+Current CPU frequencies (MHz) :  1800000  1800000  1800000  1800000
+Changes to statistics for initialisation of Infiniband communications:
+  Num voluntary context switches = 40 (288 -> 328)
+  Num page reclaims = 1686 (3529 -> 5215)
+  Num page faults = 0 (0 -> 0)
+  Num mlx4 interrupts = 40 (5525 -> 5565)
+
+Changes to statistics for Infiniband single thread message transfers:
+  Num voluntary context switches = 0 (328 -> 328)
+  Num page reclaims = 0 (5215 -> 5215)
+  Num page faults = 0 (0 -> 0)
+  Num mlx4 interrupts = 0 (5565 -> 5565)
+
+Changes to statistics for Infiniband multi-threaded message transfers:
+  Num voluntary context switches = 72 (328 -> 400)
+  Num page reclaims = 6 (5215 -> 5221)
+  Num page faults = 0 (0 -> 0)
+  Num mlx4 interrupts = 0 (5565 -> 5565)
+
+
+Test duration (secs)  Data length (bytes)  Total messages received  Total data bytes received  Messages per sec  Data bytes per sec  Rx thread free delay (us)  Tx thread max get send buffer (us)  
+            1.000212                    0                  1831889                          0           1831502                   0                         10                                 131  
+            1.003194                   16                    96513                    1544208             96206             1539291                      10000                                9929  
+            1.000172                    0                  1776903                          0           1776597                   0  
+            1.000153                    1                  1752400                    1752400           1752131             1752131  
+            1.000132                    2                  1759544                    3519088           1759311             3518622  
+            1.000184                    4                  1763256                    7053024           1762932             7051727  
+            1.000180                    8                  1747712                   13981696           1747397            13979178  
+            1.000076                   16                  1818333                   29093328           1818194            29091103  
+            1.000051                   32                  1798826                   57562432           1798734            57559502  
+            1.000021                   64                  1748269                  111889216           1748233           111886881  
+            1.000025                  128                  1641641                  210130048           1641600           210124769  
+            1.000299                  256                  1539451                  394099456           1538991           393981701  
+            1.000325                  512                  1381760                  707461120           1381311           707231269  
+            1.000425                 1024                  1127339                 1154395136           1126860          1153904770  
+            1.000600                 2048                   831630                 1703178240            831132          1702157424  
+            1.000968                 4096                   514700                 2108211200            514202          2106171891  
+            1.001625                 8192                   308768                 2529427456            308267          2525323618  
+            1.003247                16384                   156644                 2566455296            156137          2558147867  
+            1.006588                32768                    77826                 2550202368             77317          2533510917  
+            1.012968                65536                    39951                 2618228736             39440          2584711224  
+            1.025234               131072                    20779                 2723545088             20268          2656510477  
+            1.049788               262144                    10798                 2830630912             10286          2696382326  
+            1.098860               524288                     5694                 2985295872              5182          2716721605  
+            1.196431              1048576                     3120                 3271557120              2608          2734429134  
+
+
