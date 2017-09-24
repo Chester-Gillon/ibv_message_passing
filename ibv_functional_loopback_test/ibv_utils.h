@@ -34,6 +34,7 @@ void display_ibv_device_attributes (const struct ibv_context *const device, cons
 void display_ibv_port_attributes (const struct ibv_port_attr *const port_attr);
 void display_qp_capabilities (struct ibv_qp *const qp, const char *qp_name);
 void verify_qp_state (const enum ibv_qp_state expected_state, struct ibv_qp *const qp, const char *qp_name);
+uint32_t get_max_inline_data (struct ibv_qp *const qp);
 uint32_t get_random_psn (void);
 void get_infiniband_statistics_before_test (infiniband_statistics_collection *const stats);
 void get_infiniband_statistics_after_test (infiniband_statistics_collection *const stats);

@@ -10,6 +10,9 @@
  *          - The receiver is passive, polling memory for message receipt
  *          - The sender uses busy-polling to wait for any previous message transfer to complete
  *
+ *          Attempts to optimise the message rate include:
+ *          - Sending inline data when the size allows.
+ *
  *          Since a single process is used to send messages between a pair of loop-backed ports on a dual port
  *          Infiniband adapter there is no communication mechanism required to exchange Queue Pair, Memory Region
  *          or Packet Sequence Number details between the sender and receiver (which are in the same process).
@@ -100,6 +103,8 @@ typedef struct
     struct ibv_qp *message_send_qp;
     /** The Packet Sequence Number for message_send_qp */
     uint32_t message_send_psn;
+    /** The maximum number of bytes which can be sent inline on message_send_qp */
+    uint32_t message_send_qp_max_inline_data;
     /** Contains the sender context for each message buffer */
     srwrp_message_buffer_send_context buffer_contexts[NUM_MESSAGE_BUFFERS];
     /** Used to pass the send buffers to the application */
@@ -148,6 +153,8 @@ typedef struct
     struct ibv_qp *freed_sequence_number_qp;
     /** The Packet Sequence Number for freed_sequence_number_qp */
     uint32_t freed_sequence_number_psn;
+    /** The maximum number of bytes which can be sent inline on freed_sequence_number_qp */
+    uint32_t freed_sequence_number_qp_max_inline_data;
     /** Contains the receiver context for each message buffer */
     srwrp_message_buffer_receive_context buffer_contexts[NUM_MESSAGE_BUFFERS];
     /** Used to pass the receive buffers to the application */
@@ -208,6 +215,7 @@ static void srwrp_sender_create_local (srwrp_sender_context *const send_context)
     }
     verify_qp_state (IBV_QPS_RESET, send_context->message_send_qp, "message_send_qp");
     send_context->message_send_psn = get_random_psn ();
+    send_context->message_send_qp_max_inline_data = get_max_inline_data (send_context->message_send_qp);
 
     /* Transition the sender Queue Pair to the Init state */
     memset (&qp_attr, 0, sizeof (qp_attr));
@@ -280,6 +288,7 @@ static void srwrp_receiver_create_local (srwrp_receiver_context *const receive_c
     }
     verify_qp_state (IBV_QPS_RESET, receive_context->freed_sequence_number_qp, "freed_sequence_number_qp");
     receive_context->freed_sequence_number_psn = get_random_psn ();
+    receive_context->freed_sequence_number_qp_max_inline_data = get_max_inline_data (receive_context->freed_sequence_number_qp);
 
     /* Transition the receiver Queue Pair to the Init state */
     memset (&qp_attr, 0, sizeof (qp_attr));
@@ -353,6 +362,10 @@ static void srwrp_sender_initialise_message_buffers (srwrp_sender_context *const
         header_wr->next = NULL;
         header_wr->opcode = IBV_WR_RDMA_WRITE;
         header_wr->send_flags = IBV_SEND_SIGNALED;
+        if (sizeof (message_header) <= send_context->message_send_qp_max_inline_data)
+        {
+            header_wr->send_flags |= IBV_SEND_INLINE;
+        }
         header_wr->wr.rdma.rkey = receive_context->receive_mr->rkey;
         header_wr->wr.rdma.remote_addr = (uintptr_t) receive_context->receive_mr->addr +
                 offsetof (srwrp_receiver_buffer, receive_messages[buffer_index].header);
@@ -469,6 +482,10 @@ static void srwrp_receiver_initialise_message_buffers (srwrp_receiver_context *c
         buffer->freed_message_wr.next = NULL;
         buffer->freed_message_wr.opcode = IBV_WR_RDMA_WRITE;
         buffer->freed_message_wr.send_flags = IBV_SEND_SIGNALED;
+        if (sizeof (uint32_t) <= receive_context->freed_sequence_number_qp_max_inline_data)
+        {
+            buffer->freed_message_wr.send_flags |= IBV_SEND_INLINE;
+        }
         buffer->freed_message_wr.wr.rdma.rkey = send_context->send_mr->rkey;
         buffer->freed_message_wr.wr.rdma.remote_addr = (uintptr_t) send_context->send_mr->addr +
                 offsetof (srwrp_sender_buffer, freed_sequence_numbers[buffer_index]);
@@ -804,6 +821,14 @@ static void srwrp_send_message (api_send_context send_context_in, api_message_bu
      * (since a length of zero is interpreted by ibv_post_send() as a maximum length message) */
     if (buffer_context->send_wrs[MESSAGE_DATA_WQE_INDEX].sg_list->length > 0)
     {
+        if (buffer_context->send_wrs[MESSAGE_DATA_WQE_INDEX].sg_list->length <= send_context->message_send_qp_max_inline_data)
+        {
+            buffer_context->send_wrs[MESSAGE_DATA_WQE_INDEX].send_flags |= IBV_SEND_INLINE;
+        }
+        else
+        {
+            buffer_context->send_wrs[MESSAGE_DATA_WQE_INDEX].send_flags &= ~IBV_SEND_INLINE;
+        }
         rc =  ibv_post_send (send_context->message_send_qp, &buffer_context->send_wrs[MESSAGE_DATA_WQE_INDEX], &bad_wr);
         CHECK_ASSERT (rc == 0);
         buffer_context->outstanding_wrs[MESSAGE_DATA_WQE_INDEX] = true;

@@ -10,7 +10,7 @@
  *          - The receiver posts receive requests and poll the completion-queue to wait for the message.
  *          - The sender uses busy-polling to wait for any previous message transfer to complete.
  *
- *          Attempt to optimise the message rate include:
+ *          Attempts to optimise the message rate include:
  *          - Sending inline data when the size allows.
  *          - Signalling completion one in every NUM_MESSAGE_BUFFERS when possible.
  *
@@ -220,17 +220,7 @@ static void srwirpcq_sender_create_local (srwirpcq_sender_context *const send_co
     }
     verify_qp_state (IBV_QPS_RESET, send_context->sender_qp, "sender_qp");
     send_context->message_send_psn = get_random_psn ();
-
-    /* Obtain the max supported inline data size */
-    memset (&qp_init_attr, 0, sizeof (qp_init_attr));
-    memset (&qp_attr, 0, sizeof (qp_attr));
-    rc = ibv_query_qp (send_context->sender_qp, &qp_attr, IBV_QP_CAP, &qp_init_attr);
-    if (rc != 0)
-    {
-        perror ("ibv_query_qp failed");
-        exit (EXIT_FAILURE);
-    }
-    send_context->sender_qp_max_inline_data = qp_init_attr.cap.max_inline_data;
+    send_context->sender_qp_max_inline_data = get_max_inline_data (send_context->sender_qp);
 
     /* Transition the sender Queue Pair to the Init state */
     memset (&qp_attr, 0, sizeof (qp_attr));

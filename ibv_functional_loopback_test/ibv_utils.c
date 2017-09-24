@@ -385,6 +385,29 @@ void verify_qp_state (const enum ibv_qp_state expected_state, struct ibv_qp *con
 }
 
 /**
+ * @brief Return the maximum number of inline bytes which can be sent using a Queue Pair
+ * @param[in] qp The Queue Pair to get the maximum number of inline bytes for
+ * @return Returns the maximum number of lineline bytes for qp
+ */
+uint32_t get_max_inline_data (struct ibv_qp *const qp)
+{
+    struct ibv_qp_init_attr qp_init_attr;
+    struct ibv_qp_attr qp_attr;
+    int rc;
+
+    memset (&qp_init_attr, 0, sizeof (qp_init_attr));
+    memset (&qp_attr, 0, sizeof (qp_attr));
+    rc = ibv_query_qp (qp, &qp_attr, IBV_QP_CAP, &qp_init_attr);
+    if (rc != 0)
+    {
+        perror ("ibv_query_qp failed");
+        exit (EXIT_FAILURE);
+    }
+
+    return qp_init_attr.cap.max_inline_data;
+}
+
+/**
  * @brief Obtain a pseudo-random 24-bit Packet Sequence Number
  * @return Returns the starting Packet Sequence Numb er
  */
