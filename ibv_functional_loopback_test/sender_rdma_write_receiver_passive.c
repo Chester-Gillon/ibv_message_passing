@@ -901,6 +901,8 @@ static void srwrp_free_message (api_receive_context receive_context_in, api_mess
 void sender_rdma_write_receiver_passive_set_functions (message_communication_functions *const functions)
 {
     functions->description = "sender using RDMA write and the receiver passive";
+    functions->out_of_order_send_supported = true;
+    functions->out_of_order_free_supported = true;
     functions->initialise = srwrp_initialise;
     functions->finalise = srwrp_finalise;
     functions->get_send_buffer = srwrp_get_send_buffer;

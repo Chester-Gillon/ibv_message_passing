@@ -79,6 +79,18 @@ typedef struct
     /** Describes communication method used by the function pointers */
     const char *description;
 
+    /** If false send_message() must be called in the same order as the buffers were returned by get_send_buffer().
+     *
+     *  If true send_message() may be called in a different order to which the buffers were returned by get_send_buffer().
+     *  This is allowed for implementations which use RDMA write, but wouldn't be possible if the send buffers were variable length.
+     */
+    bool out_of_order_send_supported;
+
+    /** If false free_message() must be called in the same order as the buffers were returned by await_message().
+     *
+     *  If true free_message() may be called in a different order to which the buffers were returned by await_message() */
+    bool out_of_order_free_supported;
+
     /**
      * @brief Allocate and initialise the send and receive contexts to be used to transfer test messages
      * @param[out] send_context_out The allocated send context
@@ -132,5 +144,6 @@ typedef struct
 
 void sender_rdma_write_receiver_passive_set_functions (message_communication_functions *const functions);
 void sender_rdma_write_with_imm_receiver_poll_cq_set_functions (message_communication_functions *const functions);
+void sender_send_receiver_recv_set_functions (message_communication_functions *const functions);
 
 #endif /* IBV_FUNCTIONAL_LOOPBACK_TEST_INTERFACE_H_ */

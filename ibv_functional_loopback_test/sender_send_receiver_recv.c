@@ -1,13 +1,13 @@
 /*
- * @file sender_rdma_write_with_imm_receiver_poll_cq.c
- * @date 23 Sep 2017
+ * @file sender_send_receiver_recv.c
+ * @date 24 Sep 2017
  * @author Chester Gillon
  * @details Perform a functional message passing test where:
  *          - Variable size messages are sent in a circular buffer
  *          - The sender and receiver agree on the maximum message size at initialisation,
  *            and at run time the receiver determines the size of the received message from a message header.
- *          - The sender uses RDMA_WRITE_WITH_IMM.
- *          - The receiver posts receive requests and poll the completion-queue to wait for the message.
+ *          - The sender uses IBV_WR_SEND.
+ *          - The receiver posts receive requests and polls the completion-queue to wait for the message.
  *          - The sender uses busy-polling to wait for any previous message transfer to complete.
  *
  *          Attempts to optimise the message rate include:
@@ -32,23 +32,33 @@
 #include "ibv_utils.h"
 #include "ibv_functional_loopback_test_interface.h"
 
-/** This structure defines the buffer used by the sender to transmit messages.
- *  The flow control is received via the immediate data value, and so doesn't appear in this buffer.
+/** Allocate each sequence number in its own cache line */
+typedef struct
+{
+    uint32_t sequence_number;
+    char alignment[CACHE_LINE_SIZE_BYTES - sizeof (uint32_t)];
+} aligned_sequnce_number;
+
+/** This structure defines the buffer used by the sender to transmit messages, and receive flow control.
  *  Where this buffer is accessible by the Infiniband device. */
 typedef struct
 {
     /** The messages which are transmitted */
     test_message transmit_messages[NUM_MESSAGE_BUFFERS];
-} srwirpcq_sender_buffer;
+    /** Used to receive the sequence numbers of the freed messages, to provide flow control */
+    aligned_sequnce_number freed_sequence_numbers[NUM_MESSAGE_BUFFERS];
+} ssrr_sender_buffer;
 
-/** This structure defines the buffer used by the receiver to receive messages.
- *  The flow control is transmitted via the immediate data value, and so doesn't appear in this buffer.
+
+/** This structure defines the buffer used by the receiver to receive messages, and transmit flow control.
  *  Where this buffer is accessible by the Infiniband device. */
 typedef struct
 {
     /** The messages which are received */
     test_message receive_messages[NUM_MESSAGE_BUFFERS];
-} srwirpcq_receiver_buffer;
+    /** Used to transmit the sequence numbers of the freed messages, to provide flow control */
+    aligned_sequnce_number freed_sequence_numbers[NUM_MESSAGE_BUFFERS];
+} ssrr_receiver_buffer;
 
 /** Contains the context to manage one sender message buffer */
 typedef struct
@@ -65,26 +75,30 @@ typedef struct
      *                        message send transfer has completed.
      *    IBV_SEND_INLINE : Set if the number of bytes header+data is small enough to be sent as inline, as an optimisation. */
     struct ibv_send_wr send_wr;
-    /** Contains the work-request used to receive immediate data for when the buffer has been freed by the receiver */
+    /** Contains the scatter-gather entry used to receive the sequence number when the buffer has been freed by the receiver */
+    struct ibv_sge freed_buffer_sge;
+    /** Contains the work-request used to receive the sequence number when the buffer has been freed by the receiver */
     struct ibv_recv_wr freed_buffer_wr;
     /** The sequence number for the next message to be sent from this buffer */
     uint32_t next_send_sequence_number;
     /** Indicates when the buffer in the receiver is free, allowing a message to be sent:
      *  - Initialised to true.
      *  - Cleared when a message has been sent.
-     *  - Set when the receiver sends a freed buffer index via immediate data. */
+     *  - Set when the receiver sends a freed sequence number. */
     bool buffer_free;
+    /** The expected freed sequence number to be received when the receiver has freed the message */
+    uint32_t message_freed_sequence_number;
     /** Used to check usage of the message buffer:
      *  - If false in use by the send API functions.
      *  - If true in use by the application for populating the message contents to be sent */
     bool owned_by_application;
-} srwirpcq_message_buffer_send_context;
+} ssrr_message_buffer_send_context;
 
 /** This structure contains the context for the sender of the test messages */
 typedef struct
 {
     /** The message send buffer which is accessed by this program and the Infiniband device */
-    srwirpcq_sender_buffer *send_buffer;
+    ssrr_sender_buffer *send_buffer;
     /** The Infiniband Memory Region for send_buffer */
     struct ibv_mr *send_mr;
     /** Completion queue for sending the messages */
@@ -98,7 +112,7 @@ typedef struct
     /** The maximum number of bytes which can be sent inline on sender_qp */
     uint32_t sender_qp_max_inline_data;
     /** Contains the sender context for each message buffer */
-    srwirpcq_message_buffer_send_context buffer_contexts[NUM_MESSAGE_BUFFERS];
+    ssrr_message_buffer_send_context buffer_contexts[NUM_MESSAGE_BUFFERS];
     /** Used to pass the send buffers to the application */
     api_message_buffer buffers[NUM_MESSAGE_BUFFERS];
     /** The circular buffer index for the next message buffer to pass to the application for populating */
@@ -107,14 +121,18 @@ typedef struct
     uint32_t message_send_cq_pacing;
     /** Used to poll for all freed buffer indices completions at once */
     struct ibv_wc freed_message_completions[NUM_MESSAGE_BUFFERS];
-} srwirpcq_sender_context;
+} ssrr_sender_context;
 
 /** Contains the context to manage one receiver message buffer */
 typedef struct
 {
-    /** The work request used to receive immediate data for when the buffer has been written to with a message */
-    struct ibv_recv_wr message_available_wr;
-    /** The work request to transfer the the index of a freed message buffer to the sender (via immediate data).
+    /** The scatter-gather entry to receive a maximum size message */
+    struct ibv_sge receive_message_sge;
+    /** The work request used to receive the message */
+    struct ibv_recv_wr receive_message_wr;
+    /** The scatter-buffer entry to transfer the freed sequence number to the sender */
+    struct ibv_sge freed_buffer_sge;
+    /** The work request to transfer the the index of a freed message buffer to the sender.
      *  Set at initialisation, and doesn't required modification as messages are freed. */
     struct ibv_send_wr freed_buffer_wr;
     /** Defines the next expected sequence number for the receive message header, which is checked after
@@ -129,13 +147,13 @@ typedef struct
      *  - If false in use by the receive API functions.
      *  - If true in use by the application for processing the received message contents */
     bool owned_by_application;
-} srwirpcq_message_buffer_receive_context;
+} ssrr_message_buffer_receive_context;
 
 /** This structure contains the context for the receiver of the test messages */
 typedef struct
 {
     /** The message receive buffer which is accessed by this program and the Infiniband device */
-    srwirpcq_receiver_buffer *receive_buffer;
+    ssrr_receiver_buffer *receive_buffer;
     /** The Infiniband Memory Region for receive_buffer */
     struct ibv_mr *receive_mr;
     /** Completion queue for receiving the buffer index for an available receive message */
@@ -147,8 +165,10 @@ typedef struct
     struct ibv_qp *receiver_qp;
     /** The Packet Sequence Number for receiver_qp */
     uint32_t freed_buffer_psn;
+    /** The maximum number of bytes which can be sent inline on receiver_qp */
+    uint32_t receiver_qp_max_inline_data;
     /** Contains the receiver context for each message buffer */
-    srwirpcq_message_buffer_receive_context buffer_contexts[NUM_MESSAGE_BUFFERS];
+    ssrr_message_buffer_receive_context buffer_contexts[NUM_MESSAGE_BUFFERS];
     /** Used to pass the receive buffers to the application */
     api_message_buffer buffers[NUM_MESSAGE_BUFFERS];
     /** The circular buffer index for the next message message to check for message receipt */
@@ -157,25 +177,25 @@ typedef struct
     uint32_t freed_buffer_cq_pacing;
     /** Used to poll for all available message buffer indices completions at once */
     struct ibv_wc message_available_completions[NUM_MESSAGE_BUFFERS];
-} srwirpcq_receiver_context;
+} ssrr_receiver_context;
 
 /**
  * @details Perform the initialisation of the context for the sender of the test messages which creates local
  *          resources without requiring the identity of the Queue Pair on the destination.
  * @param[out] send_context The sender context to initialise
  */
-static void srwirpcq_sender_create_local (srwirpcq_sender_context *const send_context)
+static void ssrr_sender_create_local (ssrr_sender_context *const send_context)
 {
     struct ibv_qp_init_attr qp_init_attr;
     struct ibv_qp_attr qp_attr;
     int rc;
 
-    memset (send_context, 0, sizeof (srwirpcq_sender_context));
+    memset (send_context, 0, sizeof (ssrr_sender_context));
 
     /* Create and register the memory for the send buffers */
-    send_context->send_buffer = page_aligned_calloc (1, sizeof (srwirpcq_sender_buffer));
+    send_context->send_buffer = page_aligned_calloc (1, sizeof (ssrr_sender_buffer));
 
-    send_context->send_mr = ibv_reg_mr (ibv_loopback_device_pd, send_context->send_buffer, sizeof (srwirpcq_sender_buffer),
+    send_context->send_mr = ibv_reg_mr (ibv_loopback_device_pd, send_context->send_buffer, sizeof (ssrr_sender_buffer),
             IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
     if (send_context->send_mr == NULL)
     {
@@ -213,7 +233,7 @@ static void srwirpcq_sender_create_local (srwirpcq_sender_context *const send_co
     qp_init_attr.cap.max_send_wr = 2 * NUM_MESSAGE_BUFFERS;
     qp_init_attr.cap.max_send_sge = 1;
     qp_init_attr.cap.max_recv_wr = NUM_MESSAGE_BUFFERS;
-    qp_init_attr.cap.max_recv_sge = 0;
+    qp_init_attr.cap.max_recv_sge = 1;
     qp_init_attr.cap.max_inline_data = 0;
     qp_init_attr.qp_type = IBV_QPT_RC;
     qp_init_attr.sq_sig_all = false;
@@ -251,19 +271,19 @@ static void srwirpcq_sender_create_local (srwirpcq_sender_context *const send_co
  *          resources without requiring the identity of the Queue Pair on the source.
  * @param[out] receive_context The receiver context to initialise
  */
-static void srwirpcq_receiver_create_local (srwirpcq_receiver_context *const receive_context)
+static void ssrr_receiver_create_local (ssrr_receiver_context *const receive_context)
 {
     struct ibv_qp_init_attr qp_init_attr;
     struct ibv_qp_attr qp_attr;
     int rc;
 
-    memset (receive_context, 0, sizeof (srwirpcq_receiver_context));
+    memset (receive_context, 0, sizeof (ssrr_receiver_context));
 
     /* Create and register the memory for the receive buffers */
-    receive_context->receive_buffer = page_aligned_calloc (1, sizeof (srwirpcq_receiver_buffer));
+    receive_context->receive_buffer = page_aligned_calloc (1, sizeof (ssrr_receiver_buffer));
 
     receive_context->receive_mr = ibv_reg_mr (ibv_loopback_device_pd, receive_context->receive_buffer,
-            sizeof (srwirpcq_receiver_buffer), IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+            sizeof (ssrr_receiver_buffer), IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
     if (receive_context->receive_mr == NULL)
     {
         perror ("ibv_reg_mrv for receive failed");
@@ -300,7 +320,7 @@ static void srwirpcq_receiver_create_local (srwirpcq_receiver_context *const rec
     qp_init_attr.cap.max_send_wr = 2 * NUM_MESSAGE_BUFFERS;
     qp_init_attr.cap.max_send_sge = 1;
     qp_init_attr.cap.max_recv_wr = NUM_MESSAGE_BUFFERS;
-    qp_init_attr.cap.max_recv_sge = 0;
+    qp_init_attr.cap.max_recv_sge = 1;
     qp_init_attr.cap.max_inline_data = 0;
     qp_init_attr.qp_type = IBV_QPT_RC;
     qp_init_attr.sq_sig_all = false;
@@ -312,6 +332,7 @@ static void srwirpcq_receiver_create_local (srwirpcq_receiver_context *const rec
     }
     verify_qp_state (IBV_QPS_RESET, receive_context->receiver_qp, "receiver_qp");
     receive_context->freed_buffer_psn = get_random_psn ();
+    receive_context->receiver_qp_max_inline_data = get_max_inline_data (receive_context->receiver_qp);
 
     /* Transition the receiver Queue Pair to the Init state */
     memset (&qp_attr, 0, sizeof (qp_attr));
@@ -340,16 +361,16 @@ static void srwirpcq_receiver_create_local (srwirpcq_receiver_context *const rec
  * @param[in,out] send_context The sender context to initialise
  * @param[in] receive_context The receiver context containing the "remote" memory region
  */
-static void srwirpcq_sender_initialise_message_buffers (srwirpcq_sender_context *const send_context,
-                                                        const srwirpcq_receiver_context *const receive_context)
+static void ssrr_sender_initialise_message_buffers (ssrr_sender_context *const send_context,
+                                                        const ssrr_receiver_context *const receive_context)
 {
     unsigned int buffer_index;
 
     for (buffer_index = 0; buffer_index < NUM_MESSAGE_BUFFERS; buffer_index++)
     {
-        srwirpcq_message_buffer_send_context *const buffer = &send_context->buffer_contexts[buffer_index];
+        ssrr_message_buffer_send_context *const buffer = &send_context->buffer_contexts[buffer_index];
 
-        memset (buffer, 0, sizeof (srwirpcq_message_buffer_send_context));
+        memset (buffer, 0, sizeof (ssrr_message_buffer_send_context));
 
         /* Set a scatter-gather entry to transmit the header + maximum message data size, actual length will be set at run time */
         buffer->send_sge.lkey = send_context->send_mr->lkey;
@@ -357,29 +378,33 @@ static void srwirpcq_sender_initialise_message_buffers (srwirpcq_sender_context 
         buffer->send_sge.length = sizeof (send_context->send_buffer->transmit_messages[buffer_index].header) +
                 sizeof (send_context->send_buffer->transmit_messages[buffer_index].data);
 
-        /* Set the send work request for the message header+data.
-         * The wr_id is set to the buffer_index to handle calls to srwirpcq_send_message() out-of-order */
+        /* Set the send work request for the message header+data. */
         buffer->send_wr.wr_id = buffer_index;
         buffer->send_wr.sg_list = &buffer->send_sge;
         buffer->send_wr.num_sge = 1;
         buffer->send_wr.next = NULL;
-        buffer->send_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
+        buffer->send_wr.opcode = IBV_WR_SEND;
         buffer->send_wr.send_flags = 0;
-        buffer->send_wr.imm_data = buffer_index;
         buffer->send_wr.wr.rdma.rkey = receive_context->receive_mr->rkey;
         buffer->send_wr.wr.rdma.remote_addr = (uintptr_t) receive_context->receive_mr->addr +
-                offsetof (srwirpcq_receiver_buffer, receive_messages[buffer_index].header);
+                offsetof (ssrr_receiver_buffer, receive_messages[buffer_index].header);
 
-        /* Set the receive work request for the freed buffer indices as immediate data */
-        buffer->freed_buffer_wr.wr_id = 0;
-        buffer->freed_buffer_wr.sg_list = NULL;
-        buffer->freed_buffer_wr.num_sge = 0;
+        /* Set the scatter-gather entry to receive the freed sequence number */
+        buffer->freed_buffer_sge.lkey = send_context->send_mr->lkey;
+        buffer->freed_buffer_sge.addr = (uintptr_t) &send_context->send_buffer->freed_sequence_numbers[buffer_index].sequence_number;
+        buffer->freed_buffer_sge.length = sizeof (send_context->send_buffer->freed_sequence_numbers[buffer_index].sequence_number);
+
+        /* Set the receive work request to receive the free sequence number */
+        buffer->freed_buffer_wr.wr_id = buffer_index;
+        buffer->freed_buffer_wr.sg_list = &buffer->freed_buffer_sge;
+        buffer->freed_buffer_wr.num_sge = 1;
         buffer->freed_buffer_wr.next = NULL;
 
         /* Initialise the sequence number management */
         buffer->buffer_free = true;
         buffer->owned_by_application = false;
         buffer->next_send_sequence_number = buffer_index + 1;
+        buffer->message_freed_sequence_number = buffer_index + 1;
 
         send_context->buffers[buffer_index].message = &send_context->send_buffer->transmit_messages[buffer_index];
         send_context->buffers[buffer_index].buffer_index = buffer_index;
@@ -398,8 +423,8 @@ static void srwirpcq_sender_initialise_message_buffers (srwirpcq_sender_context 
  * @param[in,out] send_context The sender context to initialise
  * @param[in] receive_context The receiver context containing the "remote" Queue Pair and memory region
  */
-static void srwirpcq_sender_attach_remote (srwirpcq_sender_context *const send_context,
-                                           const srwirpcq_receiver_context *const receive_context)
+static void ssrr_sender_attach_remote (ssrr_sender_context *const send_context,
+                                           const ssrr_receiver_context *const receive_context)
 {
     struct ibv_qp_attr qp_attr;
     int rc;
@@ -455,45 +480,62 @@ static void srwirpcq_sender_attach_remote (srwirpcq_sender_context *const send_c
     verify_qp_state (IBV_QPS_RTS, send_context->sender_qp, "sender_qp");
     display_qp_capabilities (send_context->sender_qp, "sender_qp");
 
-    srwirpcq_sender_initialise_message_buffers (send_context, receive_context);
+    ssrr_sender_initialise_message_buffers (send_context, receive_context);
 }
 
 /**
  * @details Perform the initialisation of the context for the receiver of test messages for each message buffer
  *          which may be received.
  *          This sets the Infiniband structures for the:
- *          - Receiving the indices of available messages, via immediate data.
+ *          - Receiving messages
  *          - Freed index number send operations using the fixed buffer attributes.
  * @param[in,out] send_context The receiver context to initialise
  * @param[in] receive_context The sender context containing the "remote" memory region
  */
-static void srwirpcq_receiver_initialise_message_buffers (srwirpcq_receiver_context *const receive_context,
-                                                          const srwirpcq_sender_context *const send_context)
+static void ssrr_receiver_initialise_message_buffers (ssrr_receiver_context *const receive_context,
+                                                          const ssrr_sender_context *const send_context)
 {
     unsigned int buffer_index;
     int rc;
 
     for (buffer_index = 0; buffer_index < NUM_MESSAGE_BUFFERS; buffer_index++)
     {
-        srwirpcq_message_buffer_receive_context *const buffer = &receive_context->buffer_contexts[buffer_index];
+        ssrr_message_buffer_receive_context *const buffer = &receive_context->buffer_contexts[buffer_index];
         struct ibv_recv_wr *bad_wr = NULL;
 
-        /* Set the work request used to receive the buffer index of available messages via immediate data */
-        buffer->message_available_wr.wr_id = buffer_index;
-        buffer->message_available_wr.sg_list = NULL;
-        buffer->message_available_wr.num_sge = 0;
-        buffer->message_available_wr.next = NULL;
+        /* Set a scatter-gather entry to receive a maximum size message in this buffer */
+        buffer->receive_message_sge.lkey = receive_context->receive_mr->lkey;
+        buffer->receive_message_sge.addr = (uintptr_t) &receive_context->receive_buffer->receive_messages[buffer_index].header;
+        buffer->receive_message_sge.length = sizeof (receive_context->receive_buffer->receive_messages[buffer_index].header) +
+                sizeof (receive_context->receive_buffer->receive_messages[buffer_index].data);
 
-        /* Set the work request used to transmit the freed buffer index as immediate data */
+        /* Set the work request used to receive the message */
+        buffer->receive_message_wr.wr_id = buffer_index;
+        buffer->receive_message_wr.sg_list = &buffer->receive_message_sge;
+        buffer->receive_message_wr.num_sge = 1;
+        buffer->receive_message_wr.next = NULL;
+
+        /* Set the scatter-gather entry to transmit the freed sequence number */
+        buffer->freed_buffer_sge.lkey = receive_context->receive_mr->lkey;
+        buffer->freed_buffer_sge.addr =
+                (uintptr_t) &receive_context->receive_buffer->freed_sequence_numbers[buffer_index].sequence_number;
+        buffer->freed_buffer_sge.length =
+                sizeof (receive_context->receive_buffer->freed_sequence_numbers[buffer_index].sequence_number);
+
+        /* Set the work request used to transmit the freed sequence number */
         buffer->freed_buffer_wr.wr_id = buffer_index;
-        buffer->freed_buffer_wr.sg_list = NULL;
-        buffer->freed_buffer_wr.num_sge = 0;
+        buffer->freed_buffer_wr.sg_list = &buffer->freed_buffer_sge;
+        buffer->freed_buffer_wr.num_sge = 1;
         buffer->freed_buffer_wr.next = NULL;
-        buffer->freed_buffer_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
+        buffer->freed_buffer_wr.opcode = IBV_WR_SEND;
         buffer->freed_buffer_wr.send_flags = 0;
-        buffer->freed_buffer_wr.imm_data = buffer_index;
+        if (sizeof (uint32_t) <= receive_context->receiver_qp_max_inline_data)
+        {
+            buffer->freed_buffer_wr.send_flags |= IBV_SEND_INLINE;
+        }
         buffer->freed_buffer_wr.wr.rdma.rkey = send_context->send_mr->rkey;
-        buffer->freed_buffer_wr.wr.rdma.remote_addr = (uintptr_t) send_context->send_mr->addr;
+        buffer->freed_buffer_wr.wr.rdma.remote_addr = (uintptr_t) send_context->send_mr->addr +
+                offsetof (ssrr_sender_buffer, freed_sequence_numbers[buffer_index].sequence_number);
 
         /* Initialise the sequence number management */
         buffer->message_available = false;
@@ -504,10 +546,10 @@ static void srwirpcq_receiver_initialise_message_buffers (srwirpcq_receiver_cont
         receive_context->buffers[buffer_index].buffer_index = buffer_index;
 
         /* Post the work request to receive the available message */
-        rc = ibv_post_recv (receive_context->receiver_qp, &buffer->message_available_wr, &bad_wr);
+        rc = ibv_post_recv (receive_context->receiver_qp, &buffer->receive_message_wr, &bad_wr);
         if (rc != 0)
         {
-            perror ("ibv_post_recv message_available_wr failed");
+            perror ("ibv_post_recv receive_message_wr failed");
             exit (EXIT_FAILURE);
         }
     }
@@ -525,8 +567,8 @@ static void srwirpcq_receiver_initialise_message_buffers (srwirpcq_receiver_cont
  * @param[in,out] receive_context The receiver context to initialise
  * @param[in] send_context The sender context containing the "remote" Queue Pair and memory region
  */
-static void srwirpcq_receiver_attach_remote (srwirpcq_receiver_context *const receive_context,
-                                             const srwirpcq_sender_context *const send_context)
+static void ssrr_receiver_attach_remote (ssrr_receiver_context *const receive_context,
+                                             const ssrr_sender_context *const send_context)
 {
     struct ibv_qp_attr qp_attr;
     int rc;
@@ -582,7 +624,7 @@ static void srwirpcq_receiver_attach_remote (srwirpcq_receiver_context *const re
     verify_qp_state (IBV_QPS_RTS, receive_context->receiver_qp, "receiver_qp");
     display_qp_capabilities (receive_context->receiver_qp, "receiver_qp");
 
-    srwirpcq_receiver_initialise_message_buffers (receive_context, send_context);
+    ssrr_receiver_initialise_message_buffers (receive_context, send_context);
 }
 
 /**
@@ -590,15 +632,15 @@ static void srwirpcq_receiver_attach_remote (srwirpcq_receiver_context *const re
  * @param[out] send_context_out The allocated send context
  * @param[out] receive_context_out The allocated receive context
  */
-static void srwirpcq_initialise (api_send_context *const send_context_out, api_receive_context *const receive_context_out)
+static void ssrr_initialise (api_send_context *const send_context_out, api_receive_context *const receive_context_out)
 {
-    srwirpcq_sender_context *const send_context = cache_line_aligned_alloc (sizeof (srwirpcq_sender_context));
-    srwirpcq_receiver_context *const receive_context = cache_line_aligned_alloc (sizeof (srwirpcq_receiver_context));
+    ssrr_sender_context *const send_context = cache_line_aligned_alloc (sizeof (ssrr_sender_context));
+    ssrr_receiver_context *const receive_context = cache_line_aligned_alloc (sizeof (ssrr_receiver_context));
 
-    srwirpcq_sender_create_local (send_context);
-    srwirpcq_receiver_create_local (receive_context);
-    srwirpcq_sender_attach_remote (send_context, receive_context);
-    srwirpcq_receiver_attach_remote (receive_context, send_context);
+    ssrr_sender_create_local (send_context);
+    ssrr_receiver_create_local (receive_context);
+    ssrr_sender_attach_remote (send_context, receive_context);
+    ssrr_receiver_attach_remote (receive_context, send_context);
 
     *send_context_out = (api_send_context) send_context;
     *receive_context_out = (api_receive_context) receive_context;
@@ -608,7 +650,7 @@ static void srwirpcq_initialise (api_send_context *const send_context_out, api_r
  * @brief Free the resources used for the context of a message sender
  * @param[in,out] send_context The context to free the resources for
  */
-static void srwirpcq_sender_finalise (srwirpcq_sender_context *const send_context)
+static void ssrr_sender_finalise (ssrr_sender_context *const send_context)
 {
     int rc;
 
@@ -646,7 +688,7 @@ static void srwirpcq_sender_finalise (srwirpcq_sender_context *const send_contex
  * @brief Free the resources used for the context of a message receiver
  * @param[in,out] receive_context The context to free the resources for
  */
-static void srwirpcq_receiver_finalise (srwirpcq_receiver_context *const receive_context)
+static void ssrr_receiver_finalise (ssrr_receiver_context *const receive_context)
 {
     int rc;
 
@@ -685,13 +727,13 @@ static void srwirpcq_receiver_finalise (srwirpcq_receiver_context *const receive
  * @param[in] send_context_in The send context to free the resources for
  * @param[in] receive_context_in The receive context to free the resources for
  */
-static void srwirpcq_finalise (api_send_context send_context_in, api_receive_context receive_context_in)
+static void ssrr_finalise (api_send_context send_context_in, api_receive_context receive_context_in)
 {
-    srwirpcq_sender_context *const send_context = (srwirpcq_sender_context *) send_context_in;
-    srwirpcq_receiver_context *const receive_context = (srwirpcq_receiver_context *) receive_context_in;
+    ssrr_sender_context *const send_context = (ssrr_sender_context *) send_context_in;
+    ssrr_receiver_context *const receive_context = (ssrr_receiver_context *) receive_context_in;
 
-    srwirpcq_sender_finalise (send_context);
-    srwirpcq_receiver_finalise (receive_context);
+    ssrr_sender_finalise (send_context);
+    ssrr_receiver_finalise (receive_context);
     free (send_context);
     free (receive_context);
 }
@@ -703,19 +745,18 @@ static void srwirpcq_finalise (api_send_context send_context_in, api_receive_con
  * @param[in,out] send_context_in The send context to get the message buffer for
  * @return Returns a pointer to a message buffer, for which the message field can be populated with a message to send
  */
-static api_message_buffer *srwirpcq_get_send_buffer (api_send_context send_context_in)
+static api_message_buffer *ssrr_get_send_buffer (api_send_context send_context_in)
 {
-    srwirpcq_sender_context *const send_context = (srwirpcq_sender_context *) send_context_in;
+    ssrr_sender_context *const send_context = (ssrr_sender_context *) send_context_in;
     api_message_buffer *const buffer = &send_context->buffers[send_context->next_send_buffer_index];
-    srwirpcq_message_buffer_send_context *const buffer_context = &send_context->buffer_contexts[buffer->buffer_index];
-    srwirpcq_message_buffer_send_context *freed_context;
+    ssrr_message_buffer_send_context *const buffer_context = &send_context->buffer_contexts[buffer->buffer_index];
+    ssrr_message_buffer_send_context *freed_context;
     int num_completions;
     int completion_index;
 
     CHECK_ASSERT (!buffer_context->owned_by_application);
 
-    /* Wait for the receiver to indicate the previous message sent from this buffer has been freed.
-     * The loop allows buffers to be freed out-of-order. */
+    /* Wait for the receiver to indicate the previous message sent from this buffer has been freed. */
     while (!buffer_context->buffer_free)
     {
         do
@@ -728,12 +769,15 @@ static api_message_buffer *srwirpcq_get_send_buffer (api_send_context send_conte
         for (completion_index = 0; completion_index < num_completions; completion_index++)
         {
             const struct ibv_wc *const wc = &send_context->freed_message_completions[completion_index];
-            const uint32_t freed_buffer_index = wc->imm_data;
+            const uint32_t freed_buffer_index = wc->wr_id;
 
             CHECK_ASSERT ((wc->status == IBV_WC_SUCCESS) && (freed_buffer_index < NUM_MESSAGE_BUFFERS));
             freed_context = &send_context->buffer_contexts[freed_buffer_index];
-            CHECK_ASSERT (!freed_context->buffer_free);
+            CHECK_ASSERT (!freed_context->buffer_free &&
+                    (send_context->send_buffer->freed_sequence_numbers[freed_buffer_index].sequence_number ==
+                            freed_context->message_freed_sequence_number));
             freed_context->buffer_free = true;
+            freed_context->message_freed_sequence_number += NUM_MESSAGE_BUFFERS;
         }
     }
 
@@ -752,10 +796,10 @@ static api_message_buffer *srwirpcq_get_send_buffer (api_send_context send_conte
  *                       and which the message to send has been populated by the caller.
  *                       This function will set the buffer->message.header.sequence_number field
  */
-static void srwirpcq_send_message (api_send_context send_context_in, api_message_buffer *const buffer)
+static void ssrr_send_message (api_send_context send_context_in, api_message_buffer *const buffer)
 {
-    srwirpcq_sender_context *const send_context = (srwirpcq_sender_context *) send_context_in;
-    srwirpcq_message_buffer_send_context *const buffer_context = &send_context->buffer_contexts[buffer->buffer_index];
+    ssrr_sender_context *const send_context = (ssrr_sender_context *) send_context_in;
+    ssrr_message_buffer_send_context *const buffer_context = &send_context->buffer_contexts[buffer->buffer_index];
     struct ibv_recv_wr *bad_recv_wr = NULL;
     struct ibv_send_wr *bad_send_wr = NULL;
     int send_flags;
@@ -766,7 +810,7 @@ static void srwirpcq_send_message (api_send_context send_context_in, api_message
                   (buffer->message->header.message_length <= MAX_MESSAGE_DATA_LEN_BYTES));
     buffer_context->owned_by_application = false;
 
-    /* Post the work request to receive the buffer freed index, when the receiver frees the message */
+    /* Post the work request to receive the freed sequence number, when the receiver frees the message */
     buffer_context->buffer_free = false;
     rc = ibv_post_recv (send_context->sender_qp, &buffer_context->freed_buffer_wr, &bad_recv_wr);
     CHECK_ASSERT (rc == 0);
@@ -815,11 +859,11 @@ static void srwirpcq_send_message (api_send_context send_context_in, api_message
  * @param[in,out] receive_context_in The receive context to receive the message on
  * @return Returns a pointer to the received message buffer
  */
-static api_message_buffer *srwirpcq_await_message (api_receive_context receive_context_in)
+static api_message_buffer *ssrr_await_message (api_receive_context receive_context_in)
 {
-    srwirpcq_receiver_context *const receive_context = (srwirpcq_receiver_context *) receive_context_in;
+    ssrr_receiver_context *const receive_context = (ssrr_receiver_context *) receive_context_in;
     const uint32_t buffer_index = receive_context->next_receive_buffer_index;
-    srwirpcq_message_buffer_receive_context *const buffer_context = &receive_context->buffer_contexts[buffer_index];
+    ssrr_message_buffer_receive_context *const buffer_context = &receive_context->buffer_contexts[buffer_index];
 
     /* Wait for the next message buffer to have an available message.
      * The loop extracts all available buffer indices from the completion queue as an optimisation */
@@ -838,8 +882,8 @@ static api_message_buffer *srwirpcq_await_message (api_receive_context receive_c
         for (completion_index = 0; completion_index < num_completions; completion_index++)
         {
             const struct ibv_wc *const wc = &receive_context->message_available_completions[completion_index];
-            const uint32_t available_buffer_index = wc->imm_data;
-            srwirpcq_message_buffer_receive_context *available_context;
+            const uint32_t available_buffer_index = wc->wr_id;
+            ssrr_message_buffer_receive_context *available_context;
             const message_header *header;
 
             CHECK_ASSERT ((wc->status == IBV_WC_SUCCESS) && (available_buffer_index < NUM_MESSAGE_BUFFERS));
@@ -849,7 +893,6 @@ static api_message_buffer *srwirpcq_await_message (api_receive_context receive_c
                     (wc->byte_len == (sizeof (message_header) + header->message_length)) &&
                     (header->sequence_number == available_context->message_available_sequence_number));
             available_context->message_available = true;
-            available_context->message_available_sequence_number += NUM_MESSAGE_BUFFERS;
         }
     }
 
@@ -867,19 +910,18 @@ static api_message_buffer *srwirpcq_await_message (api_receive_context receive_c
  * @param[in,out] receive_context_in The receive context to free the message for
  * @param[in,out] buffer The received message buffer to free
  */
-static void srwirpcq_free_message (api_receive_context receive_context_in, api_message_buffer *const buffer)
+static void ssrr_free_message (api_receive_context receive_context_in, api_message_buffer *const buffer)
 {
-    srwirpcq_receiver_context *const receive_context = (srwirpcq_receiver_context *) receive_context_in;
-    srwirpcq_message_buffer_receive_context *const buffer_context = &receive_context->buffer_contexts[buffer->buffer_index];
+    ssrr_receiver_context *const receive_context = (ssrr_receiver_context *) receive_context_in;
+    ssrr_message_buffer_receive_context *const buffer_context = &receive_context->buffer_contexts[buffer->buffer_index];
     struct ibv_recv_wr *bad_recv_wr = NULL;
     struct ibv_send_wr *bad_send_wr = NULL;
-    int send_flags;
     int rc;
 
     CHECK_ASSERT (buffer_context->owned_by_application);
 
     /* Post the work request to receive the next available message for this buffer */
-    rc = ibv_post_recv (receive_context->receiver_qp, &buffer_context->message_available_wr, &bad_recv_wr);
+    rc = ibv_post_recv (receive_context->receiver_qp, &buffer_context->receive_message_wr, &bad_recv_wr);
     CHECK_ASSERT (rc == 0);
 
     /* Wait for the freed buffer send work request completion, which is signalled on one message in every NUM_MESSAGE_BUFFERS */
@@ -896,13 +938,18 @@ static void srwirpcq_free_message (api_receive_context receive_context_in, api_m
         receive_context->freed_buffer_cq_pacing = 0;
     }
 
-    /* Send the index of the freed buffer to the sender */
-    send_flags = 0;
+    /* Send the freed buffer sequence number to the sender */
+    receive_context->receive_buffer->freed_sequence_numbers[buffer->buffer_index].sequence_number =
+            buffer_context->message_available_sequence_number;
+    buffer_context->message_available_sequence_number += NUM_MESSAGE_BUFFERS;
     if (receive_context->freed_buffer_cq_pacing == 0)
     {
-        send_flags |= IBV_SEND_SIGNALED;
+        buffer_context->freed_buffer_wr.send_flags |= IBV_SEND_SIGNALED;
     }
-    buffer_context->freed_buffer_wr.send_flags = send_flags;
+    else
+    {
+        buffer_context->freed_buffer_wr.send_flags &= ~IBV_SEND_SIGNALED;
+    }
     receive_context->freed_buffer_cq_pacing++;
     rc = ibv_post_send (receive_context->receiver_qp, &buffer_context->freed_buffer_wr, &bad_send_wr);
     CHECK_ASSERT (rc == 0);
@@ -912,18 +959,21 @@ static void srwirpcq_free_message (api_receive_context receive_context_in, api_m
 }
 
 /**
- * @brief Set the function pointers to transfer messages with the sender using RDMA write with immediate and the receive polling the CQ
+ * @brief Set the function pointers to transfer messages with the sender using send and the receiver using recv
+ * @details Out-of-order send or free is not supported since the posted work requests to receive the messages need to know the next
+ *          expected buffer.
  * @param[out] functions Contains the functions pointers to the message transfer functions in this source file
  */
-void sender_rdma_write_with_imm_receiver_poll_cq_set_functions (message_communication_functions *const functions)
+void sender_send_receiver_recv_set_functions (message_communication_functions *const functions)
 {
-    functions->description = "sender using RDMA write with immediate and the receiver polling the CQ";
-    functions->out_of_order_send_supported = true;
-    functions->out_of_order_free_supported = true;
-    functions->initialise = srwirpcq_initialise;
-    functions->finalise = srwirpcq_finalise;
-    functions->get_send_buffer = srwirpcq_get_send_buffer;
-    functions->send_message = srwirpcq_send_message;
-    functions->await_message = srwirpcq_await_message;
-    functions->free_message = srwirpcq_free_message;
+    functions->description = "sender using send and the receiver using recv";
+    functions->out_of_order_send_supported = false;
+    functions->out_of_order_free_supported = false;
+    functions->initialise = ssrr_initialise;
+    functions->finalise = ssrr_finalise;
+    functions->get_send_buffer = ssrr_get_send_buffer;
+    functions->send_message = ssrr_send_message;
+    functions->await_message = ssrr_await_message;
+    functions->free_message = ssrr_free_message;
 }
+

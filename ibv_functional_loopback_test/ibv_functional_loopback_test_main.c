@@ -779,7 +779,9 @@ static void increasing_message_size_test (const message_communication_functions 
         /* Queue the test messages for transmission */
         for (message_index = 0; message_index < num_messages_in_iteration; message_index++)
         {
-            const unsigned int selected_index = (message_index + send_order_offset) % num_messages_in_iteration;
+            const unsigned int selected_index = comms_functions->out_of_order_send_supported ?
+                    ((message_index + send_order_offset) % num_messages_in_iteration) :
+                    message_index;
 
             comms_functions->send_message (send_context, send_buffers[selected_index]);
         }
@@ -808,7 +810,9 @@ static void increasing_message_size_test (const message_communication_functions 
         /* Free the received messages */
         for (message_index = 0; message_index < num_messages_in_iteration; message_index++)
         {
-            const unsigned int selected_index = (message_index + free_order_offset) % num_messages_in_iteration;
+            const unsigned int selected_index = comms_functions->out_of_order_free_supported ?
+                    ((message_index + free_order_offset) % num_messages_in_iteration) :
+                    message_index;
 
             comms_functions->free_message (receive_context, receive_buffers[selected_index]);
         }
@@ -895,6 +899,8 @@ int main (int argc, char *argv[])
     sender_rdma_write_receiver_passive_set_functions (&comms_functions);
     test_message_transfers (&comms_functions);
     sender_rdma_write_with_imm_receiver_poll_cq_set_functions (&comms_functions);
+    test_message_transfers (&comms_functions);
+    sender_send_receiver_recv_set_functions (&comms_functions);
     test_message_transfers (&comms_functions);
 
     close_ininiband_loopback_ports ();
