@@ -45,6 +45,8 @@ typedef struct
 /** Structure used for each test variable length test message sent */
 typedef struct
 {
+    /** Force data[] to start on a cache line boundary */
+    char alignment[CACHE_LINE_SIZE_BYTES - sizeof (message_header)];
     /** The header at the start of the application message */
     message_header header;
     /** Variable size data of the message */

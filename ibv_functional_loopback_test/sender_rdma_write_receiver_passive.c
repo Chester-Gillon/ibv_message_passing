@@ -42,6 +42,13 @@
 /** The completion queue size required for the message send, allowing for sending data followed by header */
 #define TOTAL_MESSAGE_SEND_QUEUE_SIZE (NUM_WQES_PER_MESSAGE * NUM_MESSAGE_BUFFERS)
 
+/** Allocate each sequence number in its own cache line */
+typedef struct
+{
+    uint32_t sequence_number;
+    char alignment[CACHE_LINE_SIZE_BYTES - sizeof (uint32_t)];
+} aligned_sequnce_number;
+
 /** This structure defines the buffer used by the sender to transmit messages, and receive flow control.
  *  Where this buffer is accessible by the Infiniband device. */
 typedef struct
@@ -49,7 +56,7 @@ typedef struct
     /** The messages which are transmitted */
     test_message transmit_messages[NUM_MESSAGE_BUFFERS];
     /** Used to receive the sequence numbers of the freed messages, to provide flow control */
-    uint32_t freed_sequence_numbers[NUM_MESSAGE_BUFFERS];
+    aligned_sequnce_number freed_sequence_numbers[NUM_MESSAGE_BUFFERS];
 } srwrp_sender_buffer;
 
 /** This structure defines the buffer used by the receiver to receive messages, and transmit flow control.
@@ -59,7 +66,7 @@ typedef struct
     /** The messages which are received */
     test_message receive_messages[NUM_MESSAGE_BUFFERS];
     /** Used to transmit the sequence numbers of the freed messages, to provide flow control */
-    uint32_t freed_sequence_numbers[NUM_MESSAGE_BUFFERS];
+    aligned_sequnce_number freed_sequence_numbers[NUM_MESSAGE_BUFFERS];
 } srwrp_receiver_buffer;
 
 /** Contains the context to manage one sender message buffer */
@@ -477,8 +484,10 @@ static void srwrp_receiver_initialise_message_buffers (srwrp_receiver_context *c
 
         /* Set the scatter-gather entry to transmit the freed message sequence number */
         buffer->freed_message_sge.lkey = receive_context->receive_mr->lkey;
-        buffer->freed_message_sge.addr = (uintptr_t) &receive_context->receive_buffer->freed_sequence_numbers[buffer_index];
-        buffer->freed_message_sge.length = sizeof (receive_context->receive_buffer->freed_sequence_numbers[buffer_index]);
+        buffer->freed_message_sge.addr =
+                (uintptr_t) &receive_context->receive_buffer->freed_sequence_numbers[buffer_index].sequence_number;
+        buffer->freed_message_sge.length =
+                sizeof (receive_context->receive_buffer->freed_sequence_numbers[buffer_index].sequence_number);
 
         /* Set the work request to transmit the freed message sequence number */
         buffer->freed_message_wr.wr_id = buffer_index;
@@ -493,7 +502,7 @@ static void srwrp_receiver_initialise_message_buffers (srwrp_receiver_context *c
         }
         buffer->freed_message_wr.wr.rdma.rkey = send_context->send_mr->rkey;
         buffer->freed_message_wr.wr.rdma.remote_addr = (uintptr_t) send_context->send_mr->addr +
-                offsetof (srwrp_sender_buffer, freed_sequence_numbers[buffer_index]);
+                offsetof (srwrp_sender_buffer, freed_sequence_numbers[buffer_index].sequence_number);
 
         /* Initialise the sequence number management */
         buffer->owned_by_application = false;
@@ -689,7 +698,7 @@ static api_message_buffer *srwrp_get_send_buffer (api_send_context send_context_
     api_message_buffer *const buffer = &send_context->buffers[send_context->next_send_buffer_index];
     srwrp_message_buffer_send_context *const buffer_context = &send_context->buffer_contexts[buffer->buffer_index];
     const volatile uint32_t *const freed_sequence_number =
-            &send_context->send_buffer->freed_sequence_numbers[buffer->buffer_index];
+            &send_context->send_buffer->freed_sequence_numbers[buffer->buffer_index].sequence_number;
 
     CHECK_ASSERT (!buffer_context->owned_by_application);
 
@@ -865,7 +874,7 @@ static void srwrp_free_message (api_receive_context receive_context_in, api_mess
     }
 
     /* Transmit the freed sequence number to the sender, to indicate the buffer can be reused */
-    receive_context->receive_buffer->freed_sequence_numbers[buffer->buffer_index] =
+    receive_context->receive_buffer->freed_sequence_numbers[buffer->buffer_index].sequence_number =
             buffer_context->message_available_sequence_number;
     if (receive_context->freed_sequence_number_cq_pacing == 0)
     {

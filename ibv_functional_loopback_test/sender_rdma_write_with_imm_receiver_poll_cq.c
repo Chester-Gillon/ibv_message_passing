@@ -353,8 +353,9 @@ static void srwirpcq_sender_initialise_message_buffers (srwirpcq_sender_context 
 
         /* Set a scatter-gather entry to transmit the header + maximum message data size, actual length will be set at run time */
         buffer->send_sge.lkey = send_context->send_mr->lkey;
-        buffer->send_sge.addr = (uintptr_t) &send_context->send_buffer->transmit_messages[buffer_index];
-        buffer->send_sge.length = sizeof (send_context->send_buffer->transmit_messages[buffer_index]);
+        buffer->send_sge.addr = (uintptr_t) &send_context->send_buffer->transmit_messages[buffer_index].header;
+        buffer->send_sge.length = sizeof (send_context->send_buffer->transmit_messages[buffer_index].header) +
+                sizeof (send_context->send_buffer->transmit_messages[buffer_index].data);
 
         /* Set the send work request for the message header+data.
          * The wr_id is set to the buffer_index to handle calls to srwirpcq_send_message() out-of-order */
@@ -367,7 +368,7 @@ static void srwirpcq_sender_initialise_message_buffers (srwirpcq_sender_context 
         buffer->send_wr.imm_data = buffer_index;
         buffer->send_wr.wr.rdma.rkey = receive_context->receive_mr->rkey;
         buffer->send_wr.wr.rdma.remote_addr = (uintptr_t) receive_context->receive_mr->addr +
-                offsetof (srwirpcq_receiver_buffer, receive_messages[buffer_index]);
+                offsetof (srwirpcq_receiver_buffer, receive_messages[buffer_index].header);
 
         /* Set the receive work request for the freed buffer indices as immediate data */
         buffer->freed_buffer_wr.wr_id = 0;
