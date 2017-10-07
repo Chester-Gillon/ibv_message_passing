@@ -33,6 +33,7 @@
 								<option id="gnu.c.link.option.libs.1157759317" name="Libraries (-l)" superClass="gnu.c.link.option.libs" useByScannerDiscovery="false" valueType="libs">
 									<listOptionValue builtIn="false" value="ibverbs"/>
 									<listOptionValue builtIn="false" value="pthread"/>
+									<listOptionValue builtIn="false" value="ibmad"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.linker.input.2072015468" superClass="cdt.managedbuild.tool.gnu.c.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
@@ -81,6 +82,7 @@
 								<option id="gnu.c.link.option.libs.1206937322" name="Libraries (-l)" superClass="gnu.c.link.option.libs" useByScannerDiscovery="false" valueType="libs">
 									<listOptionValue builtIn="false" value="ibverbs"/>
 									<listOptionValue builtIn="false" value="pthread"/>
+									<listOptionValue builtIn="false" value="ibmad"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.linker.input.1920003525" superClass="cdt.managedbuild.tool.gnu.c.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>

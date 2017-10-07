@@ -15,6 +15,7 @@
 #include <sys/resource.h>
 
 #include <infiniband/verbs.h>
+#include <infiniband/mad.h>
 
 #include "ibv_utils.h"
 
@@ -514,13 +515,52 @@ static uint64_t get_total_mlx4_interrupts (void)
 }
 
 /**
+ * @brief Obtain the Infiniband performance counter values for reporting statistics
+ * @param[in] handle Used to obtain the Infiniband port statistics
+ * @param[out] counters Where to store the performance counter values
+ */
+static void get_infiniband_performance_counters (const infiniband_statistics_handle *const handle,
+                                                 infiniband_port_counters *const counters)
+{
+    uint8_t port_index;
+    ib_portid_t portid;
+    uint8_t mad_buf[1024];
+    const int timeout = 0;
+
+    for (port_index = 0; port_index < handle->num_ports; port_index++)
+    {
+        memset (&portid, 0, sizeof (portid));
+        portid.lid = handle->port_lids[port_index];
+        memset (mad_buf, 0, sizeof (mad_buf));
+        if (pma_query_via (mad_buf, &portid, handle->port_numbers[port_index], timeout,
+                           IB_GSI_PORT_COUNTERS_EXT, handle->mad_port) == NULL)
+        {
+            fprintf (stderr, "pma_query_via failed for %s LID %u\n", handle->hca, portid.lid);
+            exit (EXIT_FAILURE);
+        }
+
+        mad_decode_field (mad_buf, IB_PC_EXT_XMT_BYTES_F, &counters[port_index].tx_bytes);
+        mad_decode_field (mad_buf, IB_PC_EXT_RCV_BYTES_F, &counters[port_index].rx_bytes);
+        mad_decode_field (mad_buf, IB_PC_EXT_XMT_PKTS_F, &counters[port_index].tx_packets);
+        mad_decode_field (mad_buf, IB_PC_EXT_RCV_PKTS_F, &counters[port_index].rx_packets);
+        mad_decode_field (mad_buf, IB_PC_EXT_XMT_UPKTS_F, &counters[port_index].unicast_tx_packets);
+        mad_decode_field (mad_buf, IB_PC_EXT_RCV_UPKTS_F, &counters[port_index].unicast_rx_packets);
+        mad_decode_field (mad_buf, IB_PC_EXT_XMT_MPKTS_F, &counters[port_index].multicast_tx_packets);
+        mad_decode_field (mad_buf, IB_PC_EXT_RCV_MPKTS_F, &counters[port_index].multicast_rx_packets);
+    }
+}
+
+/**
  * @brief Sample the Infiniband statistics before a test
+ * @param[in] handle Used to obtain the Infiniband port statistics
  * @param[in,out] stats Where to store the sampled statistics
  */
-void get_infiniband_statistics_before_test (infiniband_statistics_collection *const stats)
+void get_infiniband_statistics_before_test (const infiniband_statistics_handle *const handle,
+                                            infiniband_statistics_collection *const stats)
 {
     int rc;
 
+    get_infiniband_performance_counters (handle, stats->before.port_counters);
     stats->before.total_mlx4_interrupts = get_total_mlx4_interrupts ();
 
     /* Sample usage last since previous sample collection may have generated context switches */
@@ -530,9 +570,11 @@ void get_infiniband_statistics_before_test (infiniband_statistics_collection *co
 
 /**
  * @brief Sample the Infiniband statistics after a test
+ * @param[in] handle Used to obtain the Infiniband port statistics
  * @param[in,out] stats Where to store the sampled statistics
  */
-void get_infiniband_statistics_after_test (infiniband_statistics_collection *const stats)
+void get_infiniband_statistics_after_test (const infiniband_statistics_handle *const handle,
+                                           infiniband_statistics_collection *const stats)
 {
     int rc;
 
@@ -541,6 +583,55 @@ void get_infiniband_statistics_after_test (infiniband_statistics_collection *con
     CHECK_ASSERT (rc == 0);
 
     stats->after.total_mlx4_interrupts = get_total_mlx4_interrupts ();
+    get_infiniband_performance_counters (handle, stats->after.port_counters);
+}
+
+/**
+ * @brief Open a handle to be used to obtain Infiniband statistics for the ports on one Infiniband device
+ * @param[out] handle The handle which has been opened
+ * @param[in] device The Infiniband device for which to obtain the statistics for
+ * @param[in] device_attr The attributes of the Infiniband device for which to obtain the statistics for
+ * @param[in] port_attrs The attributes for the ports of the Infiniband for which to obtain the statistics for.
+ *                       The port indices count from one.
+ */
+void open_infiniband_statistics_handle (infiniband_statistics_handle *const handle,
+                                        const struct ibv_context *const device, const struct ibv_device_attr *const device_attr,
+                                        const struct ibv_port_attr *const port_attrs)
+{
+    uint8_t port;
+    int mgmt_class = IB_PERFORMANCE_CLASS;
+
+    /* Store the port LIDs for use when collecting the port statistics */
+    handle->num_ports = 0;
+    for (port = 1; (port <= device_attr->phys_port_cnt) && (handle->num_ports < MAX_STATISTICS_PORTS); port++)
+    {
+        handle->port_lids[handle->num_ports] = port_attrs[port].lid;
+        handle->port_numbers[handle->num_ports] = port;
+        handle->num_ports++;
+    }
+
+    /* Open a MAD port using the first port of the Infiniband device, which can be used to collect statistics for all ports */
+    port = 1;
+    handle->hca = strdup (ibv_get_device_name (device->device));
+    handle->mad_port = mad_rpc_open_port (handle->hca, port, &mgmt_class, 1);
+    if (handle->mad_port == NULL)
+    {
+        fprintf (stderr, "mad_rpc_open_port failed for %s port %u\n", handle->hca, port);
+        exit (EXIT_FAILURE);
+    }
+}
+
+/**
+ * @brief Close the handle used for obtaining Infiniband statistics
+ * @param[in,out] handle The handle to close
+ */
+void close_infiniband_statistics_handle (infiniband_statistics_handle *const handle)
+{
+    mad_rpc_close_port (handle->mad_port);
+    free (handle->hca);
+    handle->mad_port = NULL;
+    handle->hca = NULL;
+    handle->num_ports = 0;
 }
 
 /**
@@ -548,8 +639,11 @@ void get_infiniband_statistics_after_test (infiniband_statistics_collection *con
  * @param[in] stats Contains the sampled statistics to display
  * @param[in] description Output as a description of the test for which the statistics apply
  */
-void display_infiniband_statistics (const infiniband_statistics_collection *const stats, const char *description)
+void display_infiniband_statistics (infiniband_statistics_handle *const handle,
+                                    const infiniband_statistics_collection *const stats, const char *description)
 {
+    uint8_t port_index;
+
     printf ("Changes to statistics for %s:\n", description);
     printf ("  Num voluntary context switches = %ld (%ld -> %ld)\n",
             stats->after.usage.ru_nvcsw - stats->before.usage.ru_nvcsw,
@@ -563,6 +657,30 @@ void display_infiniband_statistics (const infiniband_statistics_collection *cons
     printf ("  Num mlx4 interrupts = %lu (%lu -> %lu)\n",
             stats->after.total_mlx4_interrupts - stats->before.total_mlx4_interrupts,
             stats->before.total_mlx4_interrupts, stats->after.total_mlx4_interrupts);
+
+    for (port_index = 0; port_index < handle->num_ports; port_index++)
+    {
+        const infiniband_port_counters *const before = &stats->before.port_counters[port_index];
+        const infiniband_port_counters *const after = &stats->after.port_counters[port_index];
+        const uint8_t port = handle->port_numbers[port_index];
+
+        printf ("  Port %u Tx Bytes = %lu (%lu -> %lu)\n", port,
+                after->tx_bytes - before->tx_bytes, before->tx_bytes, after->tx_bytes);
+        printf ("  Port %u Rx Bytes = %lu (%lu -> %lu)\n", port,
+                after->rx_bytes - before->rx_bytes, before->rx_bytes, after->rx_bytes);
+        printf ("  Port %u Tx Packets = %lu (%lu -> %lu)\n", port,
+                after->tx_packets - before->tx_packets, before->tx_packets, after->tx_packets);
+        printf ("  Port %u Rx Packets = %lu (%lu -> %lu)\n", port,
+                after->rx_packets - before->rx_packets, before->rx_packets, after->rx_packets);
+        printf ("  Port %u Tx Unicast Packets = %lu (%lu -> %lu)\n", port,
+                after->unicast_tx_packets - before->unicast_tx_packets, before->unicast_tx_packets, after->unicast_tx_packets);
+        printf ("  Port %u Rx Unicast Packets = %lu (%lu -> %lu)\n", port,
+                after->unicast_rx_packets - before->unicast_rx_packets, before->unicast_rx_packets, after->unicast_rx_packets);
+        printf ("  Port %u Tx Multicast Packets = %lu (%lu -> %lu)\n", port,
+                after->multicast_tx_packets - before->multicast_tx_packets, before->multicast_tx_packets, after->multicast_tx_packets);
+        printf ("  Port %u Rx Multicast Packets = %lu (%lu -> %lu)\n", port,
+                after->multicast_rx_packets - before->multicast_rx_packets, before->multicast_rx_packets, after->multicast_rx_packets);
+    }
     printf ("\n");
 }
 

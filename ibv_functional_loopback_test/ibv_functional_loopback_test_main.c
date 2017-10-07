@@ -36,6 +36,9 @@ struct ibv_port_attr ibv_loopback_port_attributes[NUM_TEST_PORTS+1];
 /** The protection domain for the Infiniband device used for the loopback tests */
 struct ibv_pd *ibv_loopback_device_pd;
 
+/** Used to collect statistics for the Infiniband ports used for the loopback tests */
+static infiniband_statistics_handle ibv_statistics_handle;
+
 /** For the tests using a sender and receiver thread, defines the message IDs passed to the receiver */
 typedef enum
 {
@@ -220,6 +223,9 @@ static void open_infiniband_loopback_ports (void)
         fprintf (stderr, "ibv_alloc_pd failed\n");
         exit (EXIT_SUCCESS);
     }
+
+    open_infiniband_statistics_handle (&ibv_statistics_handle, ibv_loopback_device, &ibv_loopback_device_attributes,
+                                       ibv_loopback_port_attributes);
 }
 
 /**
@@ -228,6 +234,8 @@ static void open_infiniband_loopback_ports (void)
 static void close_ininiband_loopback_ports (void)
 {
     int rc;
+
+    close_infiniband_statistics_handle (&ibv_statistics_handle);
 
     rc = ibv_dealloc_pd (ibv_loopback_device_pd);
     if (rc != 0)
@@ -840,31 +848,31 @@ static void test_message_transfers (const message_communication_functions *const
     /* Initialise */
     printf ("\nTesting using %s\n", comms_functions->description);
     initialise_message_thread_tests (thread_test_definitions);
-    get_infiniband_statistics_before_test (&initialisation_stats);
+    get_infiniband_statistics_before_test (&ibv_statistics_handle, &initialisation_stats);
     comms_functions->initialise (&send_context, &receive_context);
-    get_infiniband_statistics_after_test (&initialisation_stats);
+    get_infiniband_statistics_after_test (&ibv_statistics_handle, &initialisation_stats);
     send_thread->send_context = send_context;
     receive_thread->receive_context = receive_context;
 
     /* Test message transfers with differing number of overlapped messages per test iteration,
      * to exercise the buffer management logic.
      * As these tests are performed in the calling thread context there should be zero voluntary context switches */
-    get_infiniband_statistics_before_test (&single_thread_message_test_stats);
+    get_infiniband_statistics_before_test (&ibv_statistics_handle, &single_thread_message_test_stats);
     increasing_message_size_test (comms_functions, send_context, receive_context, 1);
     increasing_message_size_test (comms_functions, send_context, receive_context, (NUM_MESSAGE_BUFFERS / 2) + 1);
     increasing_message_size_test (comms_functions, send_context, receive_context, NUM_MESSAGE_BUFFERS);
-    get_infiniband_statistics_after_test (&single_thread_message_test_stats);
+    get_infiniband_statistics_after_test (&ibv_statistics_handle, &single_thread_message_test_stats);
 
     /* Test message transfers using a send and receive thread.
      * For each test there will be some voluntary context switches as semaphores are used to synchronise
      * the main, send and receive threads. */
-    get_infiniband_statistics_before_test (&multi_threaded_message_test_stats);
+    get_infiniband_statistics_before_test (&ibv_statistics_handle, &multi_threaded_message_test_stats);
     for (test_index = 0; test_index < THREAD_NUM_TESTS; test_index++)
     {
         perform_message_thread_test (send_thread, receive_thread,
                                      &thread_test_definitions[test_index], &thread_test_results[test_index]);
     }
-    get_infiniband_statistics_after_test (&multi_threaded_message_test_stats);
+    get_infiniband_statistics_after_test (&ibv_statistics_handle, &multi_threaded_message_test_stats);
 
     /* Free resources */
     display_current_cpu_frequencies ();
@@ -872,9 +880,12 @@ static void test_message_transfers (const message_communication_functions *const
     comms_functions->finalise (send_context, receive_context);
 
     /* Display results. Left until the end to avoid unnecessary context switches during the test */
-    display_infiniband_statistics (&initialisation_stats, "initialisation of Infiniband communications");
-    display_infiniband_statistics (&single_thread_message_test_stats, "Infiniband single thread message transfers");
-    display_infiniband_statistics (&multi_threaded_message_test_stats, "Infiniband multi-threaded message transfers");
+    display_infiniband_statistics (&ibv_statistics_handle, &initialisation_stats,
+                                   "initialisation of Infiniband communications");
+    display_infiniband_statistics (&ibv_statistics_handle, &single_thread_message_test_stats,
+                                   "Infiniband single thread message transfers");
+    display_infiniband_statistics (&ibv_statistics_handle, &multi_threaded_message_test_stats,
+                                   "Infiniband multi-threaded message transfers");
     report_message_thread_test_results (thread_test_results);
 }
 

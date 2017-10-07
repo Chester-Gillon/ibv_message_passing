@@ -39,161 +39,305 @@ Attributes of destination port 2:
 Testing using sender using RDMA write and the receiver passive
 message_send_qp capabilities: max_send_wr=223 max_recv_wr=1 max_send_sge=2 max_recv_sge=1 max_inline_data=28
 freed_sequence_number_qp capabilities: max_send_wr=95 max_recv_wr=1 max_send_sge=2 max_recv_sge=1 max_inline_data=28
-Current CPU frequencies (MHz) :  3197136  3075246  3099261  3099941
+Current CPU frequencies (MHz) :  3099714  3098242  3099941  3194417
 Changes to statistics for initialisation of Infiniband communications:
-  Num voluntary context switches = 38 (10 -> 48)
-  Num page reclaims = 1555 (124 -> 1679)
+  Num voluntary context switches = 38 (12 -> 50)
+  Num page reclaims = 1554 (142 -> 1696)
   Num page faults = 0 (0 -> 0)
-  Num mlx4 interrupts = 38 (9506 -> 9544)
+  Num mlx4 interrupts = 38 (13255 -> 13293)
+  Port 1 Tx Bytes = 72 (162590875597 -> 162590875669)
+  Port 1 Rx Bytes = 72 (5009185281 -> 5009185353)
+  Port 1 Tx Packets = 1 (692514664 -> 692514665)
+  Port 1 Rx Packets = 1 (598727282 -> 598727283)
+  Port 1 Tx Unicast Packets = 0 (0 -> 0)
+  Port 1 Rx Unicast Packets = 0 (0 -> 0)
+  Port 1 Tx Multicast Packets = 0 (0 -> 0)
+  Port 1 Rx Multicast Packets = 0 (0 -> 0)
+  Port 2 Tx Bytes = 72 (5009185281 -> 5009185353)
+  Port 2 Rx Bytes = 72 (162590875669 -> 162590875741)
+  Port 2 Tx Packets = 1 (598727282 -> 598727283)
+  Port 2 Rx Packets = 1 (692514665 -> 692514666)
+  Port 2 Tx Unicast Packets = 0 (0 -> 0)
+  Port 2 Rx Unicast Packets = 0 (0 -> 0)
+  Port 2 Tx Multicast Packets = 0 (0 -> 0)
+  Port 2 Rx Multicast Packets = 0 (0 -> 0)
 
 Changes to statistics for Infiniband single thread message transfers:
-  Num voluntary context switches = 0 (48 -> 48)
-  Num page reclaims = 0 (1680 -> 1680)
+  Num voluntary context switches = 0 (54 -> 54)
+  Num page reclaims = 0 (1697 -> 1697)
   Num page faults = 0 (0 -> 0)
-  Num mlx4 interrupts = 0 (9544 -> 9544)
+  Num mlx4 interrupts = 0 (13307 -> 13307)
+  Port 1 Tx Bytes = 816338100 (162590875741 -> 163407213841)
+  Port 1 Rx Bytes = 28598 (5009185425 -> 5009214023)
+  Port 1 Tx Packets = 793330 (692514666 -> 693307996)
+  Port 1 Rx Packets = 3855 (598727284 -> 598731139)
+  Port 1 Tx Unicast Packets = 0 (0 -> 0)
+  Port 1 Rx Unicast Packets = 0 (0 -> 0)
+  Port 1 Tx Multicast Packets = 0 (0 -> 0)
+  Port 1 Rx Multicast Packets = 0 (0 -> 0)
+  Port 2 Tx Bytes = 28598 (5009185425 -> 5009214023)
+  Port 2 Rx Bytes = 816338100 (162590875813 -> 163407213913)
+  Port 2 Tx Packets = 3855 (598727284 -> 598731139)
+  Port 2 Rx Packets = 793330 (692514667 -> 693307997)
+  Port 2 Tx Unicast Packets = 0 (0 -> 0)
+  Port 2 Rx Unicast Packets = 0 (0 -> 0)
+  Port 2 Tx Multicast Packets = 0 (0 -> 0)
+  Port 2 Rx Multicast Packets = 0 (0 -> 0)
 
 Changes to statistics for Infiniband multi-threaded message transfers:
-  Num voluntary context switches = 84 (48 -> 132)
-  Num page reclaims = 0 (1680 -> 1680)
+  Num voluntary context switches = 84 (58 -> 142)
+  Num page reclaims = 0 (1697 -> 1697)
   Num page faults = 0 (0 -> 0)
-  Num mlx4 interrupts = 0 (9544 -> 9544)
+  Num mlx4 interrupts = 0 (13319 -> 13319)
+  Port 1 Tx Bytes = 10934290012 (163407213913 -> 174341503925)
+  Port 1 Rx Bytes = 578003872 (5009214095 -> 5587217967)
+  Port 1 Tx Packets = 77158774 (693307997 -> 770466771)
+  Port 1 Rx Packets = 67292945 (598731140 -> 666024085)
+  Port 1 Tx Unicast Packets = 0 (0 -> 0)
+  Port 1 Rx Unicast Packets = 0 (0 -> 0)
+  Port 1 Tx Multicast Packets = 0 (0 -> 0)
+  Port 1 Rx Multicast Packets = 0 (0 -> 0)
+  Port 2 Tx Bytes = 578003872 (5009214095 -> 5587217967)
+  Port 2 Rx Bytes = 10934290012 (163407213985 -> 174341503997)
+  Port 2 Tx Packets = 67292945 (598731140 -> 666024085)
+  Port 2 Rx Packets = 77158774 (693307998 -> 770466772)
+  Port 2 Tx Unicast Packets = 0 (0 -> 0)
+  Port 2 Rx Unicast Packets = 0 (0 -> 0)
+  Port 2 Tx Multicast Packets = 0 (0 -> 0)
+  Port 2 Rx Multicast Packets = 0 (0 -> 0)
 
 
 Test duration (secs)  Data length (bytes)  Total messages received  Total data bytes received  Messages per sec  Data bytes per sec  Rx thread free delay (us)  Tx thread max get send buffer (us)  
-            1.000007                    0                  2215073                          0           2215057                   0                         10                                  28  
-            1.005018                   16                    95033                    1520528             94559             1512936                      10000                                9996  
-            1.000006                    0                  2215496                          0           2215482                   0  
-            1.000008                    1                  2047886                    2047886           2047870             2047870  
-            1.000008                    2                  2048259                    4096518           2048243             4096485  
-            1.000008                    4                  2048553                    8194212           2048536             8194146  
-            1.000010                    8                  2048789                   16390312           2048769            16390148  
-            1.000007                   16                  2048068                   32769088           2048053            32768843  
-            1.000007                   32                  1872759                   59928288           1872745            59927846  
-            1.000008                   64                  1862344                  119190016           1862329           119189085  
-            1.000008                  128                  1788613                  228942464           1788598           228940526  
-            1.000016                  256                  1672452                  428147712           1672426           428140976  
-            1.000012                  512                  1498617                  767291904           1498599           767282700  
-            1.000028                 1024                  1260096                 1290338304           1260061          1290302526  
-            1.000039                 2048                   887100                 1816780800            887065          1816709347  
-            1.000059                 4096                   549605                 2251182080            549573          2251050297  
-            1.000107                 8192                   316211                 2590400512            316177          2590124508  
-            1.000213                16384                   156174                 2558754816            156141          2558210268  
-            1.000413                32768                    78068                 2558132224             78036          2557076844  
-            1.000788                65536                    40771                 2671968256             40739          2669863354  
-            1.001587               131072                    20814                 2728132608             20781          2723810384  
-            1.003109               262144                    10518                 2757230592             10485          2748685068  
-            1.006250               524288                     5299                 2778202112              5266          2760947513  
-            1.012329              1048576                     2671                 2800746496              2638          2766635988  
-            1.024330              2097152                     1353                 2837446656              1321          2770051437  
-            1.048681              4194304                      693                 2906652672               661          2771722295  
-            1.098458              8388608                      363                 3045064704               330          2772125401  
-            1.197142             16777216                      198                 3321888768               165          2774849986  
+            1.000008                    0                  2221521                          0           2221504                   0                         10                                  26  
+            1.005049                   16                    95033                    1520528             94556             1512890                      10000                                9996  
+            1.000007                    0                  2221842                          0           2221826                   0  
+            1.000005                    1                  2048901                    2048901           2048890             2048890  
+            1.000008                    2                  2048839                    4097678           2048822             4097643  
+            1.000005                    4                  2049545                    8198180           2049535             8198141  
+            1.000006                    8                  2049942                   16399536           2049929            16399434  
+            1.000008                   16                  2049872                   32797952           2049855            32797682  
+            1.000008                   32                  1868912                   59805184           1868897            59804712  
+            1.000009                   64                  1856428                  118811392           1856411           118810310  
+            1.000010                  128                  1777476                  227516928           1777458           227514564  
+            1.000013                  256                  1674536                  428681216           1674515           428675802  
+            1.000011                  512                  1496079                  765992448           1496062           765983881  
+            1.000025                 1024                  1221891                 1251216384           1221860          1251185019  
+            1.000032                 2048                   878573                 1799317504            878545          1799259163  
+            1.000055                 4096                   544731                 2231218176            544701          2231096548  
+            1.000100                 8192                   316154                 2589933568            316122          2589673819  
+            1.000204                16384                   156887                 2570436608            156855          2569912593  
+            1.000410                32768                    78220                 2563112960             78188          2562062161  
+            1.000790                65536                    40895                 2680094720             40863          2677980181  
+            1.001594               131072                    20872                 2735734784             20839          2731381255  
+            1.003057               262144                    10545                 2764308480             10513          2755884716  
+            1.006230               524288                     5312                 2785017856              5279          2767775324  
+            1.012356              1048576                     2678                 2808086528              2645          2773812464  
+            1.024738              2097152                     1357                 2845835264              1324          2777135305  
+            1.049089              4194304                      695                 2915041280               662          2778639972  
+            1.099030              8388608                      364                 3053453312               331          2778315813  
+            1.195578             16777216                      198                 3321888768               166          2778479120  
 
 Testing using sender using RDMA write with immediate and the receiver polling the CQ
 sender_qp capabilities: max_send_wr=95 max_recv_wr=32 max_send_sge=2 max_recv_sge=1 max_inline_data=28
 receiver_qp capabilities: max_send_wr=95 max_recv_wr=32 max_send_sge=2 max_recv_sge=1 max_inline_data=28
-Current CPU frequencies (MHz) :  3170402  3060972  3099375  3091558
+Current CPU frequencies (MHz) :  3194304  3099941  3099941  3095976
 Changes to statistics for initialisation of Infiniband communications:
-  Num voluntary context switches = 40 (160 -> 200)
-  Num page reclaims = 1550 (1682 -> 3232)
+  Num voluntary context switches = 40 (173 -> 213)
+  Num page reclaims = 1550 (1699 -> 3249)
   Num page faults = 0 (0 -> 0)
-  Num mlx4 interrupts = 40 (9566 -> 9606)
+  Num mlx4 interrupts = 40 (13353 -> 13393)
+  Port 1 Tx Bytes = 72 (174341504018 -> 174341504090)
+  Port 1 Rx Bytes = 72 (5587218057 -> 5587218129)
+  Port 1 Tx Packets = 1 (770466774 -> 770466775)
+  Port 1 Rx Packets = 1 (666024088 -> 666024089)
+  Port 1 Tx Unicast Packets = 0 (0 -> 0)
+  Port 1 Rx Unicast Packets = 0 (0 -> 0)
+  Port 1 Tx Multicast Packets = 0 (0 -> 0)
+  Port 1 Rx Multicast Packets = 0 (0 -> 0)
+  Port 2 Tx Bytes = 72 (5587218057 -> 5587218129)
+  Port 2 Rx Bytes = 72 (174341504090 -> 174341504162)
+  Port 2 Tx Packets = 1 (666024088 -> 666024089)
+  Port 2 Rx Packets = 1 (770466775 -> 770466776)
+  Port 2 Tx Unicast Packets = 0 (0 -> 0)
+  Port 2 Rx Unicast Packets = 0 (0 -> 0)
+  Port 2 Tx Multicast Packets = 0 (0 -> 0)
+  Port 2 Rx Multicast Packets = 0 (0 -> 0)
 
 Changes to statistics for Infiniband single thread message transfers:
-  Num voluntary context switches = 0 (200 -> 200)
-  Num page reclaims = 0 (3232 -> 3232)
+  Num voluntary context switches = 0 (217 -> 217)
+  Num page reclaims = 0 (3249 -> 3249)
   Num page faults = 0 (0 -> 0)
-  Num mlx4 interrupts = 0 (9606 -> 9606)
+  Num mlx4 interrupts = 0 (13405 -> 13405)
+  Port 1 Tx Bytes = 816334008 (174341504162 -> 175157838170)
+  Port 1 Rx Bytes = 27198 (5587218201 -> 5587245399)
+  Port 1 Tx Packets = 792856 (770466776 -> 771259632)
+  Port 1 Rx Packets = 3655 (666024090 -> 666027745)
+  Port 1 Tx Unicast Packets = 0 (0 -> 0)
+  Port 1 Rx Unicast Packets = 0 (0 -> 0)
+  Port 1 Tx Multicast Packets = 0 (0 -> 0)
+  Port 1 Rx Multicast Packets = 0 (0 -> 0)
+  Port 2 Tx Bytes = 27198 (5587218201 -> 5587245399)
+  Port 2 Rx Bytes = 816334008 (174341504234 -> 175157838242)
+  Port 2 Tx Packets = 3655 (666024090 -> 666027745)
+  Port 2 Rx Packets = 792856 (770466777 -> 771259633)
+  Port 2 Tx Unicast Packets = 0 (0 -> 0)
+  Port 2 Rx Unicast Packets = 0 (0 -> 0)
+  Port 2 Tx Multicast Packets = 0 (0 -> 0)
+  Port 2 Rx Multicast Packets = 0 (0 -> 0)
 
 Changes to statistics for Infiniband multi-threaded message transfers:
-  Num voluntary context switches = 84 (200 -> 284)
-  Num page reclaims = 0 (3232 -> 3232)
+  Num voluntary context switches = 84 (221 -> 305)
+  Num page reclaims = 0 (3249 -> 3249)
   Num page faults = 0 (0 -> 0)
-  Num mlx4 interrupts = 0 (9606 -> 9606)
+  Num mlx4 interrupts = 0 (13418 -> 13418)
+  Port 1 Tx Bytes = 9606576840 (175157838242 -> 184764415082)
+  Port 1 Rx Bytes = 245571811 (5587245471 -> 5832817282)
+  Port 1 Tx Packets = 30157809 (771259633 -> 801417442)
+  Port 1 Rx Packets = 26955374 (666027746 -> 692983120)
+  Port 1 Tx Unicast Packets = 0 (0 -> 0)
+  Port 1 Rx Unicast Packets = 0 (0 -> 0)
+  Port 1 Tx Multicast Packets = 0 (0 -> 0)
+  Port 1 Rx Multicast Packets = 0 (0 -> 0)
+  Port 2 Tx Bytes = 245571811 (5587245471 -> 5832817282)
+  Port 2 Rx Bytes = 9606576840 (175157838314 -> 184764415154)
+  Port 2 Tx Packets = 26955374 (666027746 -> 692983120)
+  Port 2 Rx Packets = 30157809 (771259634 -> 801417443)
+  Port 2 Tx Unicast Packets = 0 (0 -> 0)
+  Port 2 Rx Unicast Packets = 0 (0 -> 0)
+  Port 2 Tx Multicast Packets = 0 (0 -> 0)
+  Port 2 Rx Multicast Packets = 0 (0 -> 0)
 
 
 Test duration (secs)  Data length (bytes)  Total messages received  Total data bytes received  Messages per sec  Data bytes per sec  Rx thread free delay (us)  Tx thread max get send buffer (us)  
-            1.000021                    0                   980863                          0            980842                   0                         10                                  35  
-            1.006394                   16                    90033                    1440528             89461             1431376                      10000                               10002  
-            1.000033                    0                  1016315                          0           1016281                   0  
-            1.000013                    1                  1015388                    1015388           1015375             1015375  
-            1.000016                    2                  1021849                    2043698           1021833             2043665  
-            1.000010                    4                  1016373                    4065492           1016362             4065450  
-            1.000013                    8                  1018388                    8147104           1018375             8146999  
-            1.000014                   16                  1014769                   16236304           1014754            16236072  
-            1.000031                   32                   992997                   31775904            992966            31774913  
-            1.000017                   64                   963122                   61639808            963106            61638790  
-            1.000026                  128                   922142                  118034176            922118           118031070  
-            1.000019                  256                   874338                  223830528            874321           223826174  
-            1.000015                  512                   883767                  452488704            883754           452482062  
-            1.000033                 1024                   718360                  735600640            718336           735576279  
-            1.000032                 2048                   600650                 1230131200            600631          1230092292  
-            1.000082                 4096                   437681                 1792741376            437645          1792594281  
-            1.000110                 8192                   277304                 2271674368            277273          2271424225  
-            1.000224                16384                   144070                 2360442880            144038          2359914925  
-            1.000424                32768                    75281                 2466807808             75249          2465761955  
-            1.000836                65536                    39029                 2557804544             38996          2555667824  
-            1.001587               131072                    20156                 2641887232             20124          2637701969  
-            1.003208               262144                    10308                 2702180352             10275          2693538283  
-            1.006255               524288                     5231                 2742550528              5198          2725503433  
-            1.012512              1048576                     2647                 2775580672              2614          2741281470  
-            1.024610              2097152                     1343                 2816475136              1311          2748825244  
-            1.048886              4194304                      688                 2885681152               656          2751187069  
-            1.100378              8388608                      361                 3028287488               328          2752043179  
-            1.200606             16777216                      197                 3305111552               164          2752869340  
+            1.000020                    0                   974859                          0            974839                   0                         10                                 663  
+            1.007201                   16                    90033                    1440528             89389             1430229                      10000                               10026  
+            1.000019                    0                  1029031                          0           1029011                   0  
+            1.000017                    1                  1026377                    1026377           1026360             1026360  
+            1.000022                    2                  1030870                    2061740           1030848             2061695  
+            1.000021                    4                  1028068                    4112272           1028046             4112184  
+            1.000005                    8                  1028900                    8231200           1028895             8231156  
+            1.000028                   16                  1015193                   16243088           1015165            16242635  
+            1.000026                   32                   976822                   31258304            976796            31257485  
+            1.000034                   64                   967227                   61902528            967194            61900417  
+            1.000021                  128                   946701                  121177728            946681           121175174  
+            1.000039                  256                   903533                  231304448            903497           231295319  
+            1.000038                  512                   866123                  443454976            866090           443438083  
+            1.000026                 1024                   714720                  731873280            714702           731854608  
+            1.000034                 2048                   629186                 1288572928            629164          1288528698  
+            1.000075                 4096                   438897                 1797722112            438864          1797586513  
+            1.000122                 8192                   254555                 2085314560            254524          2085059609  
+            1.000228                16384                   144457                 2366783488            144424          2366243826  
+            1.000423                32768                    75343                 2468839424             75311          2467796272  
+            1.000834                65536                    39124                 2564030464             39091          2561892613  
+            1.001599               131072                    20202                 2647916544             20170          2643688123  
+            1.003154               262144                    10329                 2707685376             10297          2699171041  
+            1.006194               524288                     5238                 2746220544              5206          2729316202  
+            1.012395              1048576                     2651                 2779774976              2619          2745740222  
+            1.024498              2097152                     1345                 2820669440              1313          2753219841  
+            1.049942              4194304                      690                 2894069760               657          2756408750  
+            1.098657              8388608                      361                 3028287488               329          2756353356  
+            1.198660             16777216                      197                 3305111552               164          2757337956  
 
 Testing using sender using send and the receiver using recv
 sender_qp capabilities: max_send_wr=95 max_recv_wr=32 max_send_sge=2 max_recv_sge=1 max_inline_data=28
 receiver_qp capabilities: max_send_wr=95 max_recv_wr=32 max_send_sge=2 max_recv_sge=1 max_inline_data=28
-Current CPU frequencies (MHz) :  3099375  3172667  3091218  3041828
+Current CPU frequencies (MHz) :  3099714  3197816  3091785  3099488
 Changes to statistics for initialisation of Infiniband communications:
-  Num voluntary context switches = 40 (313 -> 353)
-  Num page reclaims = 1550 (3232 -> 4782)
+  Num voluntary context switches = 40 (339 -> 379)
+  Num page reclaims = 1550 (3249 -> 4799)
   Num page faults = 0 (0 -> 0)
-  Num mlx4 interrupts = 40 (9630 -> 9670)
+  Num mlx4 interrupts = 40 (13454 -> 13494)
+  Port 1 Tx Bytes = 72 (184764415176 -> 184764415248)
+  Port 1 Rx Bytes = 72 (5832817372 -> 5832817444)
+  Port 1 Tx Packets = 1 (801417445 -> 801417446)
+  Port 1 Rx Packets = 1 (692983123 -> 692983124)
+  Port 1 Tx Unicast Packets = 0 (0 -> 0)
+  Port 1 Rx Unicast Packets = 0 (0 -> 0)
+  Port 1 Tx Multicast Packets = 0 (0 -> 0)
+  Port 1 Rx Multicast Packets = 0 (0 -> 0)
+  Port 2 Tx Bytes = 72 (5832817372 -> 5832817444)
+  Port 2 Rx Bytes = 72 (184764415248 -> 184764415320)
+  Port 2 Tx Packets = 1 (692983123 -> 692983124)
+  Port 2 Rx Packets = 1 (801417446 -> 801417447)
+  Port 2 Tx Unicast Packets = 0 (0 -> 0)
+  Port 2 Rx Unicast Packets = 0 (0 -> 0)
+  Port 2 Tx Multicast Packets = 0 (0 -> 0)
+  Port 2 Rx Multicast Packets = 0 (0 -> 0)
 
 Changes to statistics for Infiniband single thread message transfers:
-  Num voluntary context switches = 0 (353 -> 353)
-  Num page reclaims = 0 (4782 -> 4782)
+  Num voluntary context switches = 0 (383 -> 383)
+  Num page reclaims = 0 (4799 -> 4799)
   Num page faults = 0 (0 -> 0)
-  Num mlx4 interrupts = 0 (9670 -> 9670)
+  Num mlx4 interrupts = 0 (13506 -> 13506)
+  Port 1 Tx Bytes = 816332038 (184764415320 -> 185580747358)
+  Port 1 Rx Bytes = 25755 (5832817516 -> 5832843271)
+  Port 1 Tx Packets = 792851 (801417447 -> 802210298)
+  Port 1 Rx Packets = 3670 (692983125 -> 692986795)
+  Port 1 Tx Unicast Packets = 0 (0 -> 0)
+  Port 1 Rx Unicast Packets = 0 (0 -> 0)
+  Port 1 Tx Multicast Packets = 0 (0 -> 0)
+  Port 1 Rx Multicast Packets = 0 (0 -> 0)
+  Port 2 Tx Bytes = 25755 (5832817516 -> 5832843271)
+  Port 2 Rx Bytes = 816332038 (184764415392 -> 185580747430)
+  Port 2 Tx Packets = 3670 (692983125 -> 692986795)
+  Port 2 Rx Packets = 792851 (801417448 -> 802210299)
+  Port 2 Tx Unicast Packets = 0 (0 -> 0)
+  Port 2 Rx Unicast Packets = 0 (0 -> 0)
+  Port 2 Tx Multicast Packets = 0 (0 -> 0)
+  Port 2 Rx Multicast Packets = 0 (0 -> 0)
 
 Changes to statistics for Infiniband multi-threaded message transfers:
-  Num voluntary context switches = 84 (353 -> 437)
-  Num page reclaims = 0 (4782 -> 4782)
+  Num voluntary context switches = 84 (387 -> 471)
+  Num page reclaims = 0 (4799 -> 4799)
   Num page faults = 0 (0 -> 0)
-  Num mlx4 interrupts = 0 (9670 -> 9670)
+  Num mlx4 interrupts = 0 (13519 -> 13519)
+  Port 1 Tx Bytes = 9565321889 (185580747430 -> 195146069319)
+  Port 1 Rx Bytes = 176586195 (5832843343 -> 6009429538)
+  Port 1 Tx Packets = 28575283 (802210299 -> 830785582)
+  Port 1 Rx Packets = 25226590 (692986796 -> 718213386)
+  Port 1 Tx Unicast Packets = 0 (0 -> 0)
+  Port 1 Rx Unicast Packets = 0 (0 -> 0)
+  Port 1 Tx Multicast Packets = 0 (0 -> 0)
+  Port 1 Rx Multicast Packets = 0 (0 -> 0)
+  Port 2 Tx Bytes = 176586195 (5832843343 -> 6009429538)
+  Port 2 Rx Bytes = 9565321889 (185580747502 -> 195146069391)
+  Port 2 Tx Packets = 25226590 (692986796 -> 718213386)
+  Port 2 Rx Packets = 28575283 (802210300 -> 830785583)
+  Port 2 Tx Unicast Packets = 0 (0 -> 0)
+  Port 2 Rx Unicast Packets = 0 (0 -> 0)
+  Port 2 Tx Multicast Packets = 0 (0 -> 0)
+  Port 2 Rx Multicast Packets = 0 (0 -> 0)
 
 
 Test duration (secs)  Data length (bytes)  Total messages received  Total data bytes received  Messages per sec  Data bytes per sec  Rx thread free delay (us)  Tx thread max get send buffer (us)  
-            1.000003                    0                   844326                          0            844324                   0                         10                                  35  
-            1.006508                   16                    90033                    1440528             89451             1431213                      10000                               10002  
-            1.000017                    0                   859986                          0            859971                   0  
-            1.000016                    1                   843599                     843599            843585              843585  
-            1.000012                    2                   866263                    1732526            866253             1732506  
-            1.000019                    4                   851453                    3405812            851437             3405747  
-            1.000038                    8                   883307                    7066456            883273             7066187  
-            1.000020                   16                  1000768                   16012288           1000748            16011968  
-            1.000031                   32                   912459                   29198688            912431            29197780  
-            1.000016                   64                   966842                   61877888            966827            61876922  
-            1.000017                  128                   957744                  122591232            957728           122589167  
-            1.000020                  256                   924758                  236738048            924740           236733422  
-            1.000021                  512                   835704                  427880448            835687           427871665  
-            1.000025                 1024                   743733                  761582592            743714           761563587  
-            1.000016                 2048                   583354                 1194708992            583344          1194689416  
-            1.000074                 4096                   445152                 1823342592            445119          1823206978  
-            1.000116                 8192                   276277                 2263261184            276245          2262997963  
-            1.000239                16384                   144037                 2359902208            144003          2359337663  
-            1.000424                32768                    75375                 2469888000             75343          2468841113  
-            1.000808                65536                    39773                 2606563328             39741          2604457681  
-            1.001619               131072                    20477                 2683961344             20444          2679622858  
-            1.003158               262144                    10402                 2726821888             10369          2718238409  
-            1.006159               524288                     5255                 2755133440              5223          2738269359  
-            1.012562              1048576                     2654                 2782920704              2621          2748396140  
-            1.024535              2097152                     1345                 2820669440              1313          2753122792  
-            1.049006              4194304                      689                 2889875456               657          2754870104  
-            1.098696              8388608                      361                 3028287488               329          2756255678  
-            1.198637             16777216                      197                 3305111552               164          2757391214  
+            1.000043                    0                   847103                          0            847067                   0                         10                                 682  
+            1.008193                   16                    90033                    1440528             89301             1428821                      10000                               10002  
+            1.000026                    0                   864889                          0            864867                   0  
+            1.000001                    1                   883164                     883164            883163              883163  
+            1.000029                    2                   878197                    1756394            878172             1756344  
+            1.000025                    4                   900006                    3600024            899984             3599935  
+            1.000007                    8                   905250                    7242000            905244             7241950  
+            1.000033                   16                   980317                   15685072            980285            15684562  
+            1.000016                   32                   940094                   30083008            940079            30082531  
+            1.000032                   64                   951557                   60899648            951527            60897705  
+            1.000017                  128                   946205                  121114240            946189           121112204  
+            1.000048                  256                   931063                  238352128            931018           238340676  
+            1.000021                  512                   879328                  450215936            879310           450206559  
+            1.000060                 1024                   708575                  725580800            708533           725537469  
+            1.000061                 2048                   555156                 1136959488            555122          1136890214  
+            1.000071                 4096                   434554                 1779933184            434523          1779807206  
+            1.000113                 8192                   275355                 2255708160            275324          2255452532  
+            1.000217                16384                   145946                 2391179264            145914          2390661093  
+            1.000419                32768                    75471                 2473033728             75439          2471999088  
+            1.000806                65536                    39828                 2610167808             39796          2608066260  
+            1.001594               131072                    20515                 2688942080             20482          2684664065  
+            1.003189               262144                    10421                 2731802624             10388          2723118558  
+            1.006312               524288                     5264                 2759852032              5231          2742541655  
+            1.012249              1048576                     2657                 2786066432              2625          2752352911  
+            1.024700              2097152                     1347                 2824863744              1315          2756772064  
+            1.048912              4194304                      690                 2894069760               658          2759115947  
+            1.100345              8388608                      362                 3036676096               329          2759749068  
+            1.197116             16777216                      197                 3305111552               165          2760895118  
 
 
 Results when CPU frequency set to 2.9 GHz
