@@ -1,0 +1,119 @@
+The following is the output from the counters following a run of the ibv_functional_loopback_test program:
+
+$ ibv_display_infiniband_counters/Release/ibv_display_infiniband_counters 
+Counters for device mlx4_0 port 1 LID 1
+  IB_PC_EXT_XMT_BYTES_F = 32534357337
+  IB_PC_EXT_RCV_BYTES_F = 995676875
+  IB_PC_EXT_XMT_PKTS_F = 138025331
+  IB_PC_EXT_RCV_PKTS_F = 118931756
+  IB_PC_EXT_XMT_UPKTS_F = 0
+  IB_PC_EXT_RCV_UPKTS_F = 0
+  IB_PC_EXT_XMT_MPKTS_F = 0
+  IB_PC_EXT_RCV_MPKTS_F = 0
+  IB_PC_ERR_SYM_F = 0
+  IB_PC_LINK_RECOVERS_F = 0
+  IB_PC_LINK_DOWNED_F = 0
+  IB_PC_ERR_RCV_F = 0
+  IB_PC_ERR_PHYSRCV_F = 0
+  IB_PC_ERR_SWITCH_REL_F = 0
+  IB_PC_XMT_DISCARDS_F = 0
+  IB_PC_ERR_XMTCONSTR_F = 0
+  IB_PC_ERR_RCVCONSTR_F = 0
+  IB_PC_ERR_LOCALINTEG_F = 0
+  IB_PC_ERR_EXCESS_OVR_F = 0
+  IB_PC_VL15_DROPPED_F = 0
+  IB_PC_XMT_WAIT_F = 9504
+
+Counters for device mlx4_0 port 2 LID 2
+  IB_PC_EXT_XMT_BYTES_F = 995676875
+  IB_PC_EXT_RCV_BYTES_F = 32534357337
+  IB_PC_EXT_XMT_PKTS_F = 118931756
+  IB_PC_EXT_RCV_PKTS_F = 138025331
+  IB_PC_EXT_XMT_UPKTS_F = 0
+  IB_PC_EXT_RCV_UPKTS_F = 0
+  IB_PC_EXT_XMT_MPKTS_F = 0
+  IB_PC_EXT_RCV_MPKTS_F = 0
+  IB_PC_ERR_SYM_F = 0
+  IB_PC_LINK_RECOVERS_F = 0
+  IB_PC_LINK_DOWNED_F = 0
+  IB_PC_ERR_RCV_F = 0
+  IB_PC_ERR_PHYSRCV_F = 0
+  IB_PC_ERR_SWITCH_REL_F = 0
+  IB_PC_XMT_DISCARDS_F = 0
+  IB_PC_ERR_XMTCONSTR_F = 0
+  IB_PC_ERR_RCVCONSTR_F = 0
+  IB_PC_ERR_LOCALINTEG_F = 0
+  IB_PC_ERR_EXCESS_OVR_F = 0
+  IB_PC_VL15_DROPPED_F = 0
+  IB_PC_XMT_WAIT_F = 5893
+
+The counts of the following make sense based upon the test of data being transmitted from port 1 and received on port 2:
+with flow control in the opposite direction:
+- IB_PC_EXT_XMT_BYTES_F (transmit bytes)
+- IB_PC_EXT_RCV_BYTES_F (receive bytes)
+- IB_PC_EXT_XMT_PKTS_F (transmit packets)
+- IB_PC_EXT_RCV_PKTS_F (receive packets)
+
+The following are all zero, possibly due to no Global Routing Header and multicast not being used:
+- IB_PC_EXT_XMT_UPKTS_F (transmit unicast packets)
+- IB_PC_EXT_RCV_UPKTS_F (receive unicast packets)
+- IB_PC_EXT_XMT_MPKTS_F (transmit multicast packets)
+- IB_PC_EXT_RCV_PKTS_F (receive multicast packets)
+
+IB_PC_XMT_WAIT_F being a small value is to be expected according to https://www.openfabrics.org/mediawiki/index.php/Overview_of_Error_Counters
+and means some packets had to wait before being tranmitted.
+
+
+When the cable was pulled out got symbol errors IB_PC_ERR_SYM_F (which looks to be a 16 bit count)
+and one line downed IB_PC_LINK_DOWNED_F count which makes sense:
+
+$ ibv_display_infiniband_counters/Release/ibv_display_infiniband_counters 
+Counters for device mlx4_0 port 1 LID 1
+  IB_PC_EXT_XMT_BYTES_F = 32534366697
+  IB_PC_EXT_RCV_BYTES_F = 995686235
+  IB_PC_EXT_XMT_PKTS_F = 138025461
+  IB_PC_EXT_RCV_PKTS_F = 118931886
+  IB_PC_EXT_XMT_UPKTS_F = 0
+  IB_PC_EXT_RCV_UPKTS_F = 0
+  IB_PC_EXT_XMT_MPKTS_F = 0
+  IB_PC_EXT_RCV_MPKTS_F = 0
+  IB_PC_ERR_SYM_F = 65535
+  IB_PC_LINK_RECOVERS_F = 0
+  IB_PC_LINK_DOWNED_F = 1
+  IB_PC_ERR_RCV_F = 0
+  IB_PC_ERR_PHYSRCV_F = 0
+  IB_PC_ERR_SWITCH_REL_F = 0
+  IB_PC_XMT_DISCARDS_F = 0
+  IB_PC_ERR_XMTCONSTR_F = 0
+  IB_PC_ERR_RCVCONSTR_F = 0
+  IB_PC_ERR_LOCALINTEG_F = 0
+  IB_PC_ERR_EXCESS_OVR_F = 0
+  IB_PC_VL15_DROPPED_F = 0
+  IB_PC_XMT_WAIT_F = 9504
+
+Counters for device mlx4_0 port 2 LID 2
+  IB_PC_EXT_XMT_BYTES_F = 995686235
+  IB_PC_EXT_RCV_BYTES_F = 32534366697
+  IB_PC_EXT_XMT_PKTS_F = 118931886
+  IB_PC_EXT_RCV_PKTS_F = 138025461
+  IB_PC_EXT_XMT_UPKTS_F = 0
+  IB_PC_EXT_RCV_UPKTS_F = 0
+  IB_PC_EXT_XMT_MPKTS_F = 0
+  IB_PC_EXT_RCV_MPKTS_F = 0
+  IB_PC_ERR_SYM_F = 65535
+  IB_PC_LINK_RECOVERS_F = 0
+  IB_PC_LINK_DOWNED_F = 1
+  IB_PC_ERR_RCV_F = 0
+  IB_PC_ERR_PHYSRCV_F = 0
+  IB_PC_ERR_SWITCH_REL_F = 0
+  IB_PC_XMT_DISCARDS_F = 0
+  IB_PC_ERR_XMTCONSTR_F = 0
+  IB_PC_ERR_RCVCONSTR_F = 0
+  IB_PC_ERR_LOCALINTEG_F = 0
+  IB_PC_ERR_EXCESS_OVR_F = 0
+  IB_PC_VL15_DROPPED_F = 0
+  IB_PC_XMT_WAIT_F = 5893
+
+Once the cable was reconnected, and opensm reported that the links were back up, the IB_PC_ERR_SYM_F count has been zeroed.
+IB_PC_LINK_DOWNED_F remained at one.
+
