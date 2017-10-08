@@ -166,7 +166,7 @@ int main (int argc, char *argv[])
         struct ibv_device *const device = ibv_device_list[device_index];
         struct ibv_context *const context = ibv_open_device (device);
 
-        if (device == NULL)
+        if (context == NULL)
         {
             fprintf (stderr, "ibv_open_device failed\n");
             exit (EXIT_FAILURE);
