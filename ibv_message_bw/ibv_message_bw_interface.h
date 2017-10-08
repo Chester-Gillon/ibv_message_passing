@@ -45,6 +45,20 @@ typedef struct
     struct ibv_port_attr port_attributes;
 } ib_port_endpoint;
 
+/** Contains the context to use SLP to publish the local Queue Pair information for a communication path, and then obtain
+ *  the remote Queue Pair information.
+ *  Since SLP is used, the IP address of the remote end is not required. */
+#define SERVICE_URL_MAX_LEN 1024
+typedef struct
+{
+    /** Handle used to perform SLP operations */
+    SLPHandle handle;
+    /** The SLP service URL for the local endpoint of the communication path which is published with the local Queue Pair information */
+    char local_service_url[SERVICE_URL_MAX_LEN];
+    /** The SLP service URL for the remove endpoint of the communication path from which the remote Queue Pair information is obtained */
+    char remote_service_url[SERVICE_URL_MAX_LEN];
+} communication_path_slp_connection;
+
 /** Opaque handles for the context used to transmit or receive messages on a communication path */
 struct tx_message_context_s;
 typedef struct tx_message_context_s *tx_message_context_handle;
@@ -60,6 +74,9 @@ void *cache_line_aligned_alloc (const size_t size);
 void *cache_line_aligned_calloc (const size_t nmemb, const size_t size);
 void open_ib_port_endpoint (ib_port_endpoint *const endpoint, const communication_path_definition *const path_def);
 void close_ib_port_endpoint (ib_port_endpoint *const endpoint);
+void intialise_slp_connection (communication_path_slp_connection *const slp_connection, const bool is_tx_end,
+                               const communication_path_definition *const path_def);
+void close_slp_connection (communication_path_slp_connection *const slp_connection);
 
 tx_message_context_handle message_transmit_create_local (const communication_path_definition *const path_def);
 void message_transmit_attach_remote (tx_message_context_handle context);

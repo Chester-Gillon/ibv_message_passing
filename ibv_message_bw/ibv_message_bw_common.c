@@ -14,6 +14,7 @@
 #include <unistd.h>
 
 #include <infiniband/verbs.h>
+#include <slp.h>
 
 #include "ibv_message_bw_interface.h"
 
@@ -193,4 +194,30 @@ void close_ib_port_endpoint (ib_port_endpoint *const endpoint)
     ibv_free_device_list (endpoint->device_list);
     check_assert (rc == 0, "ibv_free_device_list");
     endpoint->num_devices = 0;
+}
+
+/**
+ * @brief Initialise the SLP connection to be used exchange Queue Pair information for a communication path
+ * @param[out] slp_connection The connection to initialise
+ * @param[in] is_tx_end Determines if the calling thread is the transmit or receive end of the communication path
+ * @param[in] path_def The definition of the communication path, used to build a unique service URL
+ */
+void intialise_slp_connection (communication_path_slp_connection *const slp_connection, const bool is_tx_end,
+                               const communication_path_definition *const path_def)
+{
+    SLPError slp_status;
+    const char *const local_end  = is_tx_end ? "tx" : "rx";
+    const char *const remote_end = is_tx_end ? "rx" : "tx";
+
+    slp_status = SLPOpen (NULL, SLP_FALSE, &slp_connection->handle);
+    check_assert (slp_status == SLP_OK, "SLPOpen");
+    sprintf (slp_connection->local_service_url, "ibv_message_bw;name=%s_%d", local_end, path_def->instance);
+    sprintf (slp_connection->remote_service_url, "ibv_message_bw;name=%s_%d", remote_end, path_def->instance);
+}
+
+void close_slp_connection (communication_path_slp_connection *const slp_connection)
+{
+    /*@todo de-register local_service_url */
+
+    SLPClose (slp_connection->handle);
 }

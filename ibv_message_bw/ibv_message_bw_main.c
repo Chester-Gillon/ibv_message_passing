@@ -21,6 +21,7 @@
 #include <errno.h>
 
 #include <infiniband/verbs.h>
+#include <slp.h>
 
 #include "ibv_message_bw_interface.h"
 
@@ -55,7 +56,7 @@ typedef struct
 {
     /** The identity of the thread */
     pthread_t thread_id;
-    /** The definition of the communication path for which this thread transmit messages on */
+    /** The definition of the communication path for which this thread transmits messages on */
     communication_path_definition path_def;
 } message_transmit_thread_context;
 

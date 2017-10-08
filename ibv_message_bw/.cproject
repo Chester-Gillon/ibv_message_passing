@@ -33,6 +33,7 @@
 								<option id="gnu.c.link.option.libs.251916268" name="Libraries (-l)" superClass="gnu.c.link.option.libs" useByScannerDiscovery="false" valueType="libs">
 									<listOptionValue builtIn="false" value="pthread"/>
 									<listOptionValue builtIn="false" value="ibverbs"/>
+									<listOptionValue builtIn="false" value="slp"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.linker.input.1867065799" superClass="cdt.managedbuild.tool.gnu.c.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
@@ -78,9 +79,10 @@
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.1063338122" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.exe.release.125840721" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.release">
-								<option id="gnu.c.link.option.libs.762146308" superClass="gnu.c.link.option.libs" useByScannerDiscovery="false" valueType="libs">
+								<option id="gnu.c.link.option.libs.762146308" name="Libraries (-l)" superClass="gnu.c.link.option.libs" useByScannerDiscovery="false" valueType="libs">
 									<listOptionValue builtIn="false" value="pthread"/>
 									<listOptionValue builtIn="false" value="ibverbs"/>
+									<listOptionValue builtIn="false" value="slp"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.linker.input.738506396" superClass="cdt.managedbuild.tool.gnu.c.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>

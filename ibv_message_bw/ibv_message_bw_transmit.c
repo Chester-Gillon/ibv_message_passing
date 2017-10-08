@@ -11,6 +11,7 @@
 #include <stdlib.h>
 
 #include <infiniband/verbs.h>
+#include <slp.h>
 
 #include "ibv_message_bw_interface.h"
 
@@ -21,6 +22,8 @@ typedef struct tx_message_context_s
     communication_path_definition path_def;
     /** The Infiniband port this context transmits messages on */
     ib_port_endpoint endpoint;
+    /** Used to exchange Queue Pair information with the receive end of the communication path */
+    communication_path_slp_connection slp_connection;
 } tx_message_context;
 
 /**
@@ -37,6 +40,7 @@ tx_message_context_handle message_transmit_create_local (const communication_pat
 
     context->path_def = *path_def;
     open_ib_port_endpoint (&context->endpoint, &context->path_def);
+    intialise_slp_connection (&context->slp_connection, true, &context->path_def);
 
     return context;
 }
@@ -60,6 +64,7 @@ void message_transmit_attach_remote (tx_message_context_handle context)
  */
 void message_transmit_finalise (tx_message_context_handle context)
 {
+    close_slp_connection (&context->slp_connection);
     close_ib_port_endpoint (&context->endpoint);
     free (context);
 }
