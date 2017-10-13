@@ -49,10 +49,17 @@ Counters for device mlx4_0 port 2 LID 2
 
 The counts of the following make sense based upon the test of data being transmitted from port 1 and received on port 2:
 with flow control in the opposite direction:
-- IB_PC_EXT_XMT_BYTES_F (transmit bytes)
-- IB_PC_EXT_RCV_BYTES_F (receive bytes)
+- IB_PC_EXT_XMT_BYTES_F (transmit 32-bit words)
+- IB_PC_EXT_RCV_BYTES_F (receive 32-bit words)
 - IB_PC_EXT_XMT_PKTS_F (transmit packets)
 - IB_PC_EXT_RCV_PKTS_F (receive packets)
+
+While the names IB_PC_EXT_XMT_BYTES_F and IB_PC_EXT_RCV_BYTES_F suggest they count bytes, https://community.mellanox.com/docs/DOC-1320 says:
+"XmtData: The total number of data octets, divided by 4, transmitted on all VLs from the port.
+ RcvData: The total number of data octets, divided by 4, received on all VLs from the port."
+ 
+Based upon the change in values for IB_PC_EXT_XMT_BYTES_F and IB_PC_EXT_RCV_BYTES_F during the ibv_functional_loopback_test they
+are counting 32-bit words and not bytes.
 
 The following are all zero, possibly due to no Global Routing Header and multicast not being used:
 - IB_PC_EXT_XMT_UPKTS_F (transmit unicast packets)
