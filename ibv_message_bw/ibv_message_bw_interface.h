@@ -8,6 +8,19 @@
 #ifndef IBV_MESSAGE_BW_INTERFACE_H_
 #define IBV_MESSAGE_BW_INTERFACE_H_
 
+/** SLP service name used to publish a transmit or receive endpoint for a communication path */
+#define SLP_SERVICE_NAME "service:message_bw"
+
+/** Defines the options used to allocate a buffer which is used to transmit or receive messages.
+ *  This buffer will be registered as a memory region with the Infiniband device */
+typedef enum
+{
+    /** Allocate the buffer from the heap of the calling process */
+    BUFFER_ALLOCATION_HEAP,
+    /** Allocate the buffer from POSIX shared memory */
+    BUFFER_ALLOCATION_SHARED_MEMORY
+} buffer_allocation_type;
+
 /** Defines a communication path for which one ibv_message_bw program is the transmit or receive endpoint */
 typedef struct
 {
@@ -26,6 +39,8 @@ typedef struct
     uint32_t max_message_size;
     /** The number of message buffers on the communication path */
     uint32_t num_message_buffers;
+    /** How the transmit or receive buffer is allocated */
+    buffer_allocation_type allocation_type;
 } communication_path_definition;
 
 /** Contains the Infiniband device and port on the local host which is used for transmitting or receiving messages from */
@@ -39,25 +54,82 @@ typedef struct
     struct ibv_device *selected_device;
     /** The opened context for selected_device */
     struct ibv_context *device_context;
+    /** The protection demain for the device_context */
+    struct ibv_pd *device_pd;
     /** The attributes for selected_device */
     struct ibv_device_attr device_attributes;
     /** The attributes for the port on selected_device which is used for transmitting or receiving messages from */
     struct ibv_port_attr port_attributes;
 } ib_port_endpoint;
 
+/** The attributes of a remote memory buffer which are retrieved by SLP, and used to establish an Infiniband connection */
+typedef struct
+{
+    /** The size of the memory buffer in bytes */
+    size_t size;
+    /** The virtual address of the memory buffer */
+    uint64_t addr;
+    /** The key to access the memory buffer */
+    uint32_t rkey;
+    /** The LID to address the memory buffer */
+    uint16_t lid;
+    /** The initial packet-sequence number */
+    uint32_t psn;
+    /** The Queue Pair number for the memory buffer */
+    uint32_t qp_num;
+} remote_memory_buffer_attributes;
+
 /** Contains the context to use SLP to publish the local Queue Pair information for a communication path, and then obtain
  *  the remote Queue Pair information.
  *  Since SLP is used, the IP address of the remote end is not required. */
-#define SERVICE_URL_MAX_LEN 1024
+#define SLP_SERVICE_URL_MAX_LEN 1024
+#define SLP_ATTRIBUTES_MAX_LEN  1024
 typedef struct
 {
     /** Handle used to perform SLP operations */
     SLPHandle handle;
     /** The SLP service URL for the local endpoint of the communication path which is published with the local Queue Pair information */
-    char local_service_url[SERVICE_URL_MAX_LEN];
-    /** The SLP service URL for the remove endpoint of the communication path from which the remote Queue Pair information is obtained */
-    char remote_service_url[SERVICE_URL_MAX_LEN];
+    char local_service_url[SLP_SERVICE_URL_MAX_LEN];
+    /** The name portion of the SLP service URL for the remote endpoint of the communication path
+     *  from which the remote Queue Pair information is obtained.
+     *  Only the name portion is given as the hostname component is not known at initialisation. */
+    char remote_service_name[SLP_SERVICE_URL_MAX_LEN];
+    /** The SLP service URL for the remote endpoint of the communication path, set by searching for remote_service_name
+     *  in all available service URLs. */
+    char remote_service_url[SLP_SERVICE_URL_MAX_LEN];
+    /** Set once have retrieved the remote_attributes */
+    bool remote_attributes_obtained;
+    /** The attributes retrieved for the remote memory buffer */
+    remote_memory_buffer_attributes remote_attributes;
 } communication_path_slp_connection;
+
+/** Contains a memory buffer which is used for transmitting or receiving messages from the Infiniband device */
+typedef struct
+{
+    /** How the memory for the buffer is allocated */
+    buffer_allocation_type allocation_type;
+    /** The size of the buffer in bytes */
+    size_t size;
+    /** The allocated buffer */
+    char *buffer;
+    /** For BUFFER_ALLOCATION_SHARED_MEMORY the name of the POSIX shared memory file */
+    char pathname[PATH_MAX];
+    /** For BUFFER_ALLOCATION_SHARED_MEMORY the file descriptor of the POSIX shared memory file */
+    int fd;
+} memory_buffer;
+
+/** The test application header placed at the start of every message sent */
+typedef struct
+{
+    /** An incrementing sequence number for every message sent */
+    uint32_t sequence_number;
+    /** The number of data bytes in the message. Maximum message length is part of the communication path definition. */
+    uint32_t message_length;
+    /** The identity of the message */
+    uint32_t message_id;
+    /** The source instance of the message, used as an arbitrary value for these tests */
+    uint32_t source_instance;
+} message_header;
 
 /** Opaque handles for the context used to transmit or receive messages on a communication path */
 struct tx_message_context_s;
@@ -76,7 +148,18 @@ void open_ib_port_endpoint (ib_port_endpoint *const endpoint, const communicatio
 void close_ib_port_endpoint (ib_port_endpoint *const endpoint);
 void intialise_slp_connection (communication_path_slp_connection *const slp_connection, const bool is_tx_end,
                                const communication_path_definition *const path_def);
+void register_memory_buffer_with_slp (communication_path_slp_connection *const slp_connection,
+                                      const ib_port_endpoint *const endpoint, const uint32_t psn,
+                                      const struct ibv_mr *const mr, const struct ibv_qp *const qp);
+void get_remote_memory_buffer_from_slp (communication_path_slp_connection *const slp_connection);
 void close_slp_connection (communication_path_slp_connection *const slp_connection);
+size_t align_to_cache_line_size (const size_t size);
+void create_memory_buffer (memory_buffer *const buffer, const bool is_tx_end,
+                           const communication_path_definition *const path_def);
+void release_memory_buffer (memory_buffer *const buffer);
+uint32_t get_random_psn (void);
+uint32_t get_max_inline_data (struct ibv_qp *const qp);
+void verify_qp_state (const enum ibv_qp_state expected_state, struct ibv_qp *const qp, const char *qp_name);
 
 tx_message_context_handle message_transmit_create_local (const communication_path_definition *const path_def);
 void message_transmit_attach_remote (tx_message_context_handle context);

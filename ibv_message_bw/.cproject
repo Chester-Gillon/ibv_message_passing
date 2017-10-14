@@ -32,6 +32,7 @@
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.exe.debug.709382424" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.debug">
 								<option id="gnu.c.link.option.libs.251916268" name="Libraries (-l)" superClass="gnu.c.link.option.libs" useByScannerDiscovery="false" valueType="libs">
 									<listOptionValue builtIn="false" value="pthread"/>
+									<listOptionValue builtIn="false" value="rt"/>
 									<listOptionValue builtIn="false" value="ibverbs"/>
 									<listOptionValue builtIn="false" value="slp"/>
 								</option>
@@ -81,6 +82,7 @@
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.exe.release.125840721" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.release">
 								<option id="gnu.c.link.option.libs.762146308" name="Libraries (-l)" superClass="gnu.c.link.option.libs" useByScannerDiscovery="false" valueType="libs">
 									<listOptionValue builtIn="false" value="pthread"/>
+									<listOptionValue builtIn="false" value="rt"/>
 									<listOptionValue builtIn="false" value="ibverbs"/>
 									<listOptionValue builtIn="false" value="slp"/>
 								</option>

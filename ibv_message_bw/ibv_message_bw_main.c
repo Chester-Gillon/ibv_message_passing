@@ -51,6 +51,9 @@ static uint32_t arg_num_message_buffers = DEFAULT_NUM_MESSAGE_BUFFERS;
 static int arg_core;
 static bool arg_core_present = false;
 
+/** Optional command line argument which specifies how buffers are allocated for the transmit and receive messages */
+static buffer_allocation_type arg_buffer_allocation_type = BUFFER_ALLOCATION_SHARED_MEMORY;
+
 /** The context for a thread which transmits test messages */
 typedef struct
 {
@@ -80,6 +83,7 @@ static const struct option command_line_options[] =
     {"max-msg-size", required_argument, NULL, 0},
     {"num-buffers", required_argument, NULL, 0},
     {"core", required_argument, NULL, 0},
+    {"alloc", required_argument, NULL, 0},
     {NULL, 0, NULL, 0}
 };
 
@@ -101,6 +105,8 @@ static void display_usage (void)
     printf ("  --num-buffers=<buffers>  The number of message buffers on the path\n"
             "                           (default %u)\n", DEFAULT_NUM_MESSAGE_BUFFERS);
     printf ("  --core=<core>     Set the affinity of the tx / rx thread to the CPU <core>\n");
+    printf ("  --alloc=heap|shared_mem  How message buffers are allocated\n"
+            "                           (default shared_mem)\n");
     exit (EXIT_FAILURE);
 }
 
@@ -189,6 +195,22 @@ static void parse_command_line_arguments (const int argc, char *argv[])
                 }
                 arg_core_present = true;
             }
+            else if (strcmp (optdef->name, "alloc") == 0)
+            {
+                if (strcmp (optarg, "heap") == 0)
+                {
+                    arg_buffer_allocation_type = BUFFER_ALLOCATION_HEAP;
+                }
+                else if (strcmp (optarg, "shared_mem") == 0)
+                {
+                    arg_buffer_allocation_type = BUFFER_ALLOCATION_SHARED_MEMORY;
+                }
+                else
+                {
+                    fprintf (stderr, "Invalid %s %s\n", optdef->name, optarg);
+                    exit (EXIT_FAILURE);
+                }
+            }
             else
             {
                 /* This is a program error, and shouldn't be triggered by the command line options */
@@ -231,7 +253,7 @@ static void *message_transmit_thread (void *const arg)
 
     tx_handle = message_transmit_create_local (&thread_context->path_def);
     message_transmit_attach_remote (tx_handle);
-
+    sleep (5); /*@todo give time for other end to connect */
     message_transmit_finalise (tx_handle);
 
     return NULL;
@@ -252,7 +274,7 @@ static void *message_receive_thread (void *const arg)
 
     rx_handle = message_receive_create_local (&thread_context->path_def);
     message_receive_attach_remote (rx_handle);
-
+    sleep (5); /*@todo give time for other end to connect */
     message_receive_finalise (rx_handle);
 
     return NULL;
@@ -341,12 +363,16 @@ int main (int argc, char *argv[])
 
     parse_command_line_arguments (argc, argv);
 
+    /* To allow generation of random Packet Sequence numbers */
+    srand48 (getpid() * time(NULL));
+
     /* Set the path definition which is common to the message transmitter and receiver */
     path_def.ib_device = arg_ib_device;
     path_def.port_num = (uint8_t) arg_ib_port;
     path_def.instance = arg_rx_instance_present ? arg_rx_instance : arg_tx_instance;
     path_def.max_message_size = arg_max_message_size;
     path_def.num_message_buffers = arg_num_message_buffers;
+    path_def.allocation_type = arg_buffer_allocation_type;
 
     /* Set CPU affinity for the thread which sends or receives messages, if specified as a command line option */
     rc = pthread_attr_init (&thread_attr);
