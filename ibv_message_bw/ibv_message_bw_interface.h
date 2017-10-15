@@ -11,6 +11,9 @@
 /** SLP service name used to publish a transmit or receive endpoint for a communication path */
 #define SLP_SERVICE_NAME "service:message_bw"
 
+/** No need to set a specific Infiniband service level for the tests */
+#define DEFAULT_SERVICE_LEVEL 0
+
 /** Defines the options used to allocate a buffer which is used to transmit or receive messages.
  *  This buffer will be registered as a memory region with the Infiniband device */
 typedef enum
@@ -131,6 +134,19 @@ typedef struct
     uint32_t source_instance;
 } message_header;
 
+/** Defines one message buffer which sent/received by the test application.
+ *  The test application de-references the pointers.
+ *  The send/receive API functions are responsible for setting the pointers and the buffer_index */
+typedef struct
+{
+    /** Points at the header of the message which is to be sent or has been received */
+    message_header *header;
+    /** Points at the data of the message which is to be sent or has been received */
+    void *data;
+    /** The message index into the circular buffer of messages */
+    uint32_t buffer_index;
+} api_message_buffer;
+
 /** Opaque handles for the context used to transmit or receive messages on a communication path */
 struct tx_message_context_s;
 typedef struct tx_message_context_s *tx_message_context_handle;
@@ -164,10 +180,15 @@ void verify_qp_state (const enum ibv_qp_state expected_state, struct ibv_qp *con
 tx_message_context_handle message_transmit_create_local (const communication_path_definition *const path_def);
 void message_transmit_attach_remote (tx_message_context_handle context);
 void message_transmit_finalise (tx_message_context_handle context);
+void await_all_outstanding_messages_freed (tx_message_context_handle context);
+api_message_buffer *get_send_buffer (tx_message_context_handle context);
+void send_message (tx_message_context_handle context, const api_message_buffer *const api_buffer);
 
 rx_message_context_handle message_receive_create_local (const communication_path_definition *const path_def);
 void message_receive_attach_remote (rx_message_context_handle context);
 void message_receive_finalise (rx_message_context_handle context);
+api_message_buffer *await_message (rx_message_context_handle context);
+void free_message (rx_message_context_handle context, api_message_buffer *const api_buffer);
 
 /** The assumed cache line size for allocating areas. Should be valid for all Sandy Bridge and Haswell processors */
 #define CACHE_LINE_SIZE_BYTES 64

@@ -18,6 +18,30 @@
 
 #include "ibv_message_bw_interface.h"
 
+/** Defines the internal information for one message buffer used to receive the message and transmit flow control */
+typedef struct
+{
+    /** The scatter-gather entry to transfer the sequence number of a freed message buffer to the sender.
+     *  Set at initialisation, and doesn't required modification as messages are freed. */
+    struct ibv_sge freed_message_sge;
+    /** The work request to transfer the sequence number of a freed message buffer to the sender.
+     *  Set at initialisation, and doesn't required modification as messages are freed. */
+    struct ibv_send_wr freed_message_wr;
+    /** Defines the sequence numbers which appear in the received message header:
+     *  - message_not_available_sequence_number: A message is not yet available
+     *  - message_available_sequence_number : A message is available
+     *
+     *  Any other value indicates an error */
+    uint32_t message_not_available_sequence_number;
+    uint32_t message_available_sequence_number;
+    /** Used to check usage of the message buffer:
+     *  - If false in use by the receive API functions.
+     *  - If true in use by the application for processing the received message contents */
+    bool owned_by_application;
+    /** Points at the receive buffer for the location of the freed sequence number */
+    uint32_t *freed_sequence_number;
+} rx_message_buffer;
+
 /** Contains the context used to receive messages from one communication path over a pair of connected Infiniband ports */
 typedef struct rx_message_context_s
 {
@@ -41,6 +65,14 @@ typedef struct rx_message_context_s
     uint32_t freed_sequence_number_psn;
     /** The maximum number of bytes which can be sent inline on freed_sequence_number_qp */
     uint32_t freed_sequence_number_qp_max_inline_data;
+    /** Array of length path_def.num_message_buffers which point at each message in receive_buffer */
+    api_message_buffer *api_message_buffers;
+    /** Array of length path_def.num_message_buffers which contains the internal information used to receive messages */
+    rx_message_buffer *rx_message_buffers;
+    /** The circular buffer index for the next message message to check for message receipt */
+    uint32_t next_receive_buffer_index;
+    /** Used to control only signalling freed sequence number send completion on one in NUM_MESSAGE_BUFFERS messages */
+    uint32_t freed_sequence_number_cq_pacing;
 } rx_message_context;
 
 /**
@@ -134,6 +166,70 @@ rx_message_context_handle message_receive_create_local (const communication_path
 }
 
 /**
+ * @details Perform the initialisation of the context for the receiver of test messages for each message buffer
+ *          which may be received.
+ *          This sets the Infiniband structures for the freed sequence number send operations using the fixed buffer attributes.
+ * @param[in,out] context The receive message context to complete the initialisation for
+ */
+static void initialise_receive_message_buffers (rx_message_context_handle context)
+{
+    uint32_t buffer_index;
+    uint64_t buffer_offset;
+    uint64_t header_offset;
+    uint64_t data_offset;
+    uint64_t freed_sequence_number_offset;
+
+    context->api_message_buffers = cache_line_aligned_calloc (context->path_def.num_message_buffers, sizeof (api_message_buffer));
+    context->rx_message_buffers = cache_line_aligned_calloc (context->path_def.num_message_buffers, sizeof (rx_message_buffer));
+    buffer_offset = 0;
+    for (buffer_index = 0; buffer_index < context->path_def.num_message_buffers; buffer_index++)
+    {
+        api_message_buffer *const api_buffer = &context->api_message_buffers[buffer_index];
+        rx_message_buffer *const rx_buffer = &context->rx_message_buffers[buffer_index];
+
+        /* Set the header, data and freed sequence number offsets for this message */
+        api_buffer->buffer_index = buffer_index;
+        header_offset = buffer_offset;
+        buffer_offset += align_to_cache_line_size (sizeof (message_header));
+        api_buffer->header = (message_header *) &context->receive_buffer.buffer[header_offset];
+        data_offset = buffer_offset;
+        buffer_offset += align_to_cache_line_size (context->path_def.max_message_size);
+        api_buffer->data = &context->receive_buffer.buffer[data_offset];
+        freed_sequence_number_offset = buffer_offset;
+        buffer_offset += align_to_cache_line_size (sizeof (uint32_t));
+        rx_buffer->freed_sequence_number = (uint32_t *) &context->receive_buffer.buffer[freed_sequence_number_offset];
+
+        /* Set the scatter-gather entry to transmit the freed message sequence number */
+        rx_buffer->freed_message_sge.lkey = context->receive_mr->lkey;
+        rx_buffer->freed_message_sge.addr = (uintptr_t) rx_buffer->freed_sequence_number;
+        rx_buffer->freed_message_sge.length = sizeof (uint32_t);
+
+        /* Set the work request to transmit the freed message sequence number */
+        rx_buffer->freed_message_wr.wr_id = buffer_index;
+        rx_buffer->freed_message_wr.sg_list = &rx_buffer->freed_message_sge;
+        rx_buffer->freed_message_wr.num_sge = 1;
+        rx_buffer->freed_message_wr.next = NULL;
+        rx_buffer->freed_message_wr.opcode = IBV_WR_RDMA_WRITE;
+        rx_buffer->freed_message_wr.send_flags = 0;
+        if (sizeof (uint32_t) <= context->freed_sequence_number_qp_max_inline_data)
+        {
+            rx_buffer->freed_message_wr.send_flags |= IBV_SEND_INLINE;
+        }
+        rx_buffer->freed_message_wr.wr.rdma.rkey = context->slp_connection.remote_attributes.rkey;
+        rx_buffer->freed_message_wr.wr.rdma.remote_addr =
+                context->slp_connection.remote_attributes.addr + freed_sequence_number_offset;
+
+        /* Initialise the sequence number management */
+        rx_buffer->owned_by_application = false;
+        rx_buffer->message_not_available_sequence_number = 0;
+        rx_buffer->message_available_sequence_number = buffer_index + 1;
+    }
+
+    context->next_receive_buffer_index = 0;
+    context->freed_sequence_number_cq_pacing = 0;
+}
+
+/**
  * @details Complete the initialisation of the context for the reception of messages on a communication path by:
  *          - Transition the receive Queue Pair, used to send freed sequence numbers, to the Ready To Send State
  *          - Initialise the free sequence number transmit buffers
@@ -143,8 +239,63 @@ rx_message_context_handle message_receive_create_local (const communication_path
  */
 void message_receive_attach_remote (rx_message_context_handle context)
 {
+    struct ibv_qp_attr qp_attr;
+    int rc;
+
     /* Wait for the attributes of the remote endpoint to be retrieved from SLP */
     get_remote_memory_buffer_from_slp (&context->slp_connection);
+
+    /* Transition the receiver Queue Pair to the Ready to Receive state */
+    memset (&qp_attr, 0, sizeof (qp_attr));
+    qp_attr.qp_state = IBV_QPS_RTR;
+    qp_attr.path_mtu = context->endpoint.port_attributes.active_mtu;
+    qp_attr.dest_qp_num = context->slp_connection.remote_attributes.qp_num;
+    qp_attr.rq_psn = context->slp_connection.remote_attributes.psn;
+    qp_attr.max_dest_rd_atomic = 0;
+    qp_attr.min_rnr_timer = 12; /* 0.64 milliseconds delay */
+    qp_attr.ah_attr.is_global = false;
+    qp_attr.ah_attr.dlid = context->slp_connection.remote_attributes.lid;
+    qp_attr.ah_attr.sl = DEFAULT_SERVICE_LEVEL;
+    qp_attr.ah_attr.src_path_bits = 0;
+    qp_attr.ah_attr.port_num = context->path_def.port_num;
+    rc = ibv_modify_qp (context->freed_sequence_number_qp, &qp_attr,
+                        IBV_QP_STATE              |
+                        IBV_QP_AV                 |
+                        IBV_QP_PATH_MTU           |
+                        IBV_QP_DEST_QPN           |
+                        IBV_QP_RQ_PSN             |
+                        IBV_QP_MAX_DEST_RD_ATOMIC |
+                        IBV_QP_MIN_RNR_TIMER);
+    if (rc != 0)
+    {
+        perror ("ibv_modify_qp freed_sequence_number_qp failed");
+        exit (EXIT_FAILURE);
+    }
+    verify_qp_state (IBV_QPS_RTR, context->freed_sequence_number_qp, "freed_sequence_number_qp");
+
+    /* Transition the sender Queue Pair to the Ready to Send state */
+    memset (&qp_attr, 0, sizeof (qp_attr));
+    qp_attr.qp_state = IBV_QPS_RTS;
+    qp_attr.sq_psn = context->freed_sequence_number_psn;
+    qp_attr.timeout = 14;
+    qp_attr.retry_cnt = 7;
+    qp_attr.rnr_retry = 7; /* Infinite */
+    qp_attr.max_rd_atomic = 0;
+    rc = ibv_modify_qp (context->freed_sequence_number_qp, &qp_attr,
+                        IBV_QP_STATE              |
+                        IBV_QP_TIMEOUT            |
+                        IBV_QP_RETRY_CNT          |
+                        IBV_QP_RNR_RETRY          |
+                        IBV_QP_SQ_PSN             |
+                        IBV_QP_MAX_QP_RD_ATOMIC);
+    if (rc != 0)
+    {
+        perror ("ibv_modify_qp freed_sequence_number_qp failed");
+        exit (EXIT_FAILURE);
+    }
+    verify_qp_state (IBV_QPS_RTS, context->freed_sequence_number_qp, "freed_sequence_number_qp");
+
+    initialise_receive_message_buffers (context);
 }
 
 /**
@@ -174,9 +325,97 @@ void message_receive_finalise (rx_message_context_handle context)
     /* De-register and free the receive buffers */
     rc = ibv_dereg_mr (context->receive_mr);
     check_assert (rc == 0, "ibv_dereg_mr");
+    free (context->api_message_buffers);
+    free (context->rx_message_buffers);
     release_memory_buffer (&context->receive_buffer);
 
     /* Close the Infiniband port */
     close_ib_port_endpoint (&context->endpoint);
     free (context);
+}
+
+/**
+ * @brief Wait for a message to be received, using a busy-poll
+ * @details The contents of the received message remains valid until the returned buffer is freed by a
+ *          call to free_message(). Flow control prevents a received message from being overwritten until freed
+ * @param[in,out] context The receive context to receive the message on
+ * @return Returns a pointer to the received message buffer
+ */
+api_message_buffer *await_message (rx_message_context_handle context)
+{
+    const uint32_t buffer_index = context->next_receive_buffer_index;
+    api_message_buffer *const api_buffer = &context->api_message_buffers[buffer_index];
+    rx_message_buffer *const rx_buffer = &context->rx_message_buffers[buffer_index];
+    const volatile uint32_t *const receive_sequence_number = &api_buffer->header->sequence_number;
+    bool message_available = false;
+
+    /* Wait for the sequence number to indicate the next message is available */
+    do
+    {
+        const uint32_t sampled_sequence_number = *receive_sequence_number;
+
+        if (sampled_sequence_number == rx_buffer->message_available_sequence_number)
+        {
+            message_available = true;
+        }
+        else
+        {
+            CHECK_ASSERT (sampled_sequence_number == rx_buffer->message_not_available_sequence_number);
+        }
+    } while (!message_available);
+
+    /* Advance to the next expected receive buffer */
+    context->next_receive_buffer_index = (context->next_receive_buffer_index + 1) % context->path_def.num_message_buffers;
+
+    /* Return the received message */
+    rx_buffer->owned_by_application = true;
+    return api_buffer;
+}
+
+/**
+ * @brief Mark a receive message buffer after the received message has been freed
+ * @details This implements flow control by indicating to sender that the buffer is now free for another message
+ * @param[in,out] context_in The receive context to free the message for
+ * @param[in,out] api_buffer The received message buffer to free
+ */
+void free_message (rx_message_context_handle context, api_message_buffer *const api_buffer)
+{
+    rx_message_buffer *const rx_buffer = &context->rx_message_buffers[api_buffer->buffer_index];
+    struct ibv_send_wr *bad_wr = NULL;
+    int rc;
+
+    CHECK_ASSERT (rx_buffer->owned_by_application);
+
+    /* Wait for the freed buffer send work request completion, which is signalled on one message in every num_message_buffers */
+    if (context->freed_sequence_number_cq_pacing == context->path_def.num_message_buffers)
+    {
+        int num_completions;
+        struct ibv_wc wc;
+
+        do
+        {
+            num_completions = ibv_poll_cq (context->freed_sequence_number_cq, 1, &wc);
+        } while (num_completions == 0);
+        CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS));
+        context->freed_sequence_number_cq_pacing = 0;
+    }
+
+    /* Transmit the freed sequence number to the sender, to indicate the buffer can be reused */
+    *rx_buffer->freed_sequence_number = rx_buffer->message_available_sequence_number;
+    if (context->freed_sequence_number_cq_pacing == 0)
+    {
+        rx_buffer->freed_message_wr.send_flags |= IBV_SEND_SIGNALED;
+    }
+    else
+    {
+        rx_buffer->freed_message_wr.send_flags &= ~IBV_SEND_SIGNALED;
+    }
+    context->freed_sequence_number_cq_pacing++;
+    rc = ibv_post_send (context->freed_sequence_number_qp, &rx_buffer->freed_message_wr, &bad_wr);
+    CHECK_ASSERT (rc == 0);
+
+    /* Advance to the next expected sequence number */
+    rx_buffer->message_not_available_sequence_number = rx_buffer->message_available_sequence_number;
+    rx_buffer->message_available_sequence_number += context->path_def.num_message_buffers;
+    rx_buffer->owned_by_application = false;
 }

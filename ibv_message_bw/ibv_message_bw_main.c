@@ -54,6 +54,21 @@ static bool arg_core_present = false;
 /** Optional command line argument which specifies how buffers are allocated for the transmit and receive messages */
 static buffer_allocation_type arg_buffer_allocation_type = BUFFER_ALLOCATION_SHARED_MEMORY;
 
+/** The different message IDs used in the test */
+typedef enum
+{
+    /** Header only message which is the first message sent on every buffer.
+     *  The transmitter waits for these to be freed to indicate the receive application is running before
+     *  starting the message rate tests. */
+    TEST_MESSAGE_WARMUP,
+    /** Variable size message where the receiver doesn't verify the content */
+    TEST_MESSAGE_UNVERIFIED_DATA,
+    /** Variable size message where the receiver verifies the content contains a test pattern */
+    TEST_MESSAGE_VERIFY_DATA,
+    /** Header only message which tells the receiver the test is complete */
+    TEST_MESSAGE_TEST_COMPLETE
+} test_message_id;
+
 /** The context for a thread which transmits test messages */
 typedef struct
 {
@@ -61,6 +76,8 @@ typedef struct
     pthread_t thread_id;
     /** The definition of the communication path for which this thread transmits messages on */
     communication_path_definition path_def;
+    /** Handle used for transmitting messages */
+    tx_message_context_handle tx_handle;
 } message_transmit_thread_context;
 
 /** The context for a thread which receives test messages */
@@ -70,6 +87,8 @@ typedef struct
     pthread_t thread_id;
     /** The definition of the communication path for which this thread receives messages on */
     communication_path_definition path_def;
+    /** Handle used for receiving messages */
+    rx_message_context_handle rx_handle;
 } message_receive_thread_context;
 
 /** The command line options for this program, in the format passed to getopt_long().
@@ -236,6 +255,33 @@ static void parse_command_line_arguments (const int argc, char *argv[])
         fprintf (stderr, "The Infiniband device and port must be specified\n");
         exit (EXIT_FAILURE);
     }
+    if (arg_num_message_buffers == 0)
+    {
+        fprintf (stderr, "num-buffers must be at least one\n");
+        exit (EXIT_FAILURE);
+    }
+}
+
+/**
+ * @brief Transmit the test warmup messages for a transmit thread
+ * @details When this function returns the remote receive thread has freed the warmup messages,
+ *          which means the receive thread is ready to start the message rate tests
+ * @param[in,out] thread_context The transmit thread context to send the messages for
+ */
+static void transmit_message_warmup (message_transmit_thread_context *const thread_context)
+{
+    uint32_t buffer_index;
+
+    for (buffer_index = 0; buffer_index < thread_context->path_def.num_message_buffers; buffer_index++)
+    {
+        api_message_buffer *const tx_buffer = get_send_buffer (thread_context->tx_handle);
+
+        tx_buffer->header->message_id = TEST_MESSAGE_WARMUP;
+        tx_buffer->header->message_length = 0;
+        tx_buffer->header->source_instance = thread_context->path_def.instance;
+        send_message (thread_context->tx_handle, tx_buffer);
+    }
+    await_all_outstanding_messages_freed (thread_context->tx_handle);
 }
 
 /**
@@ -249,14 +295,33 @@ static void parse_command_line_arguments (const int argc, char *argv[])
 static void *message_transmit_thread (void *const arg)
 {
     message_transmit_thread_context *const thread_context = (message_transmit_thread_context *) arg;
-    tx_message_context_handle tx_handle;
 
-    tx_handle = message_transmit_create_local (&thread_context->path_def);
-    message_transmit_attach_remote (tx_handle);
-    sleep (5); /*@todo give time for other end to connect */
-    message_transmit_finalise (tx_handle);
+    thread_context->tx_handle = message_transmit_create_local (&thread_context->path_def);
+    message_transmit_attach_remote (thread_context->tx_handle);
+    transmit_message_warmup (thread_context);
+
+    message_transmit_finalise (thread_context->tx_handle);
 
     return NULL;
+}
+
+/**
+ * @brief Receive and check the test warmup messages for a receive thread
+ * @param[in,out] thread_context The receive thread context to receive the messages for
+ */
+static void receive_message_warmup (message_receive_thread_context *const thread_context)
+{
+    uint32_t buffer_index;
+
+    for (buffer_index = 0; buffer_index < thread_context->path_def.num_message_buffers; buffer_index++)
+    {
+        api_message_buffer *const rx_buffer = await_message (thread_context->rx_handle);
+
+        CHECK_ASSERT ((rx_buffer->header->message_id == TEST_MESSAGE_WARMUP) &&
+                      (rx_buffer->header->message_length == 0) &&
+                      (rx_buffer->header->source_instance == thread_context->path_def.instance));
+        free_message (thread_context->rx_handle, rx_buffer);
+    }
 }
 
 /**
@@ -270,12 +335,12 @@ static void *message_transmit_thread (void *const arg)
 static void *message_receive_thread (void *const arg)
 {
     message_receive_thread_context *const thread_context = (message_receive_thread_context *) arg;
-    rx_message_context_handle rx_handle;
 
-    rx_handle = message_receive_create_local (&thread_context->path_def);
-    message_receive_attach_remote (rx_handle);
-    sleep (5); /*@todo give time for other end to connect */
-    message_receive_finalise (rx_handle);
+    thread_context->rx_handle = message_receive_create_local (&thread_context->path_def);
+    message_receive_attach_remote (thread_context->rx_handle);
+    receive_message_warmup (thread_context);
+
+    message_receive_finalise (thread_context->rx_handle);
 
     return NULL;
 }
