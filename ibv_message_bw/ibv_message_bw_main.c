@@ -19,6 +19,7 @@
 #include <time.h>
 #include <sched.h>
 #include <errno.h>
+#include <signal.h>
 #include <sys/time.h>
 #include <sys/resource.h>
 
@@ -84,10 +85,15 @@ typedef enum
 /** Used to build the test results for a message transmit or receive thread */
 typedef struct
 {
+    /** True if the data content of the message was verified during the test */
+    bool verified_data;
     /** The total number of messages processed */
     uint64_t total_messages;
     /** The total number of data bytes in messages processed (excludes the header for each message) */
     uint64_t total_data_bytes;
+    /** The extent of the different message lengths seen during the test */
+    uint32_t min_message_length_seen;
+    uint32_t max_message_length_seen;
     /** The time the first message was transmitted or received */
     struct timespec start_time;
     /** The time the last message was transmitted or received */
@@ -109,6 +115,8 @@ typedef struct
     message_test_results results;
     /** The next generated test pattern word in the message data, initialised to the instance number of the communication path */
     uint32_t test_pattern;
+    /** If true this threads inserts a test pattern in the transmitted message data, which the receiver will check */
+    bool verify_data;
 } message_transmit_thread_context;
 
 /** The context for a thread which receives test messages */
@@ -140,6 +148,13 @@ typedef struct
 /** The contexts of all message transmit or receive threads which are running in this process */
 static transmit_or_receive_context thread_contexts[MAX_THREADS];
 
+/** Set from a signal handler to request that the transmit threads in this process:
+ *  - Stop transmitting new data messages.
+ *  - Send a message to the receiver that the test is complete, which causes the receive thread to exit.
+ *  - The transmit thread to exit once the receiver has freed all the messages which have been sent.
+ */
+static volatile bool stop_transmission;
+
 /** The command line options for this program, in the format passed to getopt_long().
  *  Only long arguments are supported */
 static const struct option command_line_options[] =
@@ -154,6 +169,14 @@ static const struct option command_line_options[] =
     {"verify_data", no_argument, &arg_verify_data, true},
     {NULL, 0, NULL, 0}
 };
+
+/**
+ * @brief Signal handler to request transmission of messages is stopped
+ */
+static void stop_transmission_handler (const int sig)
+{
+    stop_transmission = true;
+}
 
 /**
  * @brief Display the usage for this program, and the exit
@@ -466,31 +489,72 @@ static void transmit_message_warmup (message_transmit_thread_context *const thre
 }
 
 /**
- * @todo Send a fixed number of message as an initial verification of functionality
+ * @brief Update the message test results using one message which has been transmitted or received
+ * @param[in,out] results The test results to update
+ * @param[in] header The header of the message to update the results with
+ */
+static void update_test_results (message_test_results *const results, const message_header *const header)
+{
+    if (header->message_id == TEST_MESSAGE_VERIFY_DATA)
+    {
+        results->verified_data = true;
+    }
+
+    if (results->total_messages == 0)
+    {
+        results->min_message_length_seen = header->message_length;
+        results->max_message_length_seen = header->message_length;
+    }
+    else
+    {
+        if (header->message_length < results->min_message_length_seen)
+        {
+            results->min_message_length_seen = header->message_length;
+        }
+        if (header->message_length > results->max_message_length_seen)
+        {
+            results->max_message_length_seen = header->message_length;
+        }
+    }
+
+    results->total_messages++;
+    results->total_data_bytes += header->message_length;
+}
+
+/**
+ * @brief Perform a message transmit test for one thread, stopping the test when requested by a signal handler
+ * @param[in,out] thread_context The transmit thread context to send the messages for
  */
 static void transmit_message_test (message_transmit_thread_context *const thread_context)
 {
-    uint32_t message_count;
     api_message_buffer *tx_buffer;
     uint32_t word_index;
     uint32_t num_tx_words;
     uint32_t *tx_words;
 
     clock_gettime (CLOCK_MONOTONIC, &thread_context->results.start_time);
-    for (message_count = 0; message_count < (4 * thread_context->path_def.num_message_buffers); message_count++)
+    while (!stop_transmission)
     {
         tx_buffer = get_send_buffer (thread_context->tx_handle);
         tx_words = (uint32_t *) tx_buffer->data;
-        tx_buffer->header->message_id = TEST_MESSAGE_VERIFY_DATA;
         tx_buffer->header->message_length = thread_context->path_def.max_message_size;
         tx_buffer->header->source_instance = thread_context->test_pattern;
-        num_tx_words = tx_buffer->header->message_length / sizeof (uint32_t);
-        for (word_index = 0; word_index < num_tx_words; word_index++)
+        if (thread_context->verify_data)
         {
-            tx_words[word_index] = thread_context->test_pattern;
-            thread_context->test_pattern++;
+            tx_buffer->header->message_id = TEST_MESSAGE_VERIFY_DATA;
+            num_tx_words = tx_buffer->header->message_length / sizeof (uint32_t);
+            for (word_index = 0; word_index < num_tx_words; word_index++)
+            {
+                tx_words[word_index] = thread_context->test_pattern;
+                thread_context->test_pattern++;
+            }
+        }
+        else
+        {
+            tx_buffer->header->message_id = TEST_MESSAGE_UNVERIFIED_DATA;
         }
         send_message (thread_context->tx_handle, tx_buffer);
+        update_test_results (&thread_context->results, tx_buffer->header);
     }
     await_all_outstanding_messages_freed (thread_context->tx_handle);
     clock_gettime (CLOCK_MONOTONIC, &thread_context->results.stop_time);
@@ -517,6 +581,7 @@ static void *message_transmit_thread (void *const arg)
     thread_context->test_pattern = thread_context->path_def.instance;
     thread_context->results.total_messages = 0;
     thread_context->results.total_data_bytes = 0;
+    thread_context->results.verified_data = false;
     thread_context->tx_handle = message_transmit_create_local (&thread_context->path_def);
     message_transmit_attach_remote (thread_context->tx_handle);
     rc = getrusage (RUSAGE_THREAD, &thread_context->results.start_usage);
@@ -572,8 +637,7 @@ static void receive_message_test (message_receive_thread_context *const thread_c
             {
                 clock_gettime (CLOCK_MONOTONIC, &thread_context->results.start_time);
             }
-            thread_context->results.total_messages++;
-            thread_context->results.total_data_bytes += rx_buffer->header->message_length;
+            update_test_results (&thread_context->results, rx_buffer->header);
             if (rx_buffer->header->message_id == TEST_MESSAGE_VERIFY_DATA)
             {
                 /* Verify that the received message contains the expected test pattern */
@@ -619,6 +683,7 @@ static void *message_receive_thread (void *const arg)
     thread_context->test_pattern = thread_context->path_def.instance;
     thread_context->results.total_messages = 0;
     thread_context->results.total_data_bytes = 0;
+    thread_context->results.verified_data = false;
     thread_context->rx_handle = message_receive_create_local (&thread_context->path_def);
     message_receive_attach_remote (thread_context->rx_handle);
     rc = getrusage (RUSAGE_THREAD, &thread_context->results.start_usage);
@@ -643,7 +708,10 @@ static void create_message_threads (void)
     pthread_attr_t thread_attr;
     int rc;
     uint32_t thread_index;
+    unsigned int num_tx_threads;
 
+    /* Create the threads */
+    num_tx_threads = 0;
     for (thread_index = 0; thread_index < num_threads; thread_index++)
     {
         transmit_or_receive_context *const tx_or_rx = &thread_contexts[thread_index];
@@ -676,12 +744,14 @@ static void create_message_threads (void)
             tx_or_rx->rx_thread_context = NULL;
             tx_or_rx->thread_joined = false;
             tx_or_rx->tx_thread_context->path_def = path_def;
+            tx_or_rx->tx_thread_context->verify_data = arg_verify_data;
             rc = pthread_create (&tx_or_rx->thread_id, &thread_attr, message_transmit_thread, tx_or_rx->tx_thread_context);
             check_assert (rc == 0, "pthread_create");
+            num_tx_threads++;
         }
         else
         {
-            tx_or_rx->tx_thread_context = NULL;;
+            tx_or_rx->tx_thread_context = NULL;
             tx_or_rx->rx_thread_context = cache_line_aligned_calloc (1, sizeof (message_receive_thread_context));
             tx_or_rx->thread_joined = false;
             tx_or_rx->rx_thread_context->path_def = path_def;
@@ -691,6 +761,19 @@ static void create_message_threads (void)
 
         rc = pthread_attr_destroy (&thread_attr);
         check_assert (rc == 0, "pthread_attr_destroy");
+    }
+
+    if (num_tx_threads > 0)
+    {
+        /* Install a signal handler to allow a request to stop transmission */
+        struct sigaction action;
+
+        printf ("Press Ctrl-C to tell the %u transmit thread(s) to stop the test\n", num_tx_threads);
+        memset (&action, 0, sizeof (action));
+        action.sa_handler = stop_transmission_handler;
+        action.sa_flags = SA_RESTART;
+        rc = sigaction (SIGINT, &action, NULL);
+        check_assert (rc == 0, "sigaction");
     }
 }
 
