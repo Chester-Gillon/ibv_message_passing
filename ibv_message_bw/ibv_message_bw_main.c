@@ -19,6 +19,8 @@
 #include <time.h>
 #include <sched.h>
 #include <errno.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #include <infiniband/verbs.h>
 #include <slp.h>
@@ -69,6 +71,23 @@ typedef enum
     TEST_MESSAGE_TEST_COMPLETE
 } test_message_id;
 
+/** Used to build the test results for a message transmit or receive thread */
+typedef struct
+{
+    /** The total number of messages processed */
+    uint64_t total_messages;
+    /** The total number of data bytes in messages processed (excludes the header for each message) */
+    uint64_t total_data_bytes;
+    /** The time the first message was transmitted or received */
+    struct timespec start_time;
+    /** The time the last message was transmitted or received */
+    struct timespec stop_time;
+    /** The resource usage for the thread before start to transmit or receive messages */
+    struct rusage start_usage;
+    /** The resource usage for the thread after have completed the transmission of reception of messages */
+    struct rusage stop_usage;
+} message_test_results;
+
 /** The context for a thread which transmits test messages */
 typedef struct
 {
@@ -78,6 +97,10 @@ typedef struct
     communication_path_definition path_def;
     /** Handle used for transmitting messages */
     tx_message_context_handle tx_handle;
+    /** The results for this thread */
+    message_test_results results;
+    /** The next generated test pattern word in the message data, initialised to the instance number of the communication path */
+    uint32_t test_pattern;
 } message_transmit_thread_context;
 
 /** The context for a thread which receives test messages */
@@ -89,6 +112,10 @@ typedef struct
     communication_path_definition path_def;
     /** Handle used for receiving messages */
     rx_message_context_handle rx_handle;
+    /** The results for this thread */
+    message_test_results results;
+    /** The next expected test pattern word in the message data, initialised to the instance number of the communication path */
+    uint32_t test_pattern;
 } message_receive_thread_context;
 
 /** The command line options for this program, in the format passed to getopt_long().
@@ -285,6 +312,42 @@ static void transmit_message_warmup (message_transmit_thread_context *const thre
 }
 
 /**
+ * @todo Send a fixed number of message as an initial verification of functionality
+ */
+static void transmit_message_test (message_transmit_thread_context *const thread_context)
+{
+    uint32_t message_count;
+    api_message_buffer *tx_buffer;
+    uint32_t word_index;
+    uint32_t num_tx_words;
+    uint32_t *tx_words;
+
+    clock_gettime (CLOCK_MONOTONIC, &thread_context->results.start_time);
+    for (message_count = 0; message_count < (4 * thread_context->path_def.num_message_buffers); message_count++)
+    {
+        tx_buffer = get_send_buffer (thread_context->tx_handle);
+        tx_words = (uint32_t *) tx_buffer->data;
+        tx_buffer->header->message_id = TEST_MESSAGE_VERIFY_DATA;
+        tx_buffer->header->message_length = thread_context->path_def.max_message_size;
+        tx_buffer->header->source_instance = thread_context->test_pattern;
+        num_tx_words = tx_buffer->header->message_length / sizeof (uint32_t);
+        for (word_index = 0; word_index < num_tx_words; word_index++)
+        {
+            tx_words[word_index] = thread_context->test_pattern;
+            thread_context->test_pattern++;
+        }
+        send_message (thread_context->tx_handle, tx_buffer);
+    }
+    await_all_outstanding_messages_freed (thread_context->tx_handle);
+    clock_gettime (CLOCK_MONOTONIC, &thread_context->results.stop_time);
+
+    tx_buffer = get_send_buffer (thread_context->tx_handle);
+    tx_buffer->header->message_id = TEST_MESSAGE_TEST_COMPLETE;
+    tx_buffer->header->message_length = 0;
+    send_message (thread_context->tx_handle, tx_buffer);
+}
+
+/**
  * @details The entry point for a thread which transmits test messages on a communication path.
  *          This transmits messages as quickly as possible until signalled to end the test.
  * @param[in,out] arg The context for the transmit thread.
@@ -295,11 +358,21 @@ static void transmit_message_warmup (message_transmit_thread_context *const thre
 static void *message_transmit_thread (void *const arg)
 {
     message_transmit_thread_context *const thread_context = (message_transmit_thread_context *) arg;
+    int rc;
 
+    thread_context->test_pattern = thread_context->path_def.instance;
+    thread_context->results.total_messages = 0;
+    thread_context->results.total_data_bytes = 0;
     thread_context->tx_handle = message_transmit_create_local (&thread_context->path_def);
     message_transmit_attach_remote (thread_context->tx_handle);
+    rc = getrusage (RUSAGE_THREAD, &thread_context->results.start_usage);
+    check_assert (rc == 0, "getrusage");
     transmit_message_warmup (thread_context);
 
+    transmit_message_test (thread_context);
+
+    rc = getrusage (RUSAGE_THREAD, &thread_context->results.stop_usage);
+    check_assert (rc == 0, "getrusage");
     message_transmit_finalise (thread_context->tx_handle);
 
     return NULL;
@@ -325,6 +398,58 @@ static void receive_message_warmup (message_receive_thread_context *const thread
 }
 
 /**
+ * @brief Perform a message receive test for one thread, exiting when receive the end of message test
+ * @param[in,out] thread_context The receive thread context for perform the test for
+ */
+static void receive_message_test (message_receive_thread_context *const thread_context)
+{
+    bool test_complete;
+
+    test_complete = false;
+    while (!test_complete)
+    {
+        api_message_buffer *const rx_buffer = await_message (thread_context->rx_handle);
+
+        switch (rx_buffer->header->message_id)
+        {
+        case TEST_MESSAGE_UNVERIFIED_DATA:
+        case TEST_MESSAGE_VERIFY_DATA:
+            if (thread_context->results.total_messages == 0)
+            {
+                clock_gettime (CLOCK_MONOTONIC, &thread_context->results.start_time);
+            }
+            thread_context->results.total_messages++;
+            thread_context->results.total_data_bytes += rx_buffer->header->message_length;
+            if (rx_buffer->header->message_id == TEST_MESSAGE_VERIFY_DATA)
+            {
+                /* Verify that the received message contains the expected test pattern */
+                const uint32_t num_rx_words = rx_buffer->header->message_length / sizeof (uint32_t);
+                const uint32_t *const rx_words = (const uint32_t *) rx_buffer->data;
+                uint32_t word_index;
+
+                CHECK_ASSERT (rx_buffer->header->source_instance == thread_context->test_pattern);
+                for (word_index = 0; word_index < num_rx_words; word_index++)
+                {
+                    CHECK_ASSERT (rx_words[word_index] == thread_context->test_pattern);
+                    thread_context->test_pattern++;
+                }
+            }
+            break;
+
+        case TEST_MESSAGE_TEST_COMPLETE:
+            clock_gettime (CLOCK_MONOTONIC, &thread_context->results.stop_time);
+            test_complete = true;
+            break;
+
+        default:
+            check_assert (false, "receive_message_test unknown message");
+            break;
+        }
+        free_message (thread_context->rx_handle, rx_buffer);
+    }
+}
+
+/**
  * @brief The entry point for a thread which receives and frees test messages on a communication path.
  *        This will exit when indicated by the received message type.
  * @param[in,out] arg The context for the receive thread.
@@ -335,10 +460,20 @@ static void receive_message_warmup (message_receive_thread_context *const thread
 static void *message_receive_thread (void *const arg)
 {
     message_receive_thread_context *const thread_context = (message_receive_thread_context *) arg;
+    int rc;
 
+    thread_context->test_pattern = thread_context->path_def.instance;
+    thread_context->results.total_messages = 0;
+    thread_context->results.total_data_bytes = 0;
     thread_context->rx_handle = message_receive_create_local (&thread_context->path_def);
     message_receive_attach_remote (thread_context->rx_handle);
+    rc = getrusage (RUSAGE_THREAD, &thread_context->results.start_usage);
+    check_assert (rc == 0, "getrusage");
     receive_message_warmup (thread_context);
+
+    receive_message_test (thread_context);
+    rc = getrusage (RUSAGE_THREAD, &thread_context->results.stop_usage);
+    check_assert (rc == 0, "getrusage");
 
     message_receive_finalise (thread_context->rx_handle);
 
