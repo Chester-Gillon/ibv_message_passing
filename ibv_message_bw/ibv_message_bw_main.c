@@ -27,19 +27,30 @@
 
 #include "ibv_message_bw_interface.h"
 
-/** Command line arguments which specify which communication path instance this program is the source or destination for.
- *  One and only one of these options should be present. */
-static int arg_rx_instance;
-static bool arg_rx_instance_present = false;
+/** The maximum number of message transmit or receive threads */
+#define MAX_THREADS 16
 
-static int arg_tx_instance;
-static bool arg_tx_instance_present = false;
+/** Delimiter for comma-separated command line arguments */
+#define DELIMITER ","
 
-/** Command line argument which specifies the Infiniband device and port to send or receive messages on */
-static char arg_ib_device[NAME_MAX];
+/** Command line arguments which specifies:
+ *  - The number of threads
+ *  - If each thread transmits or receives messages
+ *  - Which communication path instance each thread transmits or receives on */
+static unsigned int num_threads;
+static bool arg_is_tx_threads[MAX_THREADS];
+static int arg_path_instances[MAX_THREADS];
 
-static uint32_t arg_ib_port;
-static bool arg_ib_port_present = false;
+/** Command line arguments which specify the Infiniband device and port used for each thread */
+static unsigned int num_ib_devices;
+static char *arg_ib_devices[MAX_THREADS];
+
+static unsigned int num_ib_ports;
+static uint32_t arg_ib_ports[MAX_THREADS];
+
+/** Optional command line argument which sets which CPU core each transmit or receive thread has its affinity set to */
+static int num_cores;
+static int arg_cores[MAX_THREADS];
 
 /** Optional command line argument which specifies the maximum message data size which is configured on the communication path */
 #define DEFAULT_MAX_MESSAGE_SIZE_BYTES (1024U * 1024U)
@@ -49,12 +60,11 @@ static uint32_t arg_max_message_size = DEFAULT_MAX_MESSAGE_SIZE_BYTES;
 #define DEFAULT_NUM_MESSAGE_BUFFERS 16U
 static uint32_t arg_num_message_buffers = DEFAULT_NUM_MESSAGE_BUFFERS;
 
-/** Optional command line argument which sets which CPU core the transmit or receive has its affinity set to */
-static int arg_core;
-static bool arg_core_present = false;
-
 /** Optional command line argument which specifies how buffers are allocated for the transmit and receive messages */
 static buffer_allocation_type arg_buffer_allocation_type = BUFFER_ALLOCATION_SHARED_MEMORY;
+
+/** Command line argument which specifies if the data messages have a test pattern which is checked on receipt */
+static int arg_verify_data = false;
 
 /** The different message IDs used in the test */
 typedef enum
@@ -91,8 +101,6 @@ typedef struct
 /** The context for a thread which transmits test messages */
 typedef struct
 {
-    /** The identity of the thread */
-    pthread_t thread_id;
     /** The definition of the communication path for which this thread transmits messages on */
     communication_path_definition path_def;
     /** Handle used for transmitting messages */
@@ -106,8 +114,6 @@ typedef struct
 /** The context for a thread which receives test messages */
 typedef struct
 {
-    /** The identity of the thread */
-    pthread_t thread_id;
     /** The definition of the communication path for which this thread receives messages on */
     communication_path_definition path_def;
     /** Handle used for receiving messages */
@@ -118,18 +124,34 @@ typedef struct
     uint32_t test_pattern;
 } message_receive_thread_context;
 
+/** The context of one thread which is either a message transmit or receive thread */
+typedef struct
+{
+    /** The identity of the thread */
+    pthread_t thread_id;
+    /** One of these will be non-NULL to indicate if this is a transmit or receive thread */
+    message_transmit_thread_context *tx_thread_context;
+    message_receive_thread_context *rx_thread_context;
+    /** Set true when the tx/rx thread has been joined. Used by the main thread to report regular status
+     *  while at least one thread is running. */
+    bool thread_joined;
+} transmit_or_receive_context;
+
+/** The contexts of all message transmit or receive threads which are running in this process */
+static transmit_or_receive_context thread_contexts[MAX_THREADS];
+
 /** The command line options for this program, in the format passed to getopt_long().
  *  Only long arguments are supported */
 static const struct option command_line_options[] =
 {
-    {"rx", required_argument, NULL, 0},
-    {"tx", required_argument, NULL, 0},
+    {"thread", required_argument, NULL, 0},
     {"ib-dev", required_argument, NULL, 0},
     {"ib-port", required_argument, NULL, 0},
+    {"core", required_argument, NULL, 0},
     {"max-msg-size", required_argument, NULL, 0},
     {"num-buffers", required_argument, NULL, 0},
-    {"core", required_argument, NULL, 0},
     {"alloc", required_argument, NULL, 0},
+    {"verify_data", no_argument, &arg_verify_data, true},
     {NULL, 0, NULL, 0}
 };
 
@@ -141,19 +163,173 @@ static void display_usage (void)
     printf ("Usage:\n");
     printf ("  ibv_message_bw <options>   Test sending messages with flow-control\n");
     printf ("\n");
-    printf ("Options:\n");
-    printf ("  --rx=<instance>        Receive messages on the path with numeric <instance>\n");
-    printf ("  --tx=<instance>        Transmit messages on the path with numeric <instance>\n");
-    printf ("  --ib-dev=<dev>         Use IB device <dev>\n");
-    printf ("  --ib-port=<port>       Use <port> of IB device\n");
+    printf ("Options which have one or more comma-separated which allow one or more\n");
+    printf ("message passing threads to be run:\n");
+    printf ("  --thread=rx:<instance>|tx:<instance>\n");
+    printf ("             Receive or transmit messages on the path with numeric <instance>\n");
+    printf ("  --ib-dev=<dev>    Use IB device <dev>\n");
+    printf ("  --ib-port=<port>  Use <port> of IB device\n");
+    printf ("  --core=<core>     Set the affinity of the tx / rx thread to the CPU <core>\n");
+    printf ("\n");
+    printf ("Options which apply to all threads, having a single value:\n");
     printf ("  --max-msg-size=<size>  The maximum message data size configured on the path.\n"
             "                         (default %u)\n", DEFAULT_MAX_MESSAGE_SIZE_BYTES);
     printf ("  --num-buffers=<buffers>  The number of message buffers on the path\n"
             "                           (default %u)\n", DEFAULT_NUM_MESSAGE_BUFFERS);
-    printf ("  --core=<core>     Set the affinity of the tx / rx thread to the CPU <core>\n");
     printf ("  --alloc=heap|shared_mem  How message buffers are allocated\n"
             "                           (default shared_mem)\n");
+    printf ("  --verify_data         If specified the transmitter inserts a test pattern\n");
+    printf ("                        in the message data which is checked by the receiver.\n");
     exit (EXIT_FAILURE);
+}
+
+/**
+ * @brief Process the thread command line argument which is a comma-separated list
+ * @param[in] optdef Option definition
+ */
+static void process_thread_argument (const struct option *const optdef)
+{
+    char junk;
+    char *arg_copy;
+    char *saveptr;
+    char *token;
+    int instance;
+    bool is_tx_thread;
+
+    arg_copy = strdup (optarg);
+    token = strtok_r (arg_copy, DELIMITER, &saveptr);
+    while (token != NULL)
+    {
+        if (sscanf (token, "tx:%d%c", &instance, &junk) == 1)
+        {
+            is_tx_thread = true;
+        }
+        else if (sscanf (token, "rx:%d%c", &instance, &junk) == 1)
+        {
+            is_tx_thread = false;
+        }
+        else
+        {
+            fprintf (stderr, "Invalid %s instance %s\n", optdef->name, token);
+            exit (EXIT_FAILURE);
+        }
+        if (num_threads < MAX_THREADS)
+        {
+            arg_is_tx_threads[num_threads] = is_tx_thread;
+            arg_path_instances[num_threads] = instance;
+            num_threads++;
+        }
+        else
+        {
+            fprintf (stderr, "Too many %s instances\n", optdef->name);
+            exit (EXIT_FAILURE);
+        }
+        token = strtok_r (NULL, DELIMITER, &saveptr);
+    }
+    free (arg_copy);
+}
+
+/**
+ * @brief Process the ib-dev command line argument which is a comma-separated list
+ * @param[in] optdef Option definition
+ */
+static void process_ib_device_argument (const struct option *const optdef)
+{
+    char *arg_copy;
+    char *saveptr;
+    char *token;
+
+    arg_copy = strdup (optarg);
+    token = strtok_r (arg_copy, DELIMITER, &saveptr);
+    while (token != NULL)
+    {
+        if (num_ib_devices < MAX_THREADS)
+        {
+            arg_ib_devices[num_ib_devices] = strdup (token);
+            num_ib_devices++;
+        }
+        else
+        {
+            fprintf (stderr, "Too many %s instances\n", optdef->name);
+            exit (EXIT_FAILURE);
+        }
+        token = strtok_r (NULL, DELIMITER, &saveptr);
+    }
+    free (arg_copy);
+}
+
+/**
+ * @brief Process the ib-port command line argument which is a comma-separated list
+ * @param[in] optdef Option definition
+ */
+static void process_ib_port_argument (const struct option *const optdef)
+{
+    char *arg_copy;
+    char *saveptr;
+    char *token;
+    char junk;
+    uint32_t ib_port;
+
+    arg_copy = strdup (optarg);
+    token = strtok_r (arg_copy, DELIMITER, &saveptr);
+    while (token != NULL)
+    {
+        if ((sscanf (token, "%u%c", &ib_port, &junk) != 1) || (ib_port > 255))
+        {
+            fprintf (stderr, "Invalid %s %s\n", optdef->name, token);
+            exit (EXIT_FAILURE);
+        }
+        if (num_ib_ports < MAX_THREADS)
+        {
+            arg_ib_ports[num_ib_ports] = ib_port;
+            num_ib_ports++;
+        }
+        else
+        {
+            fprintf (stderr, "Too many %s instances\n", optdef->name);
+            exit (EXIT_FAILURE);
+        }
+        token = strtok_r (NULL, DELIMITER, &saveptr);
+    }
+    free (arg_copy);
+}
+
+/**
+ * @brief Process the core command line argument which is a comma-separated list
+ * @param[in] optdef Option definition
+ */
+static void process_core_argument (const struct option *const optdef)
+{
+    const int num_cpus = sysconf (_SC_NPROCESSORS_ONLN);
+    char *arg_copy;
+    char *saveptr;
+    char *token;
+    char junk;
+    int core;
+
+    arg_copy = strdup (optarg);
+    token = strtok_r (arg_copy, DELIMITER, &saveptr);
+    while (token != NULL)
+    {
+        if ((sscanf (token, "%d%c", &core, &junk) != 1) ||
+            (core < 0) || (core > num_cpus))
+        {
+            fprintf (stderr, "Invalid %s %s\n", optdef->name, token);
+            exit (EXIT_FAILURE);
+        }
+        if (num_cores < MAX_THREADS)
+        {
+            arg_cores[num_cores] = core;
+            num_cores++;
+        }
+        else
+        {
+            fprintf (stderr, "Too many %s instances\n", optdef->name);
+            exit (EXIT_FAILURE);
+        }
+        token = strtok_r (NULL, DELIMITER, &saveptr);
+    }
+    free (arg_copy);
 }
 
 /**
@@ -182,36 +358,21 @@ static void parse_command_line_arguments (const int argc, char *argv[])
             {
                 /* Argument just sets a flag */
             }
-            else if (strcmp (optdef->name, "rx") == 0)
+            else if (strcmp (optdef->name, "thread") == 0)
             {
-                if (sscanf (optarg, "%d%c", &arg_rx_instance, &junk) != 1)
-                {
-                    fprintf (stderr, "Invalid %s instance %s\n", optdef->name, optarg);
-                    exit (EXIT_FAILURE);
-                }
-                arg_rx_instance_present = true;
-            }
-            else if (strcmp (optdef->name, "tx") == 0)
-            {
-                if (sscanf (optarg, "%d%c", &arg_tx_instance, &junk) != 1)
-                {
-                    fprintf (stderr, "Invalid %s instance %s\n", optdef->name, optarg);
-                    exit (EXIT_FAILURE);
-                }
-                arg_tx_instance_present = true;
+                process_thread_argument (optdef);
             }
             else if (strcmp (optdef->name, "ib-dev") == 0)
             {
-                strcpy (arg_ib_device, optarg);
+                process_ib_device_argument (optdef);
             }
             else if (strcmp (optdef->name, "ib-port") == 0)
             {
-                if ((sscanf (optarg, "%u%c", &arg_ib_port, &junk) != 1) || (arg_ib_port > 255))
-                {
-                    fprintf (stderr, "Invalid %s %s\n", optdef->name, optarg);
-                    exit (EXIT_FAILURE);
-                }
-                arg_ib_port_present = true;
+                process_ib_port_argument (optdef);
+            }
+            else if (strcmp (optdef->name, "core") == 0)
+            {
+                process_core_argument (optdef);
             }
             else if (strcmp (optdef->name, "max-msg-size") == 0)
             {
@@ -228,18 +389,6 @@ static void parse_command_line_arguments (const int argc, char *argv[])
                     fprintf (stderr, "Invalid %s %s\n", optdef->name, optarg);
                     exit (EXIT_FAILURE);
                 }
-            }
-            else if (strcmp (optdef->name, "core") == 0)
-            {
-                const int num_cpus = sysconf (_SC_NPROCESSORS_ONLN);
-
-                if ((sscanf (optarg, "%d%c", &arg_core, &junk) != 1) ||
-                    (arg_core < 0) || (arg_core > num_cpus))
-                {
-                    fprintf (stderr, "Invalid %s %s\n", optdef->name, optarg);
-                    exit (EXIT_FAILURE);
-                }
-                arg_core_present = true;
             }
             else if (strcmp (optdef->name, "alloc") == 0)
             {
@@ -272,14 +421,19 @@ static void parse_command_line_arguments (const int argc, char *argv[])
         exit (EXIT_FAILURE);
     }
 
-    if (!(arg_tx_instance_present ^ arg_rx_instance_present))
+    if (num_threads == 0)
     {
-        fprintf (stderr, "One and only one of --tx or --rx must be specified\n");
+        fprintf (stderr, "At least one tx or rx thread must be specified\n");
         exit (EXIT_FAILURE);
     }
-    if ((strlen (arg_ib_device) == 0) || !arg_ib_port_present)
+    if ((num_threads != num_ib_devices) || (num_threads != num_ib_ports))
     {
-        fprintf (stderr, "The Infiniband device and port must be specified\n");
+        fprintf (stderr, "The number of ib-dev and ib-port instances must be the same as the number of threads\n");
+        exit (EXIT_FAILURE);
+    }
+    if ((num_cores != 0) && (num_cores != num_threads))
+    {
+        fprintf (stderr, "When the core argument is specified the number of instances must be the same as the number of threads\n");
         exit (EXIT_FAILURE);
     }
     if (arg_num_message_buffers == 0)
@@ -481,123 +635,118 @@ static void *message_receive_thread (void *const arg)
 }
 
 /**
- * @details Sequence performing a message transmit test by:
- *          - Creating a thread to transmit messages on a communication path.
- *          - Waiting for the transmit thread to exit, when the test is complete.
- *            While waiting displays the throughput of the transmitted messages at regular intervals.
- *          - Display the final transmitted message statistics.
- * @param[in] path_def The definition of the communication path to receive messages from
- * @param[in] thread_attr The attributes for the receive thread
+ * @brief Create all the message transmit or receive threads specified by the command line options.
  */
-static void perform_message_transmit_test (const communication_path_definition *const path_def,
-                                           pthread_attr_t *const thread_attr)
+static void create_message_threads (void)
 {
-    message_transmit_thread_context *const thread_context =
-            cache_line_aligned_calloc (1, sizeof (message_transmit_thread_context));
+    communication_path_definition path_def;
+    pthread_attr_t thread_attr;
+    int rc;
+    uint32_t thread_index;
+
+    for (thread_index = 0; thread_index < num_threads; thread_index++)
+    {
+        transmit_or_receive_context *const tx_or_rx = &thread_contexts[thread_index];
+
+        /* Set the path definition which is common to the message transmitter and receiver */
+        path_def.ib_device = arg_ib_devices[thread_index];
+        path_def.port_num = (uint8_t) arg_ib_ports[thread_index];
+        path_def.instance = arg_path_instances[thread_index];
+        path_def.max_message_size = arg_max_message_size;
+        path_def.num_message_buffers = arg_num_message_buffers;
+        path_def.allocation_type = arg_buffer_allocation_type;
+
+        /* Set CPU affinity for the thread which sends or receives messages, if specified as a command line option */
+        rc = pthread_attr_init (&thread_attr);
+        check_assert (rc == 0, "pthread_attr_init");
+        if (num_cores > 0)
+        {
+            cpu_set_t cpuset;
+
+            CPU_ZERO (&cpuset);
+            CPU_SET (arg_cores[thread_index], &cpuset);
+            rc = pthread_attr_setaffinity_np (&thread_attr, sizeof (cpuset), &cpuset);
+            check_assert (rc == 0, "pthread_attr_setaffinty_np");
+        }
+
+        /* Create either transmit or receive thread */
+        if (arg_is_tx_threads[thread_index])
+        {
+            tx_or_rx->tx_thread_context = cache_line_aligned_calloc (1, sizeof (message_transmit_thread_context));
+            tx_or_rx->rx_thread_context = NULL;
+            tx_or_rx->thread_joined = false;
+            tx_or_rx->tx_thread_context->path_def = path_def;
+            rc = pthread_create (&tx_or_rx->thread_id, &thread_attr, message_transmit_thread, tx_or_rx->tx_thread_context);
+            check_assert (rc == 0, "pthread_create");
+        }
+        else
+        {
+            tx_or_rx->tx_thread_context = NULL;;
+            tx_or_rx->rx_thread_context = cache_line_aligned_calloc (1, sizeof (message_receive_thread_context));
+            tx_or_rx->thread_joined = false;
+            tx_or_rx->rx_thread_context->path_def = path_def;
+            rc = pthread_create (&tx_or_rx->thread_id, &thread_attr, message_receive_thread, tx_or_rx->rx_thread_context);
+            check_assert (rc == 0, "pthread_create");
+        }
+
+        rc = pthread_attr_destroy (&thread_attr);
+        check_assert (rc == 0, "pthread_attr_destroy");
+    }
+}
+
+/**
+ * @brief Wait for all the message transmit or receive threads in this process to exit.
+ * @details While waiting display regular progress of the message tests
+ */
+static void wait_for_message_threads_to_exit (void)
+{
+    uint32_t thread_index;
     int rc;
     void *thread_result;
     struct timespec abs_time;
-    bool test_complete;
+    uint32_t num_threads_running;
 
-    /* Start the message transmit thread */
-    thread_context->path_def = *path_def;
-    rc = pthread_create (&thread_context->thread_id, thread_attr, message_transmit_thread, thread_context);
-    check_assert (rc == 0, "pthread_create");
-
-    /* Wait for the transmit thread to exit, reporting throughput at regular intervals */
+    num_threads_running = num_threads;
     clock_gettime (CLOCK_REALTIME, &abs_time);
-    do
+
+    /* While any thread is still running try and join a running thread.
+     * Where the timeout is used to trigger the reporting of progress. */
+    while (num_threads_running > 0)
     {
         abs_time.tv_sec += 2;
-        rc = pthread_timedjoin_np (thread_context->thread_id, &thread_result, &abs_time);
+        thread_index = 0;
+        while ((thread_index < num_threads) && (thread_contexts[thread_index].thread_joined))
+        {
+            thread_index++;
+        }
+        rc = pthread_timedjoin_np (thread_contexts[thread_index].thread_id, &thread_result, &abs_time);
         if (rc == 0)
         {
-            test_complete = true;
+            CHECK_ASSERT ((num_threads_running > 0) && !thread_contexts[thread_index].thread_joined);
+            thread_contexts[thread_index].thread_joined = true;
+            num_threads_running--;
         }
         else if (rc == ETIMEDOUT)
         {
-            test_complete = false;
+            /* @todo report progress */
         }
         else
         {
             check_assert (false, "pthread_timedjoin_np");
         }
-    } while (!test_complete);
-
-    free (thread_context);
-}
-
-/**
- * @details Sequence performing a message receive test by:
- *          - Creating a thread to receive messages on a communication path.
- *          - Waiting for the receive thread to exit, when the test is complete.
- *          - Display the received message statistics.
- * @param[in] path_def The definition of the communication path to receive messages from
- * @param[in] thread_attr The attributes for the receive thread
- */
-static void perform_message_receive_test (const communication_path_definition *const path_def,
-                                          pthread_attr_t *const thread_attr)
-{
-    message_receive_thread_context *const thread_context =
-            cache_line_aligned_calloc (1, sizeof (message_receive_thread_context));
-    int rc;
-    void *thread_result;
-
-    /* Start the message receive thread */
-    thread_context->path_def = *path_def;
-    rc = pthread_create (&thread_context->thread_id, thread_attr, message_receive_thread, thread_context);
-    check_assert (rc == 0, "pthread_create");
-
-    /* Wait for the receive thread to exit */
-    rc = pthread_join (thread_context->thread_id, &thread_result);
-    check_assert (rc == 0, "pthread_join");
-
-    free (thread_context);
+    }
 }
 
 int main (int argc, char *argv[])
 {
-    communication_path_definition path_def;
-    pthread_attr_t thread_attr;
-    int rc;
 
     parse_command_line_arguments (argc, argv);
 
     /* To allow generation of random Packet Sequence numbers */
     srand48 (getpid() * time(NULL));
 
-    /* Set the path definition which is common to the message transmitter and receiver */
-    path_def.ib_device = arg_ib_device;
-    path_def.port_num = (uint8_t) arg_ib_port;
-    path_def.instance = arg_rx_instance_present ? arg_rx_instance : arg_tx_instance;
-    path_def.max_message_size = arg_max_message_size;
-    path_def.num_message_buffers = arg_num_message_buffers;
-    path_def.allocation_type = arg_buffer_allocation_type;
-
-    /* Set CPU affinity for the thread which sends or receives messages, if specified as a command line option */
-    rc = pthread_attr_init (&thread_attr);
-    check_assert (rc == 0, "pthread_attr_init");
-    if (arg_core_present)
-    {
-        cpu_set_t cpuset;
-
-        CPU_ZERO (&cpuset);
-        CPU_SET (arg_core, &cpuset);
-        rc = pthread_attr_setaffinity_np (&thread_attr, sizeof (cpuset), &cpuset);
-        check_assert (rc == 0, "pthread_attr_setaffinty_np");
-    }
-
-    /* Perform the message transmit or receive test, according to the command line options */
-    if (arg_tx_instance_present)
-    {
-        perform_message_transmit_test (&path_def, &thread_attr);
-    }
-    else
-    {
-        perform_message_receive_test (&path_def, &thread_attr);
-    }
-    rc = pthread_attr_destroy (&thread_attr);
-    check_assert (rc == 0, "pthread_attr_destroy");
+    create_message_threads ();
+    wait_for_message_threads_to_exit ();
 
     return EXIT_SUCCESS;
 }
