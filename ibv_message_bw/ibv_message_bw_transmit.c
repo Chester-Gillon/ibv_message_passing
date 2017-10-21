@@ -83,6 +83,8 @@ typedef struct tx_message_context_s
     uint32_t next_transmit_buffer_index;
     /** Used to control only signalling message send completion on one in every path_def.num_message_buffers messages */
     uint32_t message_transmit_cq_pacing;
+    /** true when the message_transmit_cq was consumed while polling for Infiniband errors */
+    bool message_transmit_cq_consumed;
 } tx_message_context;
 
 /**
@@ -263,6 +265,7 @@ static void initialise_transmit_message_buffers (tx_message_context_handle conte
 
     context->next_transmit_buffer_index = 0;
     context->message_transmit_cq_pacing = 0;
+    context->message_transmit_cq_consumed = false;
 }
 
 /**
@@ -372,10 +375,15 @@ void message_transmit_finalise (tx_message_context_handle context)
 
 /**
  * @brief Wait for receiver to indicate a previous message used sent from a buffer has been freed
- * @param[in,out] tx_buffer The message buffer to wait for the previous message to be freed
+ * @param[in,out] context The transmit message context to wait for the previous message to be freed
+ * @param[in,out] buffer_index Which message buffer to wait for the previous message to be freed
  */
-static void await_buffer_freed (tx_message_buffer *const tx_buffer)
+static void await_buffer_freed (tx_message_context_handle context, const uint32_t buffer_index)
 {
+    tx_message_buffer *const tx_buffer = &context->tx_message_buffers[buffer_index];
+    struct ibv_wc wc;
+    int num_completions;
+
     if (tx_buffer->await_buffer_freed)
     {
         bool message_freed = false;
@@ -391,6 +399,28 @@ static void await_buffer_freed (tx_message_buffer *const tx_buffer)
             else
             {
                 CHECK_ASSERT (sampled_sequence_number == tx_buffer->message_not_freed_sequence_number);
+                if (context->path_def.tx_polls_for_errors)
+                {
+                    /* While waiting for the previous message to be freed, checked if an Infiniband error has occurred */
+                    num_completions = ibv_poll_cq (context->message_transmit_cq, 1, &wc);
+                    if (num_completions == 1)
+                    {
+                        if (wc.status == IBV_WC_SUCCESS)
+                        {
+                            context->message_transmit_cq_consumed = true;
+                        }
+                        else
+                        {
+                            fprintf (stderr, "Tx %d failed with Infiniband CQ error %s\n",
+                                    context->path_def.instance, ibv_wc_status_str (wc.status));
+                            exit (EXIT_FAILURE);
+                        }
+                    }
+                    else
+                    {
+                        CHECK_ASSERT (num_completions == 0);
+                    }
+                }
             }
         } while (!message_freed);
         tx_buffer->message_not_freed_sequence_number = tx_buffer->message_freed_sequence_number;
@@ -411,7 +441,7 @@ void await_all_outstanding_messages_freed (tx_message_context_handle context)
 
     for (buffer_index = 0; buffer_index < context->path_def.num_message_buffers; buffer_index++)
     {
-        await_buffer_freed (&context->tx_message_buffers[buffer_index]);
+        await_buffer_freed (context, buffer_index);
     }
 }
 
@@ -428,7 +458,7 @@ api_message_buffer *get_send_buffer (tx_message_context_handle context)
     tx_message_buffer *const tx_buffer = &context->tx_message_buffers[context->next_transmit_buffer_index];
 
     CHECK_ASSERT (!tx_buffer->owned_by_application);
-    await_buffer_freed (tx_buffer);
+    await_buffer_freed (context, context->next_transmit_buffer_index);
 
     /* Mark the buffer as being prepared by the application, and advance to the next sender buffer index */
     tx_buffer->owned_by_application = true;
@@ -461,11 +491,18 @@ void send_message (tx_message_context_handle context, const api_message_buffer *
         struct ibv_wc wc;
         int num_completions;
 
-        do
+        if (context->message_transmit_cq_consumed)
         {
-            num_completions = ibv_poll_cq (context->message_transmit_cq, 1, &wc);
-        } while (num_completions == 0);
-        CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS));
+            context->message_transmit_cq_consumed = false;
+        }
+        else
+        {
+            do
+            {
+                num_completions = ibv_poll_cq (context->message_transmit_cq, 1, &wc);
+            } while (num_completions == 0);
+            CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS));
+        }
         context->message_transmit_cq_pacing = 0;
     }
 

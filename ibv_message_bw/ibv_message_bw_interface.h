@@ -44,6 +44,10 @@ typedef struct
     uint32_t num_message_buffers;
     /** How the transmit or receive buffer is allocated */
     buffer_allocation_type allocation_type;
+    /** When true the transmitter polls for Infiniband errors while waiting to obtain a send buffer.
+     *  When false if the receiver process terminates abnormally the transmitter will just block once all messages buffers
+     *  are in use. */
+    bool tx_polls_for_errors;
 } communication_path_definition;
 
 /** Contains the Infiniband device and port on the local host which is used for transmitting or receiving messages from */
@@ -57,7 +61,7 @@ typedef struct
     struct ibv_device *selected_device;
     /** The opened context for selected_device */
     struct ibv_context *device_context;
-    /** The protection demain for the device_context */
+    /** The protection domain for the device_context */
     struct ibv_pd *device_pd;
     /** The attributes for selected_device */
     struct ibv_device_attr device_attributes;

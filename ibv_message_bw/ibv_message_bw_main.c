@@ -67,6 +67,9 @@ static buffer_allocation_type arg_buffer_allocation_type = BUFFER_ALLOCATION_SHA
 /** Command line argument which specifies if the data messages have a test pattern which is checked on receipt */
 static int arg_verify_data = false;
 
+/** Command line argument which specified if the transmitter polls for Infiniband errors */
+static int arg_tx_error_poll = false;
+
 /** The different message IDs used in the test */
 typedef enum
 {
@@ -175,7 +178,8 @@ static const struct option command_line_options[] =
     {"max-msg-size", required_argument, NULL, 0},
     {"num-buffers", required_argument, NULL, 0},
     {"alloc", required_argument, NULL, 0},
-    {"verify_data", no_argument, &arg_verify_data, true},
+    {"verify-data", no_argument, &arg_verify_data, true},
+    {"tx-error-poll", no_argument, &arg_tx_error_poll, true},
     {NULL, 0, NULL, 0}
 };
 
@@ -195,7 +199,7 @@ static void display_usage (void)
     printf ("Usage:\n");
     printf ("  ibv_message_bw <options>   Test sending messages with flow-control\n");
     printf ("\n");
-    printf ("Options which have one or more comma-separated which allow one or more\n");
+    printf ("Options which have one or more comma-separated values which allow one or more\n");
     printf ("message passing threads to be run:\n");
     printf ("  --thread=rx:<instance>|tx:<instance>\n");
     printf ("             Receive or transmit messages on the path with numeric <instance>\n");
@@ -210,8 +214,10 @@ static void display_usage (void)
             "                           (default %u)\n", DEFAULT_NUM_MESSAGE_BUFFERS);
     printf ("  --alloc=heap|shared_mem  How message buffers are allocated\n"
             "                           (default shared_mem)\n");
-    printf ("  --verify_data         If specified the transmitter inserts a test pattern\n");
+    printf ("  --verify-data         If specified the transmitter inserts a test pattern\n");
     printf ("                        in the message data which is checked by the receiver.\n");
+    printf ("  --tx-error-poll       If specified the transmitter polls for Infiniband\n");
+    printf ("                        errors while waiting to obtain a message buffer.\n");
     exit (EXIT_FAILURE);
 }
 
@@ -740,6 +746,7 @@ static void create_message_threads (void)
         path_def.max_message_size = arg_max_message_size;
         path_def.num_message_buffers = arg_num_message_buffers;
         path_def.allocation_type = arg_buffer_allocation_type;
+        path_def.tx_polls_for_errors = arg_tx_error_poll;
 
         /* Set CPU affinity for the thread which sends or receives messages, if specified as a command line option */
         rc = pthread_attr_init (&thread_attr);
