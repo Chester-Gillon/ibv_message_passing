@@ -71,7 +71,7 @@ typedef struct rx_message_context_s
     rx_message_buffer *rx_message_buffers;
     /** The circular buffer index for the next message message to check for message receipt */
     uint32_t next_receive_buffer_index;
-    /** Used to control only signalling freed sequence number send completion on one in NUM_MESSAGE_BUFFERS messages */
+    /** Used to control only signalling freed sequence number send completion on one in path_def.num_message_buffers messages */
     uint32_t freed_sequence_number_cq_pacing;
 } rx_message_context;
 
@@ -106,12 +106,15 @@ rx_message_context_handle message_receive_create_local (const communication_path
     }
 
     /* Create the queues used by the receiver.
-     * The rationale for the queue sizes are that only one in every NUM_MESSAGE_BUFFERS is signalled for send completion so:
-     * - The completion queue only need one entry.
-     * - The Queue Pair requires twice the number of work-requests than buffers to prevent the work queue from filling up
-     *   as far as ibv_post_send() is concerned. */
+     * The rationale for the queue sizes are that only one in every path_def.num_message_buffers is signalled for send completion so:
+     * a) The completion queue only need one entry in normal operation, but is set to have one entry for each WQE to prevent
+     *    the completion queue from over-running in the event that the work-requests fail with an error
+     *    (e.g. when the transmitting process exits abnormally).
+     * b) The Queue Pair requires twice the number of work-requests than buffers to prevent the work queue from filling up
+     *    as far as ibv_post_send() is concerned. */
     memset (&qp_init_attr, 0, sizeof (qp_init_attr));
-    context->freed_sequence_number_cq = ibv_create_cq (context->endpoint.device_context, 1, NULL, NULL, 0);
+    context->freed_sequence_number_cq = ibv_create_cq (context->endpoint.device_context, context->path_def.num_message_buffers,
+            NULL, NULL, 0);
     if (context->freed_sequence_number_cq == NULL)
     {
         perror ("ibv_create_cq freed_sequence_number_cq failed");

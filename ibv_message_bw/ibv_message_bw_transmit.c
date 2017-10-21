@@ -95,6 +95,7 @@ typedef struct tx_message_context_s
  */
 tx_message_context_handle message_transmit_create_local (const communication_path_definition *const path_def)
 {
+    const uint32_t max_queued_wqes = path_def->num_message_buffers * NUM_WQES_PER_MESSAGE;
     tx_message_context_handle context = cache_line_aligned_calloc (1, sizeof (tx_message_context));
     struct ibv_qp_init_attr qp_init_attr;
     struct ibv_qp_attr qp_attr;
@@ -117,11 +118,13 @@ tx_message_context_handle message_transmit_create_local (const communication_pat
 
     /* Create the queues used by the transmitter.
      * The rationale for the queue sizes are that only one in every path_def.num_message_buffers is signalled for send completion so:
-     * - The completion queue only need one entry.
-     * - The Queue Pair requires twice the number of work-requests than buffers to prevent the work queue from filling up
-     *   as far as ibv_post_send() is concerned. */
+     * a) The completion queue only need one entry in normal operation, but is set to have one entry for each WQE to prevent
+     *    the completion queue from over-running in the event that the work-requests fail with an error
+     *    (e.g. when the receiving process exits abnormally).
+     * b) The Queue Pair requires twice the number of work-requests than buffers to prevent the work queue from filling up
+     *    as far as ibv_post_send() is concerned. */
     memset (&qp_init_attr, 0, sizeof (qp_init_attr));
-    context->message_transmit_cq = ibv_create_cq (context->endpoint.device_context, 1, NULL, NULL, 0);
+    context->message_transmit_cq = ibv_create_cq (context->endpoint.device_context, max_queued_wqes, NULL, NULL, 0);
     if (context->message_transmit_cq == NULL)
     {
         perror ("ibv_create_cq message_transmit_cq failed");
@@ -132,7 +135,7 @@ tx_message_context_handle message_transmit_create_local (const communication_pat
     qp_init_attr.send_cq = context->message_transmit_cq;
     qp_init_attr.recv_cq = context->message_transmit_cq; /* Not used, but need to prevent ibv_create_qp failing */
     qp_init_attr.srq = NULL;
-    qp_init_attr.cap.max_send_wr = 2 * context->path_def.num_message_buffers * NUM_WQES_PER_MESSAGE;
+    qp_init_attr.cap.max_send_wr = 2 * max_queued_wqes;
     qp_init_attr.cap.max_send_sge = 1;
     qp_init_attr.cap.max_recv_wr = 0;
     qp_init_attr.cap.max_recv_sge = 0;
