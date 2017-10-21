@@ -85,6 +85,8 @@ typedef enum
 /** Used to build the test results for a message transmit or receive thread */
 typedef struct
 {
+    /** Set true once the communication path is connected, which means messages should start being exchanged */
+    bool communication_path_connected;
     /** True if the data content of the message was verified during the test */
     bool verified_data;
     /** The total number of messages processed */
@@ -143,6 +145,13 @@ typedef struct
     /** Set true when the tx/rx thread has been joined. Used by the main thread to report regular status
      *  while at least one thread is running. */
     bool thread_joined;
+    /** Used in the main thread to sample the results of the transmit or receive thread,
+     *  for reporting message throughput at regular intervals */
+    message_test_results previous_results;
+    message_test_results current_results;
+    /** The CLOCK_MONOTONIC time at which previous_results and current_results were sampled */
+    struct timespec previous_results_time;
+    struct timespec current_results_time;
 } transmit_or_receive_context;
 
 /** The contexts of all message transmit or receive threads which are running in this process */
@@ -489,6 +498,18 @@ static void transmit_message_warmup (message_transmit_thread_context *const thre
 }
 
 /**
+ * @brief Initialise the test results for a message transmit or receive thread
+ * @param[out] results The test results to initialise
+ */
+static void initialise_test_results (message_test_results *const results)
+{
+    results->total_messages = 0;
+    results->total_data_bytes = 0;
+    results->verified_data = false;
+    results->communication_path_connected = false;
+}
+
+/**
  * @brief Update the message test results using one message which has been transmitted or received
  * @param[in,out] results The test results to update
  * @param[in] header The header of the message to update the results with
@@ -579,13 +600,11 @@ static void *message_transmit_thread (void *const arg)
     int rc;
 
     thread_context->test_pattern = thread_context->path_def.instance;
-    thread_context->results.total_messages = 0;
-    thread_context->results.total_data_bytes = 0;
-    thread_context->results.verified_data = false;
     thread_context->tx_handle = message_transmit_create_local (&thread_context->path_def);
     message_transmit_attach_remote (thread_context->tx_handle);
     rc = getrusage (RUSAGE_THREAD, &thread_context->results.start_usage);
     check_assert (rc == 0, "getrusage");
+    thread_context->results.communication_path_connected = true;
     transmit_message_warmup (thread_context);
 
     transmit_message_test (thread_context);
@@ -681,13 +700,11 @@ static void *message_receive_thread (void *const arg)
     int rc;
 
     thread_context->test_pattern = thread_context->path_def.instance;
-    thread_context->results.total_messages = 0;
-    thread_context->results.total_data_bytes = 0;
-    thread_context->results.verified_data = false;
     thread_context->rx_handle = message_receive_create_local (&thread_context->path_def);
     message_receive_attach_remote (thread_context->rx_handle);
     rc = getrusage (RUSAGE_THREAD, &thread_context->results.start_usage);
     check_assert (rc == 0, "getrusage");
+    thread_context->results.communication_path_connected = true;
     receive_message_warmup (thread_context);
 
     receive_message_test (thread_context);
@@ -745,6 +762,9 @@ static void create_message_threads (void)
             tx_or_rx->thread_joined = false;
             tx_or_rx->tx_thread_context->path_def = path_def;
             tx_or_rx->tx_thread_context->verify_data = arg_verify_data;
+            initialise_test_results (&tx_or_rx->tx_thread_context->results);
+            tx_or_rx->previous_results = tx_or_rx->tx_thread_context->results;
+            clock_gettime (CLOCK_MONOTONIC, &tx_or_rx->current_results_time);
             rc = pthread_create (&tx_or_rx->thread_id, &thread_attr, message_transmit_thread, tx_or_rx->tx_thread_context);
             check_assert (rc == 0, "pthread_create");
             num_tx_threads++;
@@ -755,6 +775,9 @@ static void create_message_threads (void)
             tx_or_rx->rx_thread_context = cache_line_aligned_calloc (1, sizeof (message_receive_thread_context));
             tx_or_rx->thread_joined = false;
             tx_or_rx->rx_thread_context->path_def = path_def;
+            initialise_test_results (&tx_or_rx->rx_thread_context->results);
+            tx_or_rx->previous_results = tx_or_rx->rx_thread_context->results;
+            clock_gettime (CLOCK_MONOTONIC, &tx_or_rx->current_results_time);
             rc = pthread_create (&tx_or_rx->thread_id, &thread_attr, message_receive_thread, tx_or_rx->rx_thread_context);
             check_assert (rc == 0, "pthread_create");
         }
@@ -778,11 +801,70 @@ static void create_message_threads (void)
 }
 
 /**
+ * @brief Return the elapsed time in nanoseconds between two time stamps
+ * @param[in] start_time The start time for the elapsed duration
+ * @param[in] end_time The end time for the elapsed duration
+ * @return Returns the elapsed time in nanoseconds
+ */
+static uint64_t get_elapsed_ns (const struct timespec *const start_time, const struct timespec *const end_time)
+{
+    const uint64_t nsecs_per_sec = 1000000000;
+    const uint64_t start_time_ns = (start_time->tv_sec * nsecs_per_sec) + start_time->tv_nsec;
+    const uint64_t end_time_ns = (end_time->tv_sec * nsecs_per_sec) + end_time->tv_nsec;
+
+    return end_time_ns - start_time_ns;
+}
+
+/**
+ * @brief Report the progress for one message transmit or receive thread during a test
+ * @param[in] thread_index Which thread to report the progress for
+ */
+static void report_message_thread_regular_progress (const uint32_t thread_index)
+{
+    transmit_or_receive_context *const tx_or_rx = &thread_contexts[thread_index];
+    const char *const direction = arg_is_tx_threads[thread_index] ? "Tx" : "Rx";
+
+    /* Sample the current results */
+    tx_or_rx->previous_results = tx_or_rx->current_results;
+    tx_or_rx->previous_results_time = tx_or_rx->current_results_time;
+    if (arg_is_tx_threads[thread_index])
+    {
+        tx_or_rx->current_results = tx_or_rx->tx_thread_context->results;
+    }
+    else
+    {
+        tx_or_rx->current_results = tx_or_rx->rx_thread_context->results;
+    }
+    clock_gettime (CLOCK_MONOTONIC, &tx_or_rx->current_results_time);
+
+    /* Report the results */
+    if (tx_or_rx->current_results.communication_path_connected && !tx_or_rx->previous_results.communication_path_connected)
+    {
+        printf ("%s %d connected\n", direction, arg_path_instances[thread_index]);
+    }
+
+    if (tx_or_rx->current_results.total_messages > 0)
+    {
+        const double report_interval_secs =
+                get_elapsed_ns (&tx_or_rx->previous_results_time, &tx_or_rx->current_results_time) / 1E9;
+
+        printf ("%s %d %s %lu data bytes in %lu messages over last %.1f seconds\n",
+                direction, arg_path_instances[thread_index],
+                arg_is_tx_threads[thread_index] ? "transmitted" : "received",
+                        tx_or_rx->current_results.total_data_bytes - tx_or_rx->previous_results.total_data_bytes,
+                tx_or_rx->current_results.total_messages - tx_or_rx->previous_results.total_messages,
+                report_interval_secs);
+    }
+}
+
+/**
  * @brief Wait for all the message transmit or receive threads in this process to exit.
  * @details While waiting display regular progress of the message tests
+ * @todo Since CLOCK_REALTIME is used as the time source for reporting regular progress
  */
 static void wait_for_message_threads_to_exit (void)
 {
+    const int report_interval_seconds = 10;
     uint32_t thread_index;
     int rc;
     void *thread_result;
@@ -796,7 +878,6 @@ static void wait_for_message_threads_to_exit (void)
      * Where the timeout is used to trigger the reporting of progress. */
     while (num_threads_running > 0)
     {
-        abs_time.tv_sec += 2;
         thread_index = 0;
         while ((thread_index < num_threads) && (thread_contexts[thread_index].thread_joined))
         {
@@ -811,7 +892,12 @@ static void wait_for_message_threads_to_exit (void)
         }
         else if (rc == ETIMEDOUT)
         {
-            /* @todo report progress */
+            /* Report progress for each thread */
+            for (thread_index = 0; thread_index < num_threads; thread_index++)
+            {
+                report_message_thread_regular_progress (thread_index);
+            }
+            abs_time.tv_sec += report_interval_seconds;
         }
         else
         {
