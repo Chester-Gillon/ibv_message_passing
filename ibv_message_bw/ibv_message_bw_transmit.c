@@ -452,19 +452,6 @@ void send_message (tx_message_context_handle context, const api_message_buffer *
                   (api_buffer->header->message_length <= context->path_def.max_message_size));
     tx_buffer->owned_by_application = false;
 
-    /* Complete the message to be sent */
-    api_buffer->header->sequence_number = tx_buffer->next_transmit_sequence_number;
-    tx_buffer->transmit_sges[MESSAGE_DATA_WQE_INDEX].length = api_buffer->header->message_length;
-    if (context->message_transmit_cq_pacing == 0)
-    {
-        tx_buffer->transmit_wrs[MESSAGE_HEADER_WQE_INDEX].send_flags |= IBV_SEND_SIGNALED;
-    }
-    else
-    {
-        tx_buffer->transmit_wrs[MESSAGE_HEADER_WQE_INDEX].send_flags &= ~IBV_SEND_SIGNALED;
-    }
-    context->message_transmit_cq_pacing++;
-
     /* Wait for the message send work request completion, which is signalled on one message in every num_message_buffers */
     if (context->message_transmit_cq_pacing == context->path_def.num_message_buffers)
     {
@@ -478,6 +465,19 @@ void send_message (tx_message_context_handle context, const api_message_buffer *
         CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS));
         context->message_transmit_cq_pacing = 0;
     }
+
+    /* Complete the message to be sent */
+    api_buffer->header->sequence_number = tx_buffer->next_transmit_sequence_number;
+    tx_buffer->transmit_sges[MESSAGE_DATA_WQE_INDEX].length = api_buffer->header->message_length;
+    if (context->message_transmit_cq_pacing == 0)
+    {
+        tx_buffer->transmit_wrs[MESSAGE_HEADER_WQE_INDEX].send_flags |= IBV_SEND_SIGNALED;
+    }
+    else
+    {
+        tx_buffer->transmit_wrs[MESSAGE_HEADER_WQE_INDEX].send_flags &= ~IBV_SEND_SIGNALED;
+    }
+    context->message_transmit_cq_pacing++;
 
     if (tx_buffer->transmit_wrs[MESSAGE_DATA_WQE_INDEX].sg_list->length > 0)
     {
