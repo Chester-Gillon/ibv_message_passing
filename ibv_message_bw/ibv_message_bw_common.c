@@ -233,6 +233,7 @@ void intialise_slp_connection (communication_path_slp_connection *const slp_conn
     sprintf (slp_connection->local_service_url, "%s://%s/name=%s_%d",
              SLP_SERVICE_NAME, hostname, local_end, path_def->instance);
     sprintf (slp_connection->remote_service_name, "/name=%s_%d", remote_end, path_def->instance);
+    strcpy (slp_connection->remote_service_url, "");
 
     slp_status = SLPOpen (NULL, SLP_FALSE, &slp_connection->handle);
     check_assert (slp_status == SLP_OK, "SLPOpen");
@@ -250,6 +251,26 @@ static void slp_reg_callback (const SLPHandle handle, const SLPError error_code,
 }
 
 /**
+ * @brief Publish a local memory buffer with SLP, to allow the attributes to be retrieved by the remote endpoint
+ * @param[in] slp_connection The SLP connection to use for the registration, and the local memory buffer attributes
+ */
+static void publish_memory_buffer_with_slp (const communication_path_slp_connection *const slp_connection)
+{
+    char attributes_text[SLP_ATTRIBUTES_MAX_LEN];
+    SLPError slp_status;
+    SLPError registration_status;
+
+    sprintf (attributes_text, "(size=%lu,rkey=%u,addr=0x%lx,lid=%u,psn=%u,qp_num=%u,qp_rtr=%d)",
+             slp_connection->local_attributes.size, slp_connection->local_attributes.rkey, slp_connection->local_attributes.addr,
+             slp_connection->local_attributes.lid, slp_connection->local_attributes.psn, slp_connection->local_attributes.qp_num,
+             slp_connection->local_attributes.qp_ready_to_receive);
+    slp_status = SLPReg (slp_connection->handle, slp_connection->local_service_url, SLP_LIFETIME_MAXIMUM, NULL, attributes_text,
+            SLP_TRUE, slp_reg_callback, &registration_status);
+    check_assert (slp_status == SLP_OK, "SLPReg");
+    check_assert (registration_status == SLP_OK, "registration_status");
+}
+
+/**
  * @brief Register a memory for transmitting or receiving message with SLP, with attributes which allow the remote end to attach
  * @param[in,out] slp_connection The SLP connection to use for the service URL registration
  * @param[in] endpoint The Infiniband port for the local endpoint, used to publish the LID
@@ -261,16 +282,25 @@ void register_memory_buffer_with_slp (communication_path_slp_connection *const s
                                       const ib_port_endpoint *const endpoint, const uint32_t psn,
                                       const struct ibv_mr *const mr, const struct ibv_qp *const qp)
 {
-    char attributes_text[SLP_ATTRIBUTES_MAX_LEN];
-    SLPError slp_status;
-    SLPError registration_status;
+    slp_connection->local_attributes.size = mr->length;
+    slp_connection->local_attributes.rkey = mr->rkey;
+    slp_connection->local_attributes.addr = (uintptr_t) mr->addr;
+    slp_connection->local_attributes.lid = endpoint->port_attributes.lid;
+    slp_connection->local_attributes.psn = psn;
+    slp_connection->local_attributes.qp_num = qp->qp_num;
+    slp_connection->local_attributes.qp_ready_to_receive = false;
+    publish_memory_buffer_with_slp (slp_connection);
+}
 
-    sprintf (attributes_text, "(size=%lu,rkey=%u,addr=%p,lid=%u,psn=%u,qp_num=%u)",
-             mr->length, mr->rkey, mr->addr, endpoint->port_attributes.lid, psn, qp->qp_num);
-    slp_status = SLPReg (slp_connection->handle, slp_connection->local_service_url, SLP_LIFETIME_MAXIMUM, NULL, attributes_text,
-            SLP_TRUE, slp_reg_callback, &registration_status);
-    check_assert (slp_status == SLP_OK, "SLPReg");
-    check_assert (registration_status == SLP_OK, "registration_status");
+/**
+ * @details Called after the Queue-Pair for a local memory buffer is ready-to-receive, to publish an update to the SLP attributes
+ *          for the memory buffer.
+ * @param[in,out] The SLP connection to use for the registration, and the local memory buffer attributes
+ */
+void report_local_memory_buffer_rtr_with_slp (communication_path_slp_connection *const slp_connection)
+{
+    slp_connection->local_attributes.qp_ready_to_receive = true;
+    publish_memory_buffer_with_slp (slp_connection);
 }
 
 /**
@@ -321,12 +351,13 @@ static SLPBoolean slp_service_attributes_callback (const SLPHandle handle, const
 
     if ((error_code == SLP_OK) && (!slp_connection->remote_attributes_obtained))
     {
-        const int num_items = sscanf (attributes, "(size=%lu,rkey=%u,addr=0x%lx,lid=%hu,psn=%u,qp_num=%u)",
+        const int num_items = sscanf (attributes, "(size=%lu,rkey=%u,addr=0x%lx,lid=%hu,psn=%u,qp_num=%u,qp_rtr=%d)",
                 &slp_connection->remote_attributes.size, &slp_connection->remote_attributes.rkey,
                 &slp_connection->remote_attributes.addr, &slp_connection->remote_attributes.lid,
-                &slp_connection->remote_attributes.psn, &slp_connection->remote_attributes.qp_num);
+                &slp_connection->remote_attributes.psn, &slp_connection->remote_attributes.qp_num,
+                &slp_connection->remote_attributes.qp_ready_to_receive);
 
-        slp_connection->remote_attributes_obtained = num_items == 6;
+        slp_connection->remote_attributes_obtained = num_items == 7;
     }
 
     /* Only request further data if haven't extracted the required attributes */
@@ -334,28 +365,101 @@ static SLPBoolean slp_service_attributes_callback (const SLPHandle handle, const
 }
 
 /**
- * @brief Use SLP to retrieve the attributes of the remote memory buffer.
- * @details This is required to connect the Queue-Pairs between the local and remote ends of a communication path
- * @param[in,out] slp_connection The connection to retieve the remote attributes for
+ * @details Called after a SLP operation has failed to obtain the required remote memory buffer attributes,
+ *          to insert a hold off delay to avoid flooding the SLP daemon with requests
+ * @param[in] start_time CLOCK_MONOTONIC start time for the SLP operation, used to set the time to delay to
  */
-void get_remote_memory_buffer_from_slp (communication_path_slp_connection *const slp_connection)
+static void slp_retry_holdoff (const struct timespec *const start_time)
+{
+    const uint64_t nsecs_per_sec = 1000000000;
+    const uint64_t holdoff_delay_ns = 100000000; /* 100 milliseconds */
+    struct timespec holdoff_time;
+    int rc;
+
+    holdoff_time = *start_time;
+    holdoff_time.tv_nsec += holdoff_delay_ns;
+    if (holdoff_time.tv_nsec >= nsecs_per_sec)
+    {
+        holdoff_time.tv_sec++;
+        holdoff_time.tv_nsec -= nsecs_per_sec;
+    }
+    rc = clock_nanosleep (CLOCK_MONOTONIC, TIMER_ABSTIME, &holdoff_time, NULL);
+    check_assert (rc == 0, "clock_nanosleep");
+}
+
+/**
+ * @brief Retrive the attributes for a remote memory buffer using SLP
+ * @param[in,out] slp_connection The connection to retrieve the remote attributes for
+ */
+static void get_remote_buffer_attributes_from_slp (communication_path_slp_connection *const slp_connection)
 {
     SLPError slp_status;
 
+    slp_connection->remote_attributes_obtained = false;
     while (!slp_connection->remote_attributes_obtained)
     {
-        /* Attempt to find the service URL for the remote memory buffer */
-        strcpy (slp_connection->remote_service_url, "");
-        slp_status = SLPFindSrvs (slp_connection->handle, SLP_SERVICE_NAME, NULL, NULL,
-                slp_service_url_callback, slp_connection);
-        check_assert (slp_status == SLP_OK, "SLPFindSrvs");
+        if (strlen (slp_connection->remote_service_url) == 0)
+        {
+            /* Attempt to find the service URL for the remote memory buffer */
+            slp_status = SLPFindSrvs (slp_connection->handle, SLP_SERVICE_NAME, NULL, NULL,
+                    slp_service_url_callback, slp_connection);
+            check_assert (slp_status == SLP_OK, "SLPFindSrvs");
+        }
 
         if (strlen (slp_connection->remote_service_url) > 0)
         {
             /* The service URL is available, so attempt to retrieve the attributes */
+            slp_connection->remote_attributes_obtained = false;
             slp_status = SLPFindAttrs (slp_connection->handle, slp_connection->remote_service_url, "", "",
                     slp_service_attributes_callback, slp_connection);
             check_assert (slp_status == SLP_OK, "SLPFindAttrs");
+        }
+    }
+}
+
+/**
+ * @brief Use SLP to retrieve the attributes of the remote memory buffer.
+ * @details This is required to connect the Queue-Pairs between the local and remote ends of a communication path.
+ *          Depending upon timing, this may sample the attributes before or after the remote memory buffer
+ *          has transitioned to ready-to-receive
+ * @param[in,out] slp_connection The connection to retrieve the remote attributes for
+ */
+void get_remote_memory_buffer_from_slp (communication_path_slp_connection *const slp_connection)
+{
+    struct timespec start_time;
+
+    do
+    {
+        clock_gettime (CLOCK_MONOTONIC, &start_time);
+        get_remote_buffer_attributes_from_slp (slp_connection);
+        if (!slp_connection->remote_attributes_obtained)
+        {
+            slp_retry_holdoff (&start_time);
+        }
+    } while (!slp_connection->remote_attributes_obtained);
+}
+
+/**
+ * @brief Use SLP to wait for the attributes of the remote memory buffer to indicate is ready-to-receive
+ * @details When this function returns the Queue-Pair for the remote memory buffer is in a state to accept
+ *          Infiniband writes.
+ *
+ *          Depending upon timing, the previous call to get_remote_memory_buffer_from_slp() may have already
+ *          sampled the attributes of the remote memory buffer as ready-to-receive, in which case this function
+ *          doesn't perform any SLP operations.
+ * @param[in,out] slp_connection The connection to wait for the remote memory buffer to be ready-to-receive
+ */
+void await_remote_memory_buffer_rtr_from_slp (communication_path_slp_connection *const slp_connection)
+{
+    struct timespec start_time;
+
+    while (!slp_connection->remote_attributes.qp_ready_to_receive)
+    {
+        clock_gettime (CLOCK_MONOTONIC, &start_time);
+        get_remote_buffer_attributes_from_slp (slp_connection);
+        if (!slp_connection->remote_attributes.qp_ready_to_receive)
+        {
+            slp_retry_holdoff (&start_time);
         }
     }
 }

@@ -69,7 +69,7 @@ typedef struct
     struct ibv_port_attr port_attributes;
 } ib_port_endpoint;
 
-/** The attributes of a remote memory buffer which are retrieved by SLP, and used to establish an Infiniband connection */
+/** The attributes of a memory buffer which are exchanged by SLP, and used to establish an Infiniband connection */
 typedef struct
 {
     /** The size of the memory buffer in bytes */
@@ -84,7 +84,9 @@ typedef struct
     uint32_t psn;
     /** The Queue Pair number for the memory buffer */
     uint32_t qp_num;
-} remote_memory_buffer_attributes;
+    /** true once the Queue Pair is ready to receive */
+    int qp_ready_to_receive;
+} memory_buffer_attributes;
 
 /** Contains the context to use SLP to publish the local Queue Pair information for a communication path, and then obtain
  *  the remote Queue Pair information.
@@ -106,8 +108,10 @@ typedef struct
     char remote_service_url[SLP_SERVICE_URL_MAX_LEN];
     /** Set once have retrieved the remote_attributes */
     bool remote_attributes_obtained;
+    /** The attributes published for the local memory buffer */
+    memory_buffer_attributes local_attributes;
     /** The attributes retrieved for the remote memory buffer */
-    remote_memory_buffer_attributes remote_attributes;
+    memory_buffer_attributes remote_attributes;
 } communication_path_slp_connection;
 
 /** Contains a memory buffer which is used for transmitting or receiving messages from the Infiniband device */
@@ -171,7 +175,9 @@ void intialise_slp_connection (communication_path_slp_connection *const slp_conn
 void register_memory_buffer_with_slp (communication_path_slp_connection *const slp_connection,
                                       const ib_port_endpoint *const endpoint, const uint32_t psn,
                                       const struct ibv_mr *const mr, const struct ibv_qp *const qp);
+void report_local_memory_buffer_rtr_with_slp (communication_path_slp_connection *const slp_connection);
 void get_remote_memory_buffer_from_slp (communication_path_slp_connection *const slp_connection);
+void await_remote_memory_buffer_rtr_from_slp (communication_path_slp_connection *const slp_connection);
 void close_slp_connection (communication_path_slp_connection *const slp_connection);
 size_t align_to_cache_line_size (const size_t size);
 void create_memory_buffer (memory_buffer *const buffer, const bool is_tx_end,

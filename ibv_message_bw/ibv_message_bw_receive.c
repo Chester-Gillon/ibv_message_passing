@@ -276,6 +276,10 @@ void message_receive_attach_remote (rx_message_context_handle context)
     }
     verify_qp_state (IBV_QPS_RTR, context->freed_sequence_number_qp, "freed_sequence_number_qp");
 
+    /* Handshake that the memory buffers are ready-to-receive before any transmission can occur */
+    report_local_memory_buffer_rtr_with_slp (&context->slp_connection);
+    await_remote_memory_buffer_rtr_from_slp (&context->slp_connection);
+
     /* Transition the sender Queue Pair to the Ready to Send state */
     memset (&qp_attr, 0, sizeof (qp_attr));
     qp_attr.qp_state = IBV_QPS_RTS;
