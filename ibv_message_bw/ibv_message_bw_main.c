@@ -847,7 +847,7 @@ static void report_message_thread_regular_progress (const uint32_t thread_index)
     /* Report the results */
     if (tx_or_rx->current_results.communication_path_connected && !tx_or_rx->previous_results.communication_path_connected)
     {
-        printf ("%s %d connected\n", direction, arg_path_instances[thread_index]);
+        printf ("%s_%d connected\n", direction, arg_path_instances[thread_index]);
     }
 
     if (tx_or_rx->current_results.total_messages > 0)
@@ -855,7 +855,7 @@ static void report_message_thread_regular_progress (const uint32_t thread_index)
         const double report_interval_secs =
                 get_elapsed_ns (&tx_or_rx->previous_results_time, &tx_or_rx->current_results_time) / 1E9;
 
-        printf ("%s %d %s %lu data bytes in %lu messages over last %.1f seconds\n",
+        printf ("%s_%d %s %lu data bytes in %lu messages over last %.1f seconds\n",
                 direction, arg_path_instances[thread_index],
                 arg_is_tx_threads[thread_index] ? "transmitted" : "received",
                         tx_or_rx->current_results.total_data_bytes - tx_or_rx->previous_results.total_data_bytes,
@@ -913,8 +913,73 @@ static void wait_for_message_threads_to_exit (void)
     }
 }
 
+/**
+ * @brief Calculate the rusage utilisation in seconds between a start and stop time measured by getrusage()
+ * @param[in] start_time The start time for the measurement
+ * @param[in] stop_time The stop time for the measurement
+ * @return Returns the difference between start_time and stop_time in floating point seconds
+ */
+static double rusage_utilisation_secs (const struct timeval *const start_time, const struct timeval *const stop_time)
+{
+    const uint64_t us_per_sec = 1000000;
+    const uint64_t start_time_us = (start_time->tv_sec * us_per_sec) + start_time->tv_usec;
+    const uint64_t stop_time_us = (stop_time->tv_sec * us_per_sec) + stop_time->tv_usec;
+
+    return (double) (stop_time_us - start_time_us) / 1E6;
+}
+
+/**
+ * @details Display the final results for one message transmit of receive thread which is:
+ *          - The total number of messages and data bytes
+ *          - The Linux usage measurements
+ * @param[in] thread_index Which thread to display the results for
+ */
+static void display_message_thread_final_results (const uint32_t thread_index)
+{
+    transmit_or_receive_context *const tx_or_rx = &thread_contexts[thread_index];
+    const char *const direction = arg_is_tx_threads[thread_index] ? "Tx" : "Rx";
+    const message_test_results *const results = arg_is_tx_threads[thread_index] ?
+            &tx_or_rx->tx_thread_context->results : &tx_or_rx->rx_thread_context->results;
+    const double test_duration_secs = (double) get_elapsed_ns (&results->start_time, &results->stop_time) / 1E9;
+
+    printf ("\n");
+    printf ("%s_%d Total data bytes %lu over %.6f seconds; %.1f Mbytes/second\n",
+            direction, arg_path_instances[thread_index],
+            results->total_data_bytes, test_duration_secs,
+            ((double) results->total_data_bytes / test_duration_secs) / 1E6);
+    printf ("%s_%d Total messages %lu over %.6f seconds; %.0f messages/second\n",
+            direction, arg_path_instances[thread_index],
+            results->total_messages, test_duration_secs,
+            (double) results->total_messages / test_duration_secs);
+    printf ("%s_%d Min message size=%u max message size=%u data verification=%s\n",
+            direction, arg_path_instances[thread_index],
+            results->min_message_length_seen, results->max_message_length_seen,
+            results->verified_data ? "yes" : "no");
+    printf ("%s_%d minor page faults=%ld (%ld -> %ld)\n",
+            direction, arg_path_instances[thread_index],
+            results->stop_usage.ru_minflt - results->start_usage.ru_minflt,
+            results->start_usage.ru_minflt, results->stop_usage.ru_minflt);
+    printf ("%s_%d major page faults=%ld (%ld -> %ld)\n",
+            direction, arg_path_instances[thread_index],
+            results->stop_usage.ru_majflt - results->start_usage.ru_majflt,
+            results->start_usage.ru_majflt, results->stop_usage.ru_majflt);
+    printf ("%s_%d voluntary context switches=%ld (%ld -> %ld)\n",
+            direction, arg_path_instances[thread_index],
+            results->stop_usage.ru_nvcsw - results->start_usage.ru_nvcsw,
+            results->start_usage.ru_nvcsw, results->stop_usage.ru_nvcsw);
+    printf ("%s_%d involuntary context switches=%ld (%ld -> %ld)\n",
+            direction, arg_path_instances[thread_index],
+            results->stop_usage.ru_nivcsw - results->start_usage.ru_nivcsw,
+            results->start_usage.ru_nivcsw, results->stop_usage.ru_nivcsw);
+    printf ("%s_%d user time=%.6f system time=%.6f\n",
+            direction, arg_path_instances[thread_index],
+            rusage_utilisation_secs (&results->start_usage.ru_utime, &results->stop_usage.ru_utime),
+            rusage_utilisation_secs (&results->start_usage.ru_stime, &results->stop_usage.ru_stime));
+}
+
 int main (int argc, char *argv[])
 {
+    uint32_t thread_index;
 
     parse_command_line_arguments (argc, argv);
 
@@ -923,6 +988,10 @@ int main (int argc, char *argv[])
 
     create_message_threads ();
     wait_for_message_threads_to_exit ();
+    for (thread_index = 0; thread_index < num_threads; thread_index++)
+    {
+        display_message_thread_final_results (thread_index);
+    }
 
     return EXIT_SUCCESS;
 }
