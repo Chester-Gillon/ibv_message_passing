@@ -73,6 +73,11 @@ static int arg_tx_error_poll = false;
 /** Command line argument which controls if the transmitter checks the memory buffer size on the receiver matches */
 static int arg_tx_checks_memory_buffer_size = true;
 
+/** Optional command line argument which specifies the min and max message sizes sent */
+static uint32_t arg_min_msg_size_sent;
+static uint32_t arg_max_msg_size_sent;
+static bool arg_min_max_msg_sizes_present = false;
+
 /** The different message IDs used in the test */
 typedef enum
 {
@@ -112,9 +117,21 @@ typedef struct
     struct rusage stop_usage;
 } message_test_results;
 
+/** Controls the mode for a thread which transmit test messages */
+typedef enum
+{
+    /** Transmit messages of the maximum message data size configured on the communication path until
+     *  requested to stop by the user. */
+    CONTINUOS_MAX_MESSAGE_SIZE_SEND,
+    /** Transmit messages with a pseudo random data size until requested to stop by the user. */
+    CONTINUOS_VARIABLE_SIZE_SEND
+} message_transmit_mode;
+
 /** The context for a thread which transmits test messages */
 typedef struct
 {
+    /** Controls how the thread transmits messages */
+    message_transmit_mode transmit_mode;
     /** The definition of the communication path for which this thread transmits messages on */
     communication_path_definition path_def;
     /** Handle used for transmitting messages */
@@ -125,6 +142,9 @@ typedef struct
     uint32_t test_pattern;
     /** If true this threads inserts a test pattern in the transmitted message data, which the receiver will check */
     bool verify_data;
+    /** For CONTINUOS_VARIABLE_SIZE_SEND the data length of each message is a pseudo-random value between these limits */
+    uint32_t min_message_send_size;
+    uint32_t max_message_send_size;
 } message_transmit_thread_context;
 
 /** The context for a thread which receives test messages */
@@ -184,6 +204,7 @@ static const struct option command_line_options[] =
     {"verify-data", no_argument, &arg_verify_data, true},
     {"tx-error-poll", no_argument, &arg_tx_error_poll, true},
     {"no-mb-size-check", no_argument, &arg_tx_checks_memory_buffer_size, false},
+    {"msg-sizes", required_argument, NULL, 0},
     {NULL, 0, NULL, 0}
 };
 
@@ -224,6 +245,9 @@ static void display_usage (void)
     printf ("                        errors while waiting to obtain a message buffer.\n");
     printf ("  --no-mb-size-check    Disable the check that the message transmitter and\n");
     printf ("                        receiver have the same memory buffer size.\n");
+    printf ("  --msg-sizes=<min>,<max>  Send messages with a pseudo-random data size between\n");
+    printf ("                           <min> and <max>. Default is all messages sent are the\n");
+    printf ("                           maximum message data size configured on the path.\n");
     exit (EXIT_FAILURE);
 }
 
@@ -377,6 +401,61 @@ static void process_core_argument (const struct option *const optdef)
 }
 
 /**
+ * @brief Process the msg-sizes command line argument which is a comma-separated list
+ * @param[in] optdef Option definition
+ */
+static void process_msg_sizes_argument (const struct option *const optdef)
+{
+    char *arg_copy;
+    char *saveptr;
+    char *token;
+    char junk;
+    uint32_t size;
+    int size_index;
+
+    size_index = 0;
+    arg_copy = strdup (optarg);
+    token = strtok_r (arg_copy, DELIMITER, &saveptr);
+    while (token != NULL)
+    {
+        if (sscanf (token, "%u%c", &size, &junk) != 1)
+        {
+            fprintf (stderr, "Invalid %s %s\n", optdef->name, token);
+            exit (EXIT_FAILURE);
+        }
+        else if (size_index == 0)
+        {
+            arg_min_msg_size_sent = size;
+            size_index++;
+        }
+        else if (size_index == 1)
+        {
+            arg_max_msg_size_sent = size;
+            arg_min_max_msg_sizes_present = true;
+            size_index++;
+        }
+        else
+        {
+            fprintf (stderr, "%s must contain a min and max message size\n", optdef->name);
+            exit (EXIT_FAILURE);
+        }
+        token = strtok_r (NULL, DELIMITER, &saveptr);
+    }
+    free (arg_copy);
+
+    if (!arg_min_max_msg_sizes_present)
+    {
+        fprintf (stderr, "%s must contain a min and max message size\n", optdef->name);
+        exit (EXIT_FAILURE);
+    }
+    if (arg_min_msg_size_sent > arg_max_msg_size_sent)
+    {
+        fprintf (stderr, "Min message size sent must be <= max message size sent\n");
+        exit (EXIT_FAILURE);
+    }
+}
+
+/**
  * @brief Parse command line arguments, storing the result in global variables
  * @details Aborts the program if invalid arguments
  */
@@ -417,6 +496,10 @@ static void parse_command_line_arguments (const int argc, char *argv[])
             else if (strcmp (optdef->name, "core") == 0)
             {
                 process_core_argument (optdef);
+            }
+            else if (strcmp (optdef->name, "msg-sizes") == 0)
+            {
+                process_msg_sizes_argument (optdef);
             }
             else if (strcmp (optdef->name, "max-msg-size") == 0)
             {
@@ -483,6 +566,11 @@ static void parse_command_line_arguments (const int argc, char *argv[])
     if (arg_num_message_buffers == 0)
     {
         fprintf (stderr, "num-buffers must be at least one\n");
+        exit (EXIT_FAILURE);
+    }
+    if (arg_max_msg_size_sent > arg_max_message_size)
+    {
+        fprintf (stderr, "The range of msg-sizes exceeds the maximum message size configured\n");
         exit (EXIT_FAILURE);
     }
 }
@@ -564,13 +652,33 @@ static void transmit_message_test (message_transmit_thread_context *const thread
     uint32_t word_index;
     uint32_t num_tx_words;
     uint32_t *tx_words;
+    uint32_t base_message_length;
+    bool variable_message_length;
+    const uint32_t message_length_random_modulo =
+            (thread_context->max_message_send_size - thread_context->min_message_send_size) + 1;
+    unsigned int seed = thread_context->path_def.instance;
+
+    if (thread_context->transmit_mode == CONTINUOS_VARIABLE_SIZE_SEND)
+    {
+        variable_message_length = thread_context->min_message_send_size != thread_context->max_message_send_size;
+        base_message_length = thread_context->min_message_send_size;
+    }
+    else
+    {
+        variable_message_length = false;
+        base_message_length = thread_context->path_def.max_message_size;
+    }
 
     clock_gettime (CLOCK_MONOTONIC, &thread_context->results.start_time);
     while (!stop_transmission)
     {
         tx_buffer = get_send_buffer (thread_context->tx_handle);
         tx_words = (uint32_t *) tx_buffer->data;
-        tx_buffer->header->message_length = thread_context->path_def.max_message_size;
+        tx_buffer->header->message_length = base_message_length;
+        if (variable_message_length)
+        {
+            tx_buffer->header->message_length += rand_r (&seed) % message_length_random_modulo;
+        }
         tx_buffer->header->source_instance = thread_context->test_pattern;
         if (thread_context->verify_data)
         {
@@ -776,6 +884,16 @@ static void create_message_threads (void)
             tx_or_rx->thread_joined = false;
             tx_or_rx->tx_thread_context->path_def = path_def;
             tx_or_rx->tx_thread_context->verify_data = arg_verify_data;
+            if (arg_min_max_msg_sizes_present)
+            {
+                tx_or_rx->tx_thread_context->transmit_mode = CONTINUOS_VARIABLE_SIZE_SEND;
+                tx_or_rx->tx_thread_context->min_message_send_size = arg_min_msg_size_sent;
+                tx_or_rx->tx_thread_context->max_message_send_size = arg_max_msg_size_sent;
+            }
+            else
+            {
+                tx_or_rx->tx_thread_context->transmit_mode = CONTINUOS_MAX_MESSAGE_SIZE_SEND;
+            }
             initialise_test_results (&tx_or_rx->tx_thread_context->results);
             tx_or_rx->previous_results = tx_or_rx->tx_thread_context->results;
             clock_gettime (CLOCK_MONOTONIC, &tx_or_rx->current_results_time);
@@ -875,6 +993,7 @@ static void report_message_thread_regular_progress (const uint32_t thread_index)
  * @brief Wait for all the message transmit or receive threads in this process to exit.
  * @details While waiting display regular progress of the message tests
  * @todo Since CLOCK_REALTIME is used as the time source for reporting regular progress
+ *       the reporting of progress will stall if the real time jumps backwards.
  */
 static void wait_for_message_threads_to_exit (void)
 {
