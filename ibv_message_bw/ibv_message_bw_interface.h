@@ -48,6 +48,13 @@ typedef struct
      *  When false if the receiver process terminates abnormally the transmitter will just block once all messages buffers
      *  are in use. */
     bool tx_polls_for_errors;
+    /** When true the transmitter checks the size of the memory buffer on the transmitter and receiver is the same
+     *  before starting to send messages, abort with an error if the sizes doesn't match (meaning the path definition is
+     *  not the same on the transmitter and receiver).
+     *
+     *  When false the size of the memory buffer is not checked, and if the size is different the transmitter may get
+     *  an Infiniband error if the memory buffer size on the transmitter is larger. */
+    bool tx_checks_memory_buffer_size;
 } communication_path_definition;
 
 /** Contains the Infiniband device and port on the local host which is used for transmitting or receiving messages from */

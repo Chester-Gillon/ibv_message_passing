@@ -283,6 +283,15 @@ void message_transmit_attach_remote (tx_message_context_handle context)
 
     /* Wait for the attributes of the remote endpoint to be retrieved from SLP */
     get_remote_memory_buffer_from_slp (&context->slp_connection);
+    if (context->path_def.tx_checks_memory_buffer_size &&
+            (context->slp_connection.local_attributes.size != context->slp_connection.remote_attributes.size))
+    {
+        fprintf (stderr, "tx_%d has memory buffer size %lu, but rx_%d has size %lu\n",
+                 context->path_def.instance, context->slp_connection.local_attributes.size,
+                 context->path_def.instance, context->slp_connection.remote_attributes.size);
+        fprintf (stderr, "Check --max-msg-size and --num-buffers command line arguments on transmitter and receiver are the same.\n");
+        exit (EXIT_FAILURE);
+    }
 
     /* Transition the transmit Queue Pair to the Ready to Receive state */
     memset (&qp_attr, 0, sizeof (qp_attr));

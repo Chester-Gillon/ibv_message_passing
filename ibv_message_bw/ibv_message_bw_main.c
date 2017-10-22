@@ -70,6 +70,9 @@ static int arg_verify_data = false;
 /** Command line argument which specified if the transmitter polls for Infiniband errors */
 static int arg_tx_error_poll = false;
 
+/** Command line argument which controls if the transmitter checks the memory buffer size on the receiver matches */
+static int arg_tx_checks_memory_buffer_size = true;
+
 /** The different message IDs used in the test */
 typedef enum
 {
@@ -180,6 +183,7 @@ static const struct option command_line_options[] =
     {"alloc", required_argument, NULL, 0},
     {"verify-data", no_argument, &arg_verify_data, true},
     {"tx-error-poll", no_argument, &arg_tx_error_poll, true},
+    {"no-mb-size-check", no_argument, &arg_tx_checks_memory_buffer_size, false},
     {NULL, 0, NULL, 0}
 };
 
@@ -218,6 +222,8 @@ static void display_usage (void)
     printf ("                        in the message data which is checked by the receiver.\n");
     printf ("  --tx-error-poll       If specified the transmitter polls for Infiniband\n");
     printf ("                        errors while waiting to obtain a message buffer.\n");
+    printf ("  --no-mb-size-check    Disable the check that the message transmitter and\n");
+    printf ("                        receiver have the same memory buffer size.\n");
     exit (EXIT_FAILURE);
 }
 
@@ -747,6 +753,7 @@ static void create_message_threads (void)
         path_def.num_message_buffers = arg_num_message_buffers;
         path_def.allocation_type = arg_buffer_allocation_type;
         path_def.tx_polls_for_errors = arg_tx_error_poll;
+        path_def.tx_checks_memory_buffer_size = arg_tx_checks_memory_buffer_size;
 
         /* Set CPU affinity for the thread which sends or receives messages, if specified as a command line option */
         rc = pthread_attr_init (&thread_attr);
