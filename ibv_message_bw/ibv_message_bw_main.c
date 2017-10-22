@@ -39,6 +39,7 @@
  *  - If each thread transmits or receives messages
  *  - Which communication path instance each thread transmits or receives on */
 static unsigned int num_threads;
+static unsigned int num_tx_threads;
 static bool arg_is_tx_threads[MAX_THREADS];
 static int arg_path_instances[MAX_THREADS];
 
@@ -67,7 +68,7 @@ static buffer_allocation_type arg_buffer_allocation_type = BUFFER_ALLOCATION_SHA
 /** Command line argument which specifies if the data messages have a test pattern which is checked on receipt */
 static int arg_verify_data = false;
 
-/** Command line argument which specified if the transmitter polls for Infiniband errors */
+/** Command line argument which specifies if the transmitter polls for Infiniband errors */
 static int arg_tx_error_poll = false;
 
 /** Command line argument which controls if the transmitter checks the memory buffer size on the receiver matches */
@@ -77,6 +78,10 @@ static int arg_tx_checks_memory_buffer_size = true;
 static uint32_t arg_min_msg_size_sent;
 static uint32_t arg_max_msg_size_sent;
 static bool arg_min_max_msg_sizes_present = false;
+
+/** Command line argument which specifies if increasing message sizes are tested */
+static uint32_t arg_per_msg_size_duration_secs;
+static int arg_tx_all_msg_sizes = false;
 
 /** The different message IDs used in the test */
 typedef enum
@@ -122,9 +127,11 @@ typedef enum
 {
     /** Transmit messages of the maximum message data size configured on the communication path until
      *  requested to stop by the user. */
-    CONTINUOS_MAX_MESSAGE_SIZE_SEND,
+    CONTINUOUS_MAX_MESSAGE_SIZE_SEND,
     /** Transmit messages with a pseudo random data size until requested to stop by the user. */
-    CONTINUOS_VARIABLE_SIZE_SEND
+    CONTINUOUS_VARIABLE_SIZE_SEND,
+    /** Transmit messages with data sizes increasing in powers of two, where each data size tested for a fixex interval */
+    INCREASING_SIZE_SEND
 } message_transmit_mode;
 
 /** The context for a thread which transmits test messages */
@@ -136,7 +143,8 @@ typedef struct
     communication_path_definition path_def;
     /** Handle used for transmitting messages */
     tx_message_context_handle tx_handle;
-    /** The results for this thread */
+    /** The results for this thread.
+     *  For INCREASING_SIZE_SEND only the resource usage is valid */
     message_test_results results;
     /** The next generated test pattern word in the message data, initialised to the instance number of the communication path */
     uint32_t test_pattern;
@@ -145,6 +153,15 @@ typedef struct
     /** For CONTINUOS_VARIABLE_SIZE_SEND the data length of each message is a pseudo-random value between these limits */
     uint32_t min_message_send_size;
     uint32_t max_message_send_size;
+    /** For INCREASING_SIZE_SEND the number of seconds for which each message size is tested */
+    uint32_t message_size_duration_secs;
+    /** For INCREASING_SIZE_SEND the number of different message sizes which are tested */
+    uint32_t num_message_sizes_tested;
+    /** For INCREASING_SIZE_SEND array of length [num_message_sizes_tested] which contains the message sizes to be tested */
+    uint32_t *message_sizes_tested;
+    /** For INCREASING_SIZE_SEND array of length [num_message_sizes_tested] containing the results for each message size tested.
+     *  The usage measurements are not valid. */
+    message_test_results *message_sizes_results;
 } message_transmit_thread_context;
 
 /** The context for a thread which receives test messages */
@@ -183,6 +200,11 @@ typedef struct
 /** The contexts of all message transmit or receive threads which are running in this process */
 static transmit_or_receive_context thread_contexts[MAX_THREADS];
 
+/** Barrier used by the transmit threads to synchronise starting the next message test at the same time
+ *  when INCREASING_SIZE_SEND. This attempts to get multiple transmitting threads in the same process
+ *  to be sending messages at the same time, when checking how multiple communication paths share bandwidth. */
+static pthread_barrier_t tx_all_msg_sizes_barrier;
+
 /** Set from a signal handler to request that the transmit threads in this process:
  *  - Stop transmitting new data messages.
  *  - Send a message to the receiver that the test is complete, which causes the receive thread to exit.
@@ -205,6 +227,7 @@ static const struct option command_line_options[] =
     {"tx-error-poll", no_argument, &arg_tx_error_poll, true},
     {"no-mb-size-check", no_argument, &arg_tx_checks_memory_buffer_size, false},
     {"msg-sizes", required_argument, NULL, 0},
+    {"all-sizes", required_argument, NULL, 0},
     {NULL, 0, NULL, 0}
 };
 
@@ -248,6 +271,8 @@ static void display_usage (void)
     printf ("  --msg-sizes=<min>,<max>  Send messages with a pseudo-random data size between\n");
     printf ("                           <min> and <max>. Default is all messages sent are the\n");
     printf ("                           maximum message data size configured on the path.\n");
+    printf ("  --all-sizes=<duration>  Test sending increasing data length, in powers of two.\n");
+    printf ("                          Each data length is tested for <duration> seconds.\n");
     exit (EXIT_FAILURE);
 }
 
@@ -380,7 +405,7 @@ static void process_core_argument (const struct option *const optdef)
     while (token != NULL)
     {
         if ((sscanf (token, "%d%c", &core, &junk) != 1) ||
-            (core < 0) || (core > num_cpus))
+            (core < 0) || (core >= num_cpus))
         {
             fprintf (stderr, "Invalid %s %s\n", optdef->name, token);
             exit (EXIT_FAILURE);
@@ -533,6 +558,16 @@ static void parse_command_line_arguments (const int argc, char *argv[])
                     exit (EXIT_FAILURE);
                 }
             }
+            else if (strcmp (optdef->name, "all-sizes") == 0)
+            {
+                if ((sscanf (optarg, "%u%c", &arg_per_msg_size_duration_secs, &junk) != 1) ||
+                    (arg_per_msg_size_duration_secs == 0))
+                {
+                    fprintf (stderr, "Invalid %s %s\n", optdef->name, optarg);
+                    exit (EXIT_FAILURE);
+                }
+                arg_tx_all_msg_sizes = true;
+            }
             else
             {
                 /* This is a program error, and shouldn't be triggered by the command line options */
@@ -571,6 +606,16 @@ static void parse_command_line_arguments (const int argc, char *argv[])
     if (arg_max_msg_size_sent > arg_max_message_size)
     {
         fprintf (stderr, "The range of msg-sizes exceeds the maximum message size configured\n");
+        exit (EXIT_FAILURE);
+    }
+    if (arg_tx_all_msg_sizes && arg_min_max_msg_sizes_present)
+    {
+        fprintf (stderr, "msg-sizes and all-sizes options are mutually exclusive\n");
+        exit (EXIT_FAILURE);
+    }
+    if (arg_tx_all_msg_sizes && arg_verify_data)
+    {
+        fprintf (stderr, "verify-data and all-sizes options are mutually exclusive\n");
         exit (EXIT_FAILURE);
     }
 }
@@ -646,7 +691,7 @@ static void update_test_results (message_test_results *const results, const mess
  * @brief Perform a message transmit test for one thread, stopping the test when requested by a signal handler
  * @param[in,out] thread_context The transmit thread context to send the messages for
  */
-static void transmit_message_test (message_transmit_thread_context *const thread_context)
+static void continuous_transmit_message_test (message_transmit_thread_context *const thread_context)
 {
     api_message_buffer *tx_buffer;
     uint32_t word_index;
@@ -658,7 +703,7 @@ static void transmit_message_test (message_transmit_thread_context *const thread
             (thread_context->max_message_send_size - thread_context->min_message_send_size) + 1;
     unsigned int seed = thread_context->path_def.instance;
 
-    if (thread_context->transmit_mode == CONTINUOS_VARIABLE_SIZE_SEND)
+    if (thread_context->transmit_mode == CONTINUOUS_VARIABLE_SIZE_SEND)
     {
         variable_message_length = thread_context->min_message_send_size != thread_context->max_message_send_size;
         base_message_length = thread_context->min_message_send_size;
@@ -707,6 +752,51 @@ static void transmit_message_test (message_transmit_thread_context *const thread
 }
 
 /**
+ * @brief Perform a message transmit test for one thread, testing increasing size messages each for a fixed duration
+ * @param[in,out] thread_context The transmit thread context to send the messages for
+ */
+static void increasing_size_transmit_message_test (message_transmit_thread_context *const thread_context)
+{
+    uint32_t size_index;
+    struct timespec stop_time;
+    struct timespec now;
+    bool size_test_complete;
+    api_message_buffer *tx_buffer;
+    int rc;
+
+    for (size_index = 0; size_index < thread_context->num_message_sizes_tested; size_index++)
+    {
+        message_test_results *const results = &thread_context->message_sizes_results[size_index];
+        const uint32_t message_length = thread_context->message_sizes_tested[size_index];
+
+        rc = pthread_barrier_wait (&tx_all_msg_sizes_barrier);
+        CHECK_ASSERT ((rc == 0) || (rc == PTHREAD_BARRIER_SERIAL_THREAD));
+        clock_gettime (CLOCK_MONOTONIC, &results->start_time);
+        stop_time = results->start_time;
+        stop_time.tv_sec += thread_context->message_size_duration_secs;
+
+        do
+        {
+            tx_buffer = get_send_buffer (thread_context->tx_handle);
+            tx_buffer->header->message_length = message_length;
+            tx_buffer->header->message_id = TEST_MESSAGE_UNVERIFIED_DATA;
+            send_message (thread_context->tx_handle, tx_buffer);
+            update_test_results (results, tx_buffer->header);
+            clock_gettime (CLOCK_MONOTONIC, &now);
+            size_test_complete = (now.tv_sec >= stop_time.tv_sec) && (now.tv_nsec >= stop_time.tv_nsec);
+        } while (!size_test_complete);
+
+        await_all_outstanding_messages_freed (thread_context->tx_handle);
+        clock_gettime (CLOCK_MONOTONIC, &results->stop_time);
+    }
+
+    tx_buffer = get_send_buffer (thread_context->tx_handle);
+    tx_buffer->header->message_id = TEST_MESSAGE_TEST_COMPLETE;
+    tx_buffer->header->message_length = 0;
+    send_message (thread_context->tx_handle, tx_buffer);
+}
+
+/**
  * @details The entry point for a thread which transmits test messages on a communication path.
  *          This transmits messages as quickly as possible until signalled to end the test.
  * @param[in,out] arg The context for the transmit thread.
@@ -727,7 +817,14 @@ static void *message_transmit_thread (void *const arg)
     thread_context->results.communication_path_connected = true;
     transmit_message_warmup (thread_context);
 
-    transmit_message_test (thread_context);
+    if (thread_context->transmit_mode == INCREASING_SIZE_SEND)
+    {
+        increasing_size_transmit_message_test (thread_context);
+    }
+    else
+    {
+        continuous_transmit_message_test (thread_context);
+    }
 
     rc = getrusage (RUSAGE_THREAD, &thread_context->results.stop_usage);
     check_assert (rc == 0, "getrusage");
@@ -837,6 +934,58 @@ static void *message_receive_thread (void *const arg)
 }
 
 /**
+ * @brief Set the size of messages tested with increasing sizes in powers-of-two
+ * @param[in,out] thread_context The message transmit thread context to store the message sizes to be tested in
+ */
+static void set_increasing_message_sizes_tested (message_transmit_thread_context *const thread_context)
+{
+    uint32_t data_length;
+    uint32_t size_index;
+
+    /* Determine how many different data lengths to test */
+    thread_context->num_message_sizes_tested = 1; /* Zero message_length */
+    data_length = 1;
+    while (data_length < arg_max_message_size)
+    {
+        thread_context->num_message_sizes_tested++;
+        data_length <<= 1;
+    }
+    if (arg_max_message_size > 0)
+    {
+        thread_context->num_message_sizes_tested++;
+    }
+
+    /* Set the data lengths to test, and allocate space for the results */
+    thread_context->transmit_mode = INCREASING_SIZE_SEND;
+    thread_context->message_size_duration_secs = arg_per_msg_size_duration_secs;
+    thread_context->message_sizes_tested =
+            cache_line_aligned_calloc (thread_context->num_message_sizes_tested, sizeof (uint32_t));
+    thread_context->message_sizes_results =
+            cache_line_aligned_calloc (thread_context->num_message_sizes_tested, sizeof (message_test_results));
+    size_index = 0;
+    thread_context->message_sizes_tested[size_index] = 0;
+    size_index++;
+    data_length = 1;
+    while (data_length < arg_max_message_size)
+    {
+        thread_context->message_sizes_tested[size_index] = data_length;
+        size_index++;
+        data_length <<= 1;
+    }
+    if (arg_max_message_size > 0)
+    {
+        thread_context->message_sizes_tested[size_index] = arg_max_message_size;
+        size_index++;
+    }
+    CHECK_ASSERT (size_index == thread_context->num_message_sizes_tested);
+
+    for (size_index = 0; size_index < thread_context->num_message_sizes_tested; size_index++)
+    {
+        initialise_test_results (&thread_context->message_sizes_results[size_index]);
+    }
+}
+
+/**
  * @brief Create all the message transmit or receive threads specified by the command line options.
  */
 static void create_message_threads (void)
@@ -845,10 +994,8 @@ static void create_message_threads (void)
     pthread_attr_t thread_attr;
     int rc;
     uint32_t thread_index;
-    unsigned int num_tx_threads;
 
     /* Create the threads */
-    num_tx_threads = 0;
     for (thread_index = 0; thread_index < num_threads; thread_index++)
     {
         transmit_or_receive_context *const tx_or_rx = &thread_contexts[thread_index];
@@ -884,15 +1031,19 @@ static void create_message_threads (void)
             tx_or_rx->thread_joined = false;
             tx_or_rx->tx_thread_context->path_def = path_def;
             tx_or_rx->tx_thread_context->verify_data = arg_verify_data;
-            if (arg_min_max_msg_sizes_present)
+            if (arg_tx_all_msg_sizes)
             {
-                tx_or_rx->tx_thread_context->transmit_mode = CONTINUOS_VARIABLE_SIZE_SEND;
+                set_increasing_message_sizes_tested (tx_or_rx->tx_thread_context);
+            }
+            else if (arg_min_max_msg_sizes_present)
+            {
+                tx_or_rx->tx_thread_context->transmit_mode = CONTINUOUS_VARIABLE_SIZE_SEND;
                 tx_or_rx->tx_thread_context->min_message_send_size = arg_min_msg_size_sent;
                 tx_or_rx->tx_thread_context->max_message_send_size = arg_max_msg_size_sent;
             }
             else
             {
-                tx_or_rx->tx_thread_context->transmit_mode = CONTINUOS_MAX_MESSAGE_SIZE_SEND;
+                tx_or_rx->tx_thread_context->transmit_mode = CONTINUOUS_MAX_MESSAGE_SIZE_SEND;
             }
             initialise_test_results (&tx_or_rx->tx_thread_context->results);
             tx_or_rx->previous_results = tx_or_rx->tx_thread_context->results;
@@ -920,15 +1071,23 @@ static void create_message_threads (void)
 
     if (num_tx_threads > 0)
     {
-        /* Install a signal handler to allow a request to stop transmission */
-        struct sigaction action;
+        if (arg_tx_all_msg_sizes)
+        {
+            rc = pthread_barrier_init (&tx_all_msg_sizes_barrier, NULL, num_tx_threads);
+            check_assert (rc == 0, "pthread_barrier_init");
+        }
+        else
+        {
+            /* Install a signal handler to allow a request to stop transmission */
+            struct sigaction action;
 
-        printf ("Press Ctrl-C to tell the %u transmit thread(s) to stop the test\n", num_tx_threads);
-        memset (&action, 0, sizeof (action));
-        action.sa_handler = stop_transmission_handler;
-        action.sa_flags = SA_RESTART;
-        rc = sigaction (SIGINT, &action, NULL);
-        check_assert (rc == 0, "sigaction");
+            printf ("Press Ctrl-C to tell the %u transmit thread(s) to stop the test\n", num_tx_threads);
+            memset (&action, 0, sizeof (action));
+            action.sa_handler = stop_transmission_handler;
+            action.sa_flags = SA_RESTART;
+            rc = sigaction (SIGINT, &action, NULL);
+            check_assert (rc == 0, "sigaction");
+        }
     }
 }
 
@@ -1055,6 +1214,57 @@ static double rusage_utilisation_secs (const struct timeval *const start_time, c
 }
 
 /**
+ * @details For the transmitter with increasing message sizes, display as CSV results with one row for each message
+ *          size tested. This is intended for pasting into a spreadsheet for display transfer rate .vs. data length.
+ *
+ *          Note that the receiver will display the total across all message sizes, as the receiver doesn't
+ *          know which mode the transmitter is using.
+ */
+static void display_increasing_size_results (void)
+{
+    uint32_t num_message_sizes_tested;
+    uint32_t size_index;
+    uint32_t thread_index;
+    int rc;
+
+    num_message_sizes_tested = 0;
+    for (thread_index = 0; (num_message_sizes_tested == 0) && (thread_index < num_threads); thread_index++)
+    {
+        if (arg_is_tx_threads[thread_index])
+        {
+            num_message_sizes_tested = thread_contexts[thread_index].tx_thread_context->num_message_sizes_tested;
+        }
+    }
+
+    printf ("\n");
+    printf ("Path,Data length bytes,Duration (secs),Total data bytes,Total messages,Data bytes/sec,Messages/sec\n");
+    for (size_index = 0; size_index < num_message_sizes_tested; size_index++)
+    {
+        for (thread_index = 0; thread_index < num_threads; thread_index++)
+        {
+            if (arg_is_tx_threads[thread_index])
+            {
+                const transmit_or_receive_context *const tx_or_rx = &thread_contexts[thread_index];
+                const message_test_results *const tx_results = &tx_or_rx->tx_thread_context->message_sizes_results[size_index];
+                const double test_duration_secs = (double) get_elapsed_ns (&tx_results->start_time, &tx_results->stop_time) / 1E9;
+
+                printf ("Tx_%d,%u,%0.6f,%lu,%lu,%0.f,%0.f\n",
+                        arg_path_instances[thread_index],
+                        tx_or_rx->tx_thread_context->message_sizes_tested[size_index], test_duration_secs,
+                        tx_results->total_data_bytes, tx_results->total_messages,
+                        (double) tx_results->total_data_bytes / test_duration_secs,
+                        (double) tx_results->total_messages / test_duration_secs);
+
+            }
+        }
+    }
+    printf ("\n");
+
+    rc = pthread_barrier_destroy (&tx_all_msg_sizes_barrier);
+    check_assert (rc == 0, "pthread_barrier_destroy");
+}
+
+/**
  * @details Display the final results for one message transmit of receive thread which is:
  *          - The total number of messages and data bytes
  *          - The Linux usage measurements
@@ -1062,25 +1272,36 @@ static double rusage_utilisation_secs (const struct timeval *const start_time, c
  */
 static void display_message_thread_final_results (const uint32_t thread_index)
 {
-    transmit_or_receive_context *const tx_or_rx = &thread_contexts[thread_index];
+    const transmit_or_receive_context *const tx_or_rx = &thread_contexts[thread_index];
     const char *const direction = arg_is_tx_threads[thread_index] ? "Tx" : "Rx";
     const message_test_results *const results = arg_is_tx_threads[thread_index] ?
             &tx_or_rx->tx_thread_context->results : &tx_or_rx->rx_thread_context->results;
-    const double test_duration_secs = (double) get_elapsed_ns (&results->start_time, &results->stop_time) / 1E9;
 
     printf ("\n");
-    printf ("%s_%d Total data bytes %lu over %.6f seconds; %.1f Mbytes/second\n",
-            direction, arg_path_instances[thread_index],
-            results->total_data_bytes, test_duration_secs,
-            ((double) results->total_data_bytes / test_duration_secs) / 1E6);
-    printf ("%s_%d Total messages %lu over %.6f seconds; %.0f messages/second\n",
-            direction, arg_path_instances[thread_index],
-            results->total_messages, test_duration_secs,
-            (double) results->total_messages / test_duration_secs);
-    printf ("%s_%d Min message size=%u max message size=%u data verification=%s\n",
-            direction, arg_path_instances[thread_index],
-            results->min_message_length_seen, results->max_message_length_seen,
-            results->verified_data ? "yes" : "no");
+    if (arg_tx_all_msg_sizes && arg_is_tx_threads[thread_index])
+    {
+        /* Results for a transmitter with increasing message sizes are displayed by display_increasing_size_results */
+    }
+    else
+    {
+        /* Display textual results for the number of data bytes and messages for the entire run */
+        const double test_duration_secs = (double) get_elapsed_ns (&results->start_time, &results->stop_time) / 1E9;
+
+        printf ("%s_%d Total data bytes %lu over %.6f seconds; %.1f Mbytes/second\n",
+                direction, arg_path_instances[thread_index],
+                results->total_data_bytes, test_duration_secs,
+                ((double) results->total_data_bytes / test_duration_secs) / 1E6);
+        printf ("%s_%d Total messages %lu over %.6f seconds; %.0f messages/second\n",
+                direction, arg_path_instances[thread_index],
+                results->total_messages, test_duration_secs,
+                (double) results->total_messages / test_duration_secs);
+        printf ("%s_%d Min message size=%u max message size=%u data verification=%s\n",
+                direction, arg_path_instances[thread_index],
+                results->min_message_length_seen, results->max_message_length_seen,
+                results->verified_data ? "yes" : "no");
+    }
+
+    /* Display resource usage for the entire run */
     printf ("%s_%d minor page faults=%ld (%ld -> %ld)\n",
             direction, arg_path_instances[thread_index],
             results->stop_usage.ru_minflt - results->start_usage.ru_minflt,
@@ -1128,6 +1349,10 @@ int main (int argc, char *argv[])
     for (thread_index = 0; thread_index < num_threads; thread_index++)
     {
         display_message_thread_final_results (thread_index);
+    }
+    if (arg_tx_all_msg_sizes && (num_tx_threads > 0))
+    {
+        display_increasing_size_results ();
     }
 
     SLPClose (slp_main_thread_handle);
