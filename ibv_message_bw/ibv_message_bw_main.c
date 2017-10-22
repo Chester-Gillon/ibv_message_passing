@@ -1106,11 +1106,22 @@ static void display_message_thread_final_results (const uint32_t thread_index)
 int main (int argc, char *argv[])
 {
     uint32_t thread_index;
+    SLPError slp_status;
+    SLPHandle slp_main_thread_handle;
 
     parse_command_line_arguments (argc, argv);
 
     /* To allow generation of random Packet Sequence numbers */
     srand48 (getpid() * time(NULL));
+
+    /* @todo The first SLPOpen call reads configuration parameters from the SLP configuration file into a linked list,
+     *       which is freed when the last handle is freed.
+     *       When SLPOpen was initially only called in each message thread, SLPOpen would sometimes cause a SIGSEGV
+     *       due to the information read from the SLP configuration file being in an inconsistent state.
+     *       As a work-around call SLPOpen to get a dummy handle and read the SLP configuration file in the main
+     *       thread before SLPOpen is used in each message thread. */
+    slp_status = SLPOpen (NULL, SLP_FALSE, &slp_main_thread_handle);
+    check_assert (slp_status == SLP_OK, "SLPOpen");
 
     create_message_threads ();
     wait_for_message_threads_to_exit ();
@@ -1118,6 +1129,8 @@ int main (int argc, char *argv[])
     {
         display_message_thread_final_results (thread_index);
     }
+
+    SLPClose (slp_main_thread_handle);
 
     return EXIT_SUCCESS;
 }
