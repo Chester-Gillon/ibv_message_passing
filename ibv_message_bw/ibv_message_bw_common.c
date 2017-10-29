@@ -475,6 +475,17 @@ void close_slp_connection (communication_path_slp_connection *const slp_connecti
 
     /* de-register local_service_url */
     slp_status = SLPDereg (slp_connection->handle, slp_connection->local_service_url, slp_reg_callback, &deregistration_status);
+    if (slp_status == SLP_NETWORK_ERROR)
+    {
+        /* If the test has been running for a period of time, the slpd daemon have have closed the socket our process was using,
+         * causing SLPDereg to fail with SLP_NETWORK_ERROR.
+         * In which case close and re-open the handle before attempting to repeat the de-registration. */
+        SLPClose (slp_connection->handle);
+        slp_status = SLPOpen (NULL, SLP_FALSE, &slp_connection->handle);
+        check_assert (slp_status == SLP_OK, "SLPOpen");
+        slp_status = SLPDereg (slp_connection->handle, slp_connection->local_service_url,
+                slp_reg_callback, &deregistration_status);
+    }
     check_assert (slp_status == SLP_OK, "SLPDereg");
     check_assert (deregistration_status == SLP_OK, "deregistration_status");
 
