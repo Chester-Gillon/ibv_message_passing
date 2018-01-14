@@ -4,7 +4,7 @@
  * @author Chester Gillon
  * @brief Display the size and offsets of the structure fields in ibv_message_bw_interface.h
  * @details The sizes are reported in bits, for comparing against the 'Size of the C structures converted
- *          to Ada records by the gcc -dump-ada-specs option.
+ *          to Ada records by the GNAT g++ -dump-ada-spec option.
  */
 
 #include <stdbool.h>

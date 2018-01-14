@@ -6,6 +6,8 @@ The tests have been run using:
 - A cable looping back the two ports of the MT26428.
 - opensm as the subnet manager.
 - Ubuntu 16.04 LTS with a 4.4.0-96-generic Kernel.
+- GCC 5.4.0 to compile the C code.
+- GNAT GLP 2017 (20170515) to compile the Ada code.
 
 http://www.rdmamojo.com/2014/11/08/working-rdma-ubuntu was used for how to install support for RDMA on Ubuntu.
 
