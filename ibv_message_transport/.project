@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>ibv_message_bw</name>
+	<name>ibv_message_transport</name>
 	<comment></comment>
 	<projects>
-		<project>ibv_message_transport</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
