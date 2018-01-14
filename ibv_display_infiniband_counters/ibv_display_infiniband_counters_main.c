@@ -11,6 +11,7 @@
 
 #include <infiniband/verbs.h>
 #include <infiniband/mad.h>
+#include <infiniband/iba/ib_types.h>
 
 /**
  * @brief Display a 32-bit MAD field value
@@ -55,6 +56,7 @@ static void display_port_counters (char *const hca, const uint8_t port_num, cons
     ib_portid_t portid;
     uint8_t mad_buf[1024];
     const int timeout = 0;
+    uint16_t cap_mask;
 
     mad_port = mad_rpc_open_port (hca, port_num, &mgmt_class, 1);
     if (mad_port == NULL)
@@ -63,24 +65,40 @@ static void display_port_counters (char *const hca, const uint8_t port_num, cons
         exit (EXIT_FAILURE);
     }
 
+    /* Determine which counters are supported */
     memset (&portid, 0, sizeof (portid));
     portid.lid = port_attributes->lid;
     memset (mad_buf, 0, sizeof (mad_buf));
-    if (pma_query_via (mad_buf, &portid, port_num, timeout, IB_GSI_PORT_COUNTERS_EXT, mad_port) == NULL)
+    if (pma_query_via (mad_buf, &portid, port_num, timeout, CLASS_PORT_INFO, mad_port) == NULL)
     {
         fprintf (stderr, "pma_query_via failed for %s LID %u\n", hca, portid.lid);
         exit (EXIT_FAILURE);
     }
+    mad_decode_field (mad_buf, IB_CPI_CAPMASK_F, &cap_mask);
+    cap_mask = CL_HTON16 (cap_mask);
 
-    printf ("Counters for device %s port %u LID %u\n", hca, port_num, portid.lid);
-    DISPLAY_64BIT_FIELD (mad_buf, IB_PC_EXT_XMT_BYTES_F);
-    DISPLAY_64BIT_FIELD (mad_buf, IB_PC_EXT_RCV_BYTES_F);
-    DISPLAY_64BIT_FIELD (mad_buf, IB_PC_EXT_XMT_PKTS_F);
-    DISPLAY_64BIT_FIELD (mad_buf, IB_PC_EXT_RCV_PKTS_F);
-    DISPLAY_64BIT_FIELD (mad_buf, IB_PC_EXT_XMT_UPKTS_F);
-    DISPLAY_64BIT_FIELD (mad_buf, IB_PC_EXT_RCV_UPKTS_F);
-    DISPLAY_64BIT_FIELD (mad_buf, IB_PC_EXT_XMT_MPKTS_F);
-    DISPLAY_64BIT_FIELD (mad_buf, IB_PC_EXT_RCV_MPKTS_F);
+    if ((cap_mask & IB_PM_EXT_WIDTH_SUPPORTED) || (cap_mask & IB_PM_EXT_WIDTH_NOIETF_SUP))
+    {
+        memset (mad_buf, 0, sizeof (mad_buf));
+        if (pma_query_via (mad_buf, &portid, port_num, timeout, IB_GSI_PORT_COUNTERS_EXT, mad_port) == NULL)
+        {
+            fprintf (stderr, "pma_query_via failed for %s LID %u\n", hca, portid.lid);
+            exit (EXIT_FAILURE);
+        }
+
+        printf ("Counters for device %s port %u LID %u\n", hca, port_num, portid.lid);
+        DISPLAY_64BIT_FIELD (mad_buf, IB_PC_EXT_XMT_BYTES_F);
+        DISPLAY_64BIT_FIELD (mad_buf, IB_PC_EXT_RCV_BYTES_F);
+        DISPLAY_64BIT_FIELD (mad_buf, IB_PC_EXT_XMT_PKTS_F);
+        DISPLAY_64BIT_FIELD (mad_buf, IB_PC_EXT_RCV_PKTS_F);
+        if (cap_mask & IB_PM_EXT_WIDTH_SUPPORTED)
+        {
+            DISPLAY_64BIT_FIELD (mad_buf, IB_PC_EXT_XMT_UPKTS_F);
+            DISPLAY_64BIT_FIELD (mad_buf, IB_PC_EXT_RCV_UPKTS_F);
+            DISPLAY_64BIT_FIELD (mad_buf, IB_PC_EXT_XMT_MPKTS_F);
+            DISPLAY_64BIT_FIELD (mad_buf, IB_PC_EXT_RCV_MPKTS_F);
+        }
+    }
 
     memset (mad_buf, 0, sizeof (mad_buf));
     if (pma_query_via (mad_buf, &portid, port_num, timeout, IB_GSI_PORT_COUNTERS, mad_port) == NULL)
@@ -100,7 +118,10 @@ static void display_port_counters (char *const hca, const uint8_t port_num, cons
     DISPLAY_32BIT_FIELD (mad_buf, IB_PC_ERR_LOCALINTEG_F);
     DISPLAY_32BIT_FIELD (mad_buf, IB_PC_ERR_EXCESS_OVR_F);
     DISPLAY_32BIT_FIELD (mad_buf, IB_PC_VL15_DROPPED_F);
-    DISPLAY_32BIT_FIELD (mad_buf, IB_PC_XMT_WAIT_F);
+    if (cap_mask & IB_PM_PC_XMIT_WAIT_SUP)
+    {
+        DISPLAY_32BIT_FIELD (mad_buf, IB_PC_XMT_WAIT_F);
+    }
     printf ("\n");
 
     mad_rpc_close_port (mad_port);
