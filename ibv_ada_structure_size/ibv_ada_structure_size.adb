@@ -187,15 +187,27 @@ procedure Ibv_Ada_Structure_Size is
       print_struct_field (struct_name, "source_instance", header.source_instance'Size, header.source_instance'Position);
    end report_message_header;
 
-   procedure report_api_message_buffer is
-      struct_name : constant string := "api_message_buffer";
-      buffer : ibv_message_bw_interface_h.api_message_buffer;
+   procedure report_tx_api_message_buffer is
+      struct_name : constant string := "tx_api_message_buffer";
+      buffer : ibv_message_bw_interface_h.tx_api_message_buffer;
    begin
       print_struct_size (struct_name, buffer'Size);
       print_struct_field (struct_name, "header", buffer.header'Size, buffer.header'Position);
       print_struct_field (struct_name, "data", buffer.data'Size, buffer.data'Position);
+      print_struct_field (struct_name, "context", buffer.context'Size, buffer.context'Position);
       print_struct_field (struct_name, "buffer_index", buffer.buffer_index'Size, buffer.buffer_index'Position);
-   end report_api_message_buffer;
+   end report_tx_api_message_buffer;
+
+   procedure report_rx_api_message_buffer is
+      struct_name : constant string := "rx_api_message_buffer";
+      buffer : ibv_message_bw_interface_h.rx_api_message_buffer;
+   begin
+      print_struct_size (struct_name, buffer'Size);
+      print_struct_field (struct_name, "header", buffer.header'Size, buffer.header'Position);
+      print_struct_field (struct_name, "data", buffer.data'Size, buffer.data'Position);
+      print_struct_field (struct_name, "context", buffer.context'Size, buffer.context'Position);
+      print_struct_field (struct_name, "buffer_index", buffer.buffer_index'Size, buffer.buffer_index'Position);
+   end report_rx_api_message_buffer;
 
 begin
    ada.Text_IO.Put_Line ("Structure name,Size (bits),Offset (bytes)");
@@ -205,6 +217,7 @@ begin
    report_communication_path_slp_connection;
    report_memory_buffer;
    report_message_header;
-   report_api_message_buffer;
+   report_tx_api_message_buffer;
+   report_rx_api_message_buffer;
 end Ibv_Ada_Structure_Size;
 

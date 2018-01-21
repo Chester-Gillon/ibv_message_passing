@@ -632,12 +632,12 @@ static void transmit_message_warmup (message_transmit_thread_context *const thre
 
     for (buffer_index = 0; buffer_index < thread_context->path_def.num_message_buffers; buffer_index++)
     {
-        api_message_buffer *const tx_buffer = get_send_buffer (thread_context->tx_handle);
+        tx_api_message_buffer *const tx_buffer = get_send_buffer (thread_context->tx_handle);
 
         tx_buffer->header->message_id = TEST_MESSAGE_WARMUP;
         tx_buffer->header->message_length = 0;
         tx_buffer->header->source_instance = thread_context->path_def.instance;
-        send_message (thread_context->tx_handle, tx_buffer);
+        send_message (tx_buffer);
     }
     await_all_outstanding_messages_freed (thread_context->tx_handle);
 }
@@ -693,7 +693,7 @@ static void update_test_results (message_test_results *const results, const mess
  */
 static void continuous_transmit_message_test (message_transmit_thread_context *const thread_context)
 {
-    api_message_buffer *tx_buffer;
+    tx_api_message_buffer *tx_buffer;
     uint32_t word_index;
     uint32_t num_tx_words;
     uint32_t *tx_words;
@@ -739,7 +739,7 @@ static void continuous_transmit_message_test (message_transmit_thread_context *c
         {
             tx_buffer->header->message_id = TEST_MESSAGE_UNVERIFIED_DATA;
         }
-        send_message (thread_context->tx_handle, tx_buffer);
+        send_message (tx_buffer);
         update_test_results (&thread_context->results, tx_buffer->header);
     }
     await_all_outstanding_messages_freed (thread_context->tx_handle);
@@ -748,7 +748,7 @@ static void continuous_transmit_message_test (message_transmit_thread_context *c
     tx_buffer = get_send_buffer (thread_context->tx_handle);
     tx_buffer->header->message_id = TEST_MESSAGE_TEST_COMPLETE;
     tx_buffer->header->message_length = 0;
-    send_message (thread_context->tx_handle, tx_buffer);
+    send_message (tx_buffer);
 }
 
 /**
@@ -761,7 +761,7 @@ static void increasing_size_transmit_message_test (message_transmit_thread_conte
     struct timespec stop_time;
     struct timespec now;
     bool size_test_complete;
-    api_message_buffer *tx_buffer;
+    tx_api_message_buffer *tx_buffer;
     int rc;
 
     for (size_index = 0; size_index < thread_context->num_message_sizes_tested; size_index++)
@@ -780,7 +780,7 @@ static void increasing_size_transmit_message_test (message_transmit_thread_conte
             tx_buffer = get_send_buffer (thread_context->tx_handle);
             tx_buffer->header->message_length = message_length;
             tx_buffer->header->message_id = TEST_MESSAGE_UNVERIFIED_DATA;
-            send_message (thread_context->tx_handle, tx_buffer);
+            send_message (tx_buffer);
             update_test_results (results, tx_buffer->header);
             clock_gettime (CLOCK_MONOTONIC, &now);
             size_test_complete = (now.tv_sec >= stop_time.tv_sec) && (now.tv_nsec >= stop_time.tv_nsec);
@@ -793,7 +793,7 @@ static void increasing_size_transmit_message_test (message_transmit_thread_conte
     tx_buffer = get_send_buffer (thread_context->tx_handle);
     tx_buffer->header->message_id = TEST_MESSAGE_TEST_COMPLETE;
     tx_buffer->header->message_length = 0;
-    send_message (thread_context->tx_handle, tx_buffer);
+    send_message (tx_buffer);
 }
 
 /**
@@ -843,12 +843,12 @@ static void receive_message_warmup (message_receive_thread_context *const thread
 
     for (buffer_index = 0; buffer_index < thread_context->path_def.num_message_buffers; buffer_index++)
     {
-        api_message_buffer *const rx_buffer = await_message (thread_context->rx_handle);
+        rx_api_message_buffer *const rx_buffer = await_message (thread_context->rx_handle);
 
         CHECK_ASSERT ((rx_buffer->header->message_id == TEST_MESSAGE_WARMUP) &&
                       (rx_buffer->header->message_length == 0) &&
                       (rx_buffer->header->source_instance == thread_context->path_def.instance));
-        free_message (thread_context->rx_handle, rx_buffer);
+        free_message (rx_buffer);
     }
 }
 
@@ -863,7 +863,7 @@ static void receive_message_test (message_receive_thread_context *const thread_c
     test_complete = false;
     while (!test_complete)
     {
-        api_message_buffer *const rx_buffer = await_message (thread_context->rx_handle);
+        rx_api_message_buffer *const rx_buffer = await_message (thread_context->rx_handle);
 
         switch (rx_buffer->header->message_id)
         {
@@ -899,7 +899,7 @@ static void receive_message_test (message_receive_thread_context *const thread_c
             check_assert (false, "receive_message_test unknown message");
             break;
         }
-        free_message (thread_context->rx_handle, rx_buffer);
+        free_message (rx_buffer);
     }
 }
 

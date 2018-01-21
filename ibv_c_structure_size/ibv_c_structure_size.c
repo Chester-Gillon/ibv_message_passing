@@ -151,10 +151,17 @@ int main (int argc, char *argv[])
     PRINT_STRUCT_FIELD (message_header, message_id);
     PRINT_STRUCT_FIELD (message_header, source_instance);
 
-    PRINT_STRUCT_SIZE (api_message_buffer);
-    PRINT_STRUCT_FIELD (api_message_buffer, header);
-    PRINT_STRUCT_FIELD (api_message_buffer, data);
-    PRINT_STRUCT_FIELD (api_message_buffer, buffer_index);
+    PRINT_STRUCT_SIZE (tx_api_message_buffer);
+    PRINT_STRUCT_FIELD (tx_api_message_buffer, header);
+    PRINT_STRUCT_FIELD (tx_api_message_buffer, data);
+    PRINT_STRUCT_FIELD (tx_api_message_buffer, context);
+    PRINT_STRUCT_FIELD (tx_api_message_buffer, buffer_index);
+
+    PRINT_STRUCT_SIZE (rx_api_message_buffer);
+    PRINT_STRUCT_FIELD (rx_api_message_buffer, header);
+    PRINT_STRUCT_FIELD (rx_api_message_buffer, data);
+    PRINT_STRUCT_FIELD (rx_api_message_buffer, context);
+    PRINT_STRUCT_FIELD (rx_api_message_buffer, buffer_index);
 
     return 0;
 }

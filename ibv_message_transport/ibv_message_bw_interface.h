@@ -149,25 +149,42 @@ typedef struct
     uint32_t source_instance;
 } message_header;
 
-/** Defines one message buffer which sent/received by the test application.
- *  The test application de-references the pointers.
- *  The send/receive API functions are responsible for setting the pointers and the buffer_index */
-typedef struct
-{
-    /** Points at the header of the message which is to be sent or has been received */
-    message_header *header;
-    /** Points at the data of the message which is to be sent or has been received */
-    void *data;
-    /** The message index into the circular buffer of messages */
-    uint32_t buffer_index;
-} api_message_buffer;
-
 /** Opaque handles for the context used to transmit or receive messages on a communication path */
 struct tx_message_context_s;
 typedef struct tx_message_context_s *tx_message_context_handle;
 
 struct rx_message_context_s;
 typedef struct rx_message_context_s *rx_message_context_handle;
+
+/** Defines one message buffer which is sent by the test application.
+ *  The test application de-references the header and data pointers to populate the message to send.
+ *  The send API functions are responsible for setting the pointers and the buffer_index */
+typedef struct
+{
+    /** Points at the header of the message which is to be sent */
+    message_header *header;
+    /** Points at the data of the message which is to be sent */
+    void *data;
+    /** The transmit context to send the message on */
+    tx_message_context_handle context;
+    /** The message index into the circular buffer of messages */
+    uint32_t buffer_index;
+} tx_api_message_buffer;
+
+/** Defines one message buffer which is received by the test application.
+ *  The test application de-references the header and data pointers to read the received message.
+ *  The receive API functions are responsible for setting the pointers and the buffer_index */
+typedef struct
+{
+    /** Points at the header of the message which has been received */
+    message_header *header;
+    /** Points at the data of the message which has been received */
+    void *data;
+    /** The receive context the message has been received from */
+    rx_message_context_handle context;
+    /** The message index into the circular buffer of messages */
+    uint32_t buffer_index;
+} rx_api_message_buffer;
 
 void check_assert (const bool assertion, const char *message);
 #define CHECK_ASSERT(assertion) check_assert(assertion,#assertion)
@@ -198,14 +215,16 @@ tx_message_context_handle message_transmit_create_local (const communication_pat
 void message_transmit_attach_remote (tx_message_context_handle context);
 void message_transmit_finalise (tx_message_context_handle context);
 void await_all_outstanding_messages_freed (tx_message_context_handle context);
-api_message_buffer *get_send_buffer (tx_message_context_handle context);
-void send_message (tx_message_context_handle context, const api_message_buffer *const api_buffer);
+tx_api_message_buffer *get_send_buffer_no_wait (tx_message_context_handle context);
+tx_api_message_buffer *get_send_buffer (tx_message_context_handle context);
+void send_message (const tx_api_message_buffer *const api_buffer);
 
 rx_message_context_handle message_receive_create_local (const communication_path_definition *const path_def);
 void message_receive_attach_remote (rx_message_context_handle context);
 void message_receive_finalise (rx_message_context_handle context);
-api_message_buffer *await_message (rx_message_context_handle context);
-void free_message (rx_message_context_handle context, api_message_buffer *const api_buffer);
+rx_api_message_buffer *poll_rx_message (rx_message_context_handle context);
+rx_api_message_buffer *await_message (rx_message_context_handle context);
+void free_message (rx_api_message_buffer *const api_buffer);
 
 /** The assumed cache line size for allocating areas. Should be valid for all Sandy Bridge and Haswell processors */
 #define CACHE_LINE_SIZE_BYTES 64

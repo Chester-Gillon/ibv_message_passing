@@ -76,7 +76,7 @@ typedef struct tx_message_context_s
     /** The maximum number of bytes which can be sent inline on transmit_send_qp */
     uint32_t message_transmit_qp_max_inline_data;
     /** Array of length path_def.num_message_buffers which point at each message in transmit_buffer */
-    api_message_buffer *api_message_buffers;
+    tx_api_message_buffer *api_message_buffers;
     /** Array of length path_def.num_message_buffers which contains the internal information used to transmit messages */
     tx_message_buffer *tx_message_buffers;
     /** The circular buffer index for the next message buffer to pass to the application for populating */
@@ -195,12 +195,13 @@ static void initialise_transmit_message_buffers (tx_message_context_handle conte
     uint64_t data_offset;
     uint64_t freed_sequence_number_offset;
 
-    context->api_message_buffers = cache_line_aligned_calloc (context->path_def.num_message_buffers, sizeof (api_message_buffer));
+    context->api_message_buffers =
+            cache_line_aligned_calloc (context->path_def.num_message_buffers, sizeof (tx_api_message_buffer));
     context->tx_message_buffers = cache_line_aligned_calloc (context->path_def.num_message_buffers, sizeof (tx_message_buffer));
     buffer_offset = 0;
     for (buffer_index = 0; buffer_index < context->path_def.num_message_buffers; buffer_index++)
     {
-        api_message_buffer *const api_buffer = &context->api_message_buffers[buffer_index];
+        tx_api_message_buffer *const api_buffer = &context->api_message_buffers[buffer_index];
         tx_message_buffer *const tx_buffer = &context->tx_message_buffers[buffer_index];
         struct ibv_sge *const data_sge = &tx_buffer->transmit_sges[MESSAGE_DATA_WQE_INDEX];
         struct ibv_sge *const header_sge = &tx_buffer->transmit_sges[MESSAGE_HEADER_WQE_INDEX];
@@ -208,6 +209,7 @@ static void initialise_transmit_message_buffers (tx_message_context_handle conte
         struct ibv_send_wr *const header_wr = &tx_buffer->transmit_wrs[MESSAGE_HEADER_WQE_INDEX];
 
         /* Set the header, data and freed sequence number offsets for this message */
+        api_buffer->context = context;
         api_buffer->buffer_index = buffer_index;
         header_offset = buffer_offset;
         buffer_offset += align_to_cache_line_size (sizeof (message_header));
@@ -387,59 +389,68 @@ void message_transmit_finalise (tx_message_context_handle context)
 }
 
 /**
- * @brief Wait for receiver to indicate a previous message used sent from a buffer has been freed
- * @param[in,out] context The transmit message context to wait for the previous message to be freed
- * @param[in,out] buffer_index Which message buffer to wait for the previous message to be freed
+ * @brief Determine if a message buffer is free, or if a previous message to use the buffer is still in use by the receiver
+ * @param[in,out] context The transmit message context to check for the message buffer being free
+ * @param[in,out] buffer_index Which message buffer to check for being free
+ * @return Returns:
+ *         false - the buffer is in use with a message which has not been freed by the receiver.
+ *         true  - the buffer is free, and can be used to send a message.
  */
-static void await_buffer_freed (tx_message_context_handle context, const uint32_t buffer_index)
+static bool is_buffer_free (tx_message_context_handle context, const uint32_t buffer_index)
 {
     tx_message_buffer *const tx_buffer = &context->tx_message_buffers[buffer_index];
     struct ibv_wc wc;
     int num_completions;
+    bool buffer_free = false;
 
     if (tx_buffer->await_buffer_freed)
     {
-        bool message_freed = false;
+        const uint32_t sampled_sequence_number = *tx_buffer->freed_sequence_number;
 
-        do
+        if (sampled_sequence_number == tx_buffer->message_freed_sequence_number)
         {
-            const uint32_t sampled_sequence_number = *tx_buffer->freed_sequence_number;
-
-            if (sampled_sequence_number == tx_buffer->message_freed_sequence_number)
+            buffer_free = true;
+        }
+        else
+        {
+            CHECK_ASSERT (sampled_sequence_number == tx_buffer->message_not_freed_sequence_number);
+            if (context->path_def.tx_polls_for_errors)
             {
-                message_freed = true;
-            }
-            else
-            {
-                CHECK_ASSERT (sampled_sequence_number == tx_buffer->message_not_freed_sequence_number);
-                if (context->path_def.tx_polls_for_errors)
+                /* While waiting for the previous message to be freed, checked if an Infiniband error has occurred */
+                num_completions = ibv_poll_cq (context->message_transmit_cq, 1, &wc);
+                if (num_completions == 1)
                 {
-                    /* While waiting for the previous message to be freed, checked if an Infiniband error has occurred */
-                    num_completions = ibv_poll_cq (context->message_transmit_cq, 1, &wc);
-                    if (num_completions == 1)
+                    if (wc.status == IBV_WC_SUCCESS)
                     {
-                        if (wc.status == IBV_WC_SUCCESS)
-                        {
-                            context->message_transmit_cq_consumed = true;
-                        }
-                        else
-                        {
-                            fprintf (stderr, "Tx %d failed with Infiniband CQ error %s\n",
-                                    context->path_def.instance, ibv_wc_status_str (wc.status));
-                            exit (EXIT_FAILURE);
-                        }
+                        context->message_transmit_cq_consumed = true;
                     }
                     else
                     {
-                        CHECK_ASSERT (num_completions == 0);
+                        fprintf (stderr, "Tx %d failed with Infiniband CQ error %s\n",
+                                context->path_def.instance, ibv_wc_status_str (wc.status));
+                        exit (EXIT_FAILURE);
                     }
                 }
+                else
+                {
+                    CHECK_ASSERT (num_completions == 0);
+                }
             }
-        } while (!message_freed);
-        tx_buffer->message_not_freed_sequence_number = tx_buffer->message_freed_sequence_number;
-        tx_buffer->message_freed_sequence_number = tx_buffer->next_transmit_sequence_number;
-        tx_buffer->await_buffer_freed = false;
+        }
+
+        if (buffer_free)
+        {
+            tx_buffer->message_not_freed_sequence_number = tx_buffer->message_freed_sequence_number;
+            tx_buffer->message_freed_sequence_number = tx_buffer->next_transmit_sequence_number;
+            tx_buffer->await_buffer_freed = false;
+        }
     }
+    else
+    {
+        buffer_free = true;
+    }
+
+    return buffer_free;
 }
 
 /**
@@ -454,8 +465,37 @@ void await_all_outstanding_messages_freed (tx_message_context_handle context)
 
     for (buffer_index = 0; buffer_index < context->path_def.num_message_buffers; buffer_index++)
     {
-        await_buffer_freed (context, buffer_index);
+        while (!is_buffer_free (context, buffer_index))
+        {
+        }
     }
+}
+
+/**
+ * @brief Attempt to get a message send buffer to populate
+ * @details If the next message buffer is still in use, then unable to obtain a buffer
+ * @param[in,out] context The transmit context to get the message buffer for
+ * @return Returns a pointer to a message buffer, for which the message field can be populated with a message to send.
+ *                 Returns NULL if a free buffer is not currently available
+ */
+tx_api_message_buffer *get_send_buffer_no_wait (tx_message_context_handle context)
+{
+    tx_api_message_buffer *api_buffer = &context->api_message_buffers[context->next_transmit_buffer_index];
+    tx_message_buffer *const tx_buffer = &context->tx_message_buffers[context->next_transmit_buffer_index];
+
+    CHECK_ASSERT (!tx_buffer->owned_by_application);
+    if (is_buffer_free (context, context->next_transmit_buffer_index))
+    {
+        /* Mark the buffer as being prepared by the application, and advance to the next sender buffer index */
+        tx_buffer->owned_by_application = true;
+        context->next_transmit_buffer_index = (context->next_transmit_buffer_index + 1) % context->path_def.num_message_buffers;
+    }
+    else
+    {
+        api_buffer = NULL;
+    }
+
+    return api_buffer;
 }
 
 /**
@@ -465,17 +505,14 @@ void await_all_outstanding_messages_freed (tx_message_context_handle context)
  * @param[in,out] context The transmit context to get the message buffer for
  * @return Returns a pointer to a message buffer, for which the message field can be populated with a message to send
  */
-api_message_buffer *get_send_buffer (tx_message_context_handle context)
+tx_api_message_buffer *get_send_buffer (tx_message_context_handle context)
 {
-    api_message_buffer *const api_buffer = &context->api_message_buffers[context->next_transmit_buffer_index];
-    tx_message_buffer *const tx_buffer = &context->tx_message_buffers[context->next_transmit_buffer_index];
+    tx_api_message_buffer *api_buffer;
 
-    CHECK_ASSERT (!tx_buffer->owned_by_application);
-    await_buffer_freed (context, context->next_transmit_buffer_index);
-
-    /* Mark the buffer as being prepared by the application, and advance to the next sender buffer index */
-    tx_buffer->owned_by_application = true;
-    context->next_transmit_buffer_index = (context->next_transmit_buffer_index + 1) % context->path_def.num_message_buffers;
+    do
+    {
+        api_buffer = get_send_buffer_no_wait (context);
+    } while (api_buffer == NULL);
 
     return api_buffer;
 }
@@ -483,46 +520,45 @@ api_message_buffer *get_send_buffer (tx_message_context_handle context)
 /**
  * @brief Send a message with the content which has been populated by the caller
  * @details When this function returns the message has been queued for transmission
- * @param[in,out] context_in The transmit context to send the message on
  * @param[in,out] api_buffer The message buffer to send, which was previously returned by get_send_buffer()
  *                       and which the message to send has been populated by the caller.
  *                       This function will set the api_buffer->header->sequence_number field
  */
-void send_message (tx_message_context_handle context, const api_message_buffer *const api_buffer)
+void send_message (const tx_api_message_buffer *const api_buffer)
 {
-    tx_message_buffer *const tx_buffer = &context->tx_message_buffers[api_buffer->buffer_index];
+    tx_message_buffer *const tx_buffer = &api_buffer->context->tx_message_buffers[api_buffer->buffer_index];
     struct ibv_send_wr *bad_wr = NULL;
     int rc;
 
     CHECK_ASSERT ((tx_buffer->owned_by_application) &&
-                  (api_buffer->header->message_length <= context->path_def.max_message_size));
+                  (api_buffer->header->message_length <= api_buffer->context->path_def.max_message_size));
     tx_buffer->owned_by_application = false;
 
     /* Wait for the message send work request completion, which is signalled on one message in every num_message_buffers */
-    if (context->message_transmit_cq_pacing == context->path_def.num_message_buffers)
+    if (api_buffer->context->message_transmit_cq_pacing == api_buffer->context->path_def.num_message_buffers)
     {
         struct ibv_wc wc;
         int num_completions;
 
-        if (context->message_transmit_cq_consumed)
+        if (api_buffer->context->message_transmit_cq_consumed)
         {
-            context->message_transmit_cq_consumed = false;
+            api_buffer->context->message_transmit_cq_consumed = false;
         }
         else
         {
             do
             {
-                num_completions = ibv_poll_cq (context->message_transmit_cq, 1, &wc);
+                num_completions = ibv_poll_cq (api_buffer->context->message_transmit_cq, 1, &wc);
             } while (num_completions == 0);
             CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS));
         }
-        context->message_transmit_cq_pacing = 0;
+        api_buffer->context->message_transmit_cq_pacing = 0;
     }
 
     /* Complete the message to be sent */
     api_buffer->header->sequence_number = tx_buffer->next_transmit_sequence_number;
     tx_buffer->transmit_sges[MESSAGE_DATA_WQE_INDEX].length = api_buffer->header->message_length;
-    if (context->message_transmit_cq_pacing == 0)
+    if (api_buffer->context->message_transmit_cq_pacing == 0)
     {
         tx_buffer->transmit_wrs[MESSAGE_HEADER_WQE_INDEX].send_flags |= IBV_SEND_SIGNALED;
     }
@@ -530,12 +566,13 @@ void send_message (tx_message_context_handle context, const api_message_buffer *
     {
         tx_buffer->transmit_wrs[MESSAGE_HEADER_WQE_INDEX].send_flags &= ~IBV_SEND_SIGNALED;
     }
-    context->message_transmit_cq_pacing++;
+    api_buffer->context->message_transmit_cq_pacing++;
 
     if (tx_buffer->transmit_wrs[MESSAGE_DATA_WQE_INDEX].sg_list->length > 0)
     {
         /* Start the transfer for the data followed by the header */
-        if (tx_buffer->transmit_wrs[MESSAGE_DATA_WQE_INDEX].sg_list->length <= context->message_transmit_qp_max_inline_data)
+        if (tx_buffer->transmit_wrs[MESSAGE_DATA_WQE_INDEX].sg_list->length <=
+                api_buffer->context->message_transmit_qp_max_inline_data)
         {
             tx_buffer->transmit_wrs[MESSAGE_DATA_WQE_INDEX].send_flags |= IBV_SEND_INLINE;
         }
@@ -543,18 +580,19 @@ void send_message (tx_message_context_handle context, const api_message_buffer *
         {
             tx_buffer->transmit_wrs[MESSAGE_DATA_WQE_INDEX].send_flags &= ~IBV_SEND_INLINE;
         }
-        rc =  ibv_post_send (context->message_transmit_qp, &tx_buffer->transmit_wrs[MESSAGE_DATA_WQE_INDEX], &bad_wr);
+        rc =  ibv_post_send (api_buffer->context->message_transmit_qp, &tx_buffer->transmit_wrs[MESSAGE_DATA_WQE_INDEX], &bad_wr);
         CHECK_ASSERT (rc == 0);
     }
     else
     {
         /* Start the transfer for the header */
-        rc =  ibv_post_send (context->message_transmit_qp, &tx_buffer->transmit_wrs[MESSAGE_HEADER_WQE_INDEX], &bad_wr);
+        rc =  ibv_post_send (api_buffer->context->message_transmit_qp,
+                &tx_buffer->transmit_wrs[MESSAGE_HEADER_WQE_INDEX], &bad_wr);
         CHECK_ASSERT (rc == 0);
     }
 
     tx_buffer->await_buffer_freed = true;
 
     /* Advance to the next sequence number for this buffer */
-    tx_buffer->next_transmit_sequence_number += context->path_def.num_message_buffers;
+    tx_buffer->next_transmit_sequence_number += api_buffer->context->path_def.num_message_buffers;
 }

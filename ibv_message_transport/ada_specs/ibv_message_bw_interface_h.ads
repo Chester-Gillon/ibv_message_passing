@@ -20,7 +20,7 @@ package ibv_message_bw_interface_h is
    SLP_ATTRIBUTES_MAX_LEN : constant := 1024;  --  ../ibv_message_bw_interface.h:102
    --  unsupported macro: CHECK_ASSERT(assertion) check_assert(assertion,#assertion)
 
-   CACHE_LINE_SIZE_BYTES : constant := 64;  --  ../ibv_message_bw_interface.h:211
+   CACHE_LINE_SIZE_BYTES : constant := 64;  --  ../ibv_message_bw_interface.h:230
 
    type buffer_allocation_type is 
      (BUFFER_ALLOCATION_HEAP,
@@ -105,48 +105,59 @@ package ibv_message_bw_interface_h is
 
    --  skipped anonymous struct anon_43
 
-   type api_message_buffer is record
-      header : access message_header;  -- ../ibv_message_bw_interface.h:158
-      data : System.Address;  -- ../ibv_message_bw_interface.h:160
-      buffer_index : aliased stdint_h.uint32_t;  -- ../ibv_message_bw_interface.h:162
-   end record;
-   pragma Convention (C_Pass_By_Copy, api_message_buffer);  -- ../ibv_message_bw_interface.h:163
-
-   --  skipped anonymous struct anon_44
-
    --  skipped empty struct tx_message_context_s
 
-   type tx_message_context_handle is new System.Address;  -- ../ibv_message_bw_interface.h:167
+   type tx_message_context_handle is new System.Address;  -- ../ibv_message_bw_interface.h:154
 
    --  skipped empty struct rx_message_context_s
 
-   type rx_message_context_handle is new System.Address;  -- ../ibv_message_bw_interface.h:170
+   type rx_message_context_handle is new System.Address;  -- ../ibv_message_bw_interface.h:157
 
-   procedure check_assert (assertion : Extensions.bool; message : Interfaces.C.Strings.chars_ptr);  -- ../ibv_message_bw_interface.h:172
+   type tx_api_message_buffer is record
+      header : access message_header;  -- ../ibv_message_bw_interface.h:165
+      data : System.Address;  -- ../ibv_message_bw_interface.h:167
+      context : tx_message_context_handle;  -- ../ibv_message_bw_interface.h:169
+      buffer_index : aliased stdint_h.uint32_t;  -- ../ibv_message_bw_interface.h:171
+   end record;
+   pragma Convention (C_Pass_By_Copy, tx_api_message_buffer);  -- ../ibv_message_bw_interface.h:172
+
+   --  skipped anonymous struct anon_44
+
+   type rx_api_message_buffer is record
+      header : access message_header;  -- ../ibv_message_bw_interface.h:180
+      data : System.Address;  -- ../ibv_message_bw_interface.h:182
+      context : rx_message_context_handle;  -- ../ibv_message_bw_interface.h:184
+      buffer_index : aliased stdint_h.uint32_t;  -- ../ibv_message_bw_interface.h:186
+   end record;
+   pragma Convention (C_Pass_By_Copy, rx_api_message_buffer);  -- ../ibv_message_bw_interface.h:187
+
+   --  skipped anonymous struct anon_45
+
+   procedure check_assert (assertion : Extensions.bool; message : Interfaces.C.Strings.chars_ptr);  -- ../ibv_message_bw_interface.h:189
    pragma Import (C, check_assert, "check_assert");
 
-   function page_aligned_alloc (size : stddef_h.size_t) return System.Address;  -- ../ibv_message_bw_interface.h:174
+   function page_aligned_alloc (size : stddef_h.size_t) return System.Address;  -- ../ibv_message_bw_interface.h:191
    pragma Import (C, page_aligned_alloc, "page_aligned_alloc");
 
-   function page_aligned_calloc (nmemb : stddef_h.size_t; size : stddef_h.size_t) return System.Address;  -- ../ibv_message_bw_interface.h:175
+   function page_aligned_calloc (nmemb : stddef_h.size_t; size : stddef_h.size_t) return System.Address;  -- ../ibv_message_bw_interface.h:192
    pragma Import (C, page_aligned_calloc, "page_aligned_calloc");
 
-   function cache_line_aligned_alloc (size : stddef_h.size_t) return System.Address;  -- ../ibv_message_bw_interface.h:176
+   function cache_line_aligned_alloc (size : stddef_h.size_t) return System.Address;  -- ../ibv_message_bw_interface.h:193
    pragma Import (C, cache_line_aligned_alloc, "cache_line_aligned_alloc");
 
-   function cache_line_aligned_calloc (nmemb : stddef_h.size_t; size : stddef_h.size_t) return System.Address;  -- ../ibv_message_bw_interface.h:177
+   function cache_line_aligned_calloc (nmemb : stddef_h.size_t; size : stddef_h.size_t) return System.Address;  -- ../ibv_message_bw_interface.h:194
    pragma Import (C, cache_line_aligned_calloc, "cache_line_aligned_calloc");
 
-   procedure open_ib_port_endpoint (endpoint : access ib_port_endpoint; path_def : access constant communication_path_definition);  -- ../ibv_message_bw_interface.h:178
+   procedure open_ib_port_endpoint (endpoint : access ib_port_endpoint; path_def : access constant communication_path_definition);  -- ../ibv_message_bw_interface.h:195
    pragma Import (C, open_ib_port_endpoint, "open_ib_port_endpoint");
 
-   procedure close_ib_port_endpoint (endpoint : access ib_port_endpoint);  -- ../ibv_message_bw_interface.h:179
+   procedure close_ib_port_endpoint (endpoint : access ib_port_endpoint);  -- ../ibv_message_bw_interface.h:196
    pragma Import (C, close_ib_port_endpoint, "close_ib_port_endpoint");
 
    procedure intialise_slp_connection
      (slp_connection : access communication_path_slp_connection;
       is_tx_end : Extensions.bool;
-      path_def : access constant communication_path_definition);  -- ../ibv_message_bw_interface.h:180
+      path_def : access constant communication_path_definition);  -- ../ibv_message_bw_interface.h:197
    pragma Import (C, intialise_slp_connection, "intialise_slp_connection");
 
    procedure register_memory_buffer_with_slp
@@ -154,76 +165,82 @@ package ibv_message_bw_interface_h is
       endpoint : access constant ib_port_endpoint;
       psn : stdint_h.uint32_t;
       mr : access constant infiniband_verbs_h.ibv_mr;
-      qp : access constant infiniband_verbs_h.ibv_qp);  -- ../ibv_message_bw_interface.h:182
+      qp : access constant infiniband_verbs_h.ibv_qp);  -- ../ibv_message_bw_interface.h:199
    pragma Import (C, register_memory_buffer_with_slp, "register_memory_buffer_with_slp");
 
-   procedure report_local_memory_buffer_rtr_with_slp (slp_connection : access communication_path_slp_connection);  -- ../ibv_message_bw_interface.h:185
+   procedure report_local_memory_buffer_rtr_with_slp (slp_connection : access communication_path_slp_connection);  -- ../ibv_message_bw_interface.h:202
    pragma Import (C, report_local_memory_buffer_rtr_with_slp, "report_local_memory_buffer_rtr_with_slp");
 
-   procedure get_remote_memory_buffer_from_slp (slp_connection : access communication_path_slp_connection);  -- ../ibv_message_bw_interface.h:186
+   procedure get_remote_memory_buffer_from_slp (slp_connection : access communication_path_slp_connection);  -- ../ibv_message_bw_interface.h:203
    pragma Import (C, get_remote_memory_buffer_from_slp, "get_remote_memory_buffer_from_slp");
 
-   procedure await_remote_memory_buffer_rtr_from_slp (slp_connection : access communication_path_slp_connection);  -- ../ibv_message_bw_interface.h:187
+   procedure await_remote_memory_buffer_rtr_from_slp (slp_connection : access communication_path_slp_connection);  -- ../ibv_message_bw_interface.h:204
    pragma Import (C, await_remote_memory_buffer_rtr_from_slp, "await_remote_memory_buffer_rtr_from_slp");
 
-   procedure close_slp_connection (slp_connection : access communication_path_slp_connection);  -- ../ibv_message_bw_interface.h:188
+   procedure close_slp_connection (slp_connection : access communication_path_slp_connection);  -- ../ibv_message_bw_interface.h:205
    pragma Import (C, close_slp_connection, "close_slp_connection");
 
-   function align_to_cache_line_size (size : stddef_h.size_t) return stddef_h.size_t;  -- ../ibv_message_bw_interface.h:189
+   function align_to_cache_line_size (size : stddef_h.size_t) return stddef_h.size_t;  -- ../ibv_message_bw_interface.h:206
    pragma Import (C, align_to_cache_line_size, "align_to_cache_line_size");
 
    procedure create_memory_buffer
      (buffer : access memory_buffer;
       is_tx_end : Extensions.bool;
-      path_def : access constant communication_path_definition);  -- ../ibv_message_bw_interface.h:190
+      path_def : access constant communication_path_definition);  -- ../ibv_message_bw_interface.h:207
    pragma Import (C, create_memory_buffer, "create_memory_buffer");
 
-   procedure release_memory_buffer (buffer : access memory_buffer);  -- ../ibv_message_bw_interface.h:192
+   procedure release_memory_buffer (buffer : access memory_buffer);  -- ../ibv_message_bw_interface.h:209
    pragma Import (C, release_memory_buffer, "release_memory_buffer");
 
-   function get_random_psn return stdint_h.uint32_t;  -- ../ibv_message_bw_interface.h:193
+   function get_random_psn return stdint_h.uint32_t;  -- ../ibv_message_bw_interface.h:210
    pragma Import (C, get_random_psn, "get_random_psn");
 
-   function get_max_inline_data (qp : access infiniband_verbs_h.ibv_qp) return stdint_h.uint32_t;  -- ../ibv_message_bw_interface.h:194
+   function get_max_inline_data (qp : access infiniband_verbs_h.ibv_qp) return stdint_h.uint32_t;  -- ../ibv_message_bw_interface.h:211
    pragma Import (C, get_max_inline_data, "get_max_inline_data");
 
    procedure verify_qp_state
      (expected_state : infiniband_verbs_h.ibv_qp_state;
       qp : access infiniband_verbs_h.ibv_qp;
-      qp_name : Interfaces.C.Strings.chars_ptr);  -- ../ibv_message_bw_interface.h:195
+      qp_name : Interfaces.C.Strings.chars_ptr);  -- ../ibv_message_bw_interface.h:212
    pragma Import (C, verify_qp_state, "verify_qp_state");
 
-   function message_transmit_create_local (path_def : access constant communication_path_definition) return tx_message_context_handle;  -- ../ibv_message_bw_interface.h:197
+   function message_transmit_create_local (path_def : access constant communication_path_definition) return tx_message_context_handle;  -- ../ibv_message_bw_interface.h:214
    pragma Import (C, message_transmit_create_local, "message_transmit_create_local");
 
-   procedure message_transmit_attach_remote (context : tx_message_context_handle);  -- ../ibv_message_bw_interface.h:198
+   procedure message_transmit_attach_remote (context : tx_message_context_handle);  -- ../ibv_message_bw_interface.h:215
    pragma Import (C, message_transmit_attach_remote, "message_transmit_attach_remote");
 
-   procedure message_transmit_finalise (context : tx_message_context_handle);  -- ../ibv_message_bw_interface.h:199
+   procedure message_transmit_finalise (context : tx_message_context_handle);  -- ../ibv_message_bw_interface.h:216
    pragma Import (C, message_transmit_finalise, "message_transmit_finalise");
 
-   procedure await_all_outstanding_messages_freed (context : tx_message_context_handle);  -- ../ibv_message_bw_interface.h:200
+   procedure await_all_outstanding_messages_freed (context : tx_message_context_handle);  -- ../ibv_message_bw_interface.h:217
    pragma Import (C, await_all_outstanding_messages_freed, "await_all_outstanding_messages_freed");
 
-   function get_send_buffer (context : tx_message_context_handle) return access api_message_buffer;  -- ../ibv_message_bw_interface.h:201
+   function get_send_buffer_no_wait (context : tx_message_context_handle) return access tx_api_message_buffer;  -- ../ibv_message_bw_interface.h:218
+   pragma Import (C, get_send_buffer_no_wait, "get_send_buffer_no_wait");
+
+   function get_send_buffer (context : tx_message_context_handle) return access tx_api_message_buffer;  -- ../ibv_message_bw_interface.h:219
    pragma Import (C, get_send_buffer, "get_send_buffer");
 
-   procedure send_message (context : tx_message_context_handle; api_buffer : access constant api_message_buffer);  -- ../ibv_message_bw_interface.h:202
+   procedure send_message (api_buffer : access constant tx_api_message_buffer);  -- ../ibv_message_bw_interface.h:220
    pragma Import (C, send_message, "send_message");
 
-   function message_receive_create_local (path_def : access constant communication_path_definition) return rx_message_context_handle;  -- ../ibv_message_bw_interface.h:204
+   function message_receive_create_local (path_def : access constant communication_path_definition) return rx_message_context_handle;  -- ../ibv_message_bw_interface.h:222
    pragma Import (C, message_receive_create_local, "message_receive_create_local");
 
-   procedure message_receive_attach_remote (context : rx_message_context_handle);  -- ../ibv_message_bw_interface.h:205
+   procedure message_receive_attach_remote (context : rx_message_context_handle);  -- ../ibv_message_bw_interface.h:223
    pragma Import (C, message_receive_attach_remote, "message_receive_attach_remote");
 
-   procedure message_receive_finalise (context : rx_message_context_handle);  -- ../ibv_message_bw_interface.h:206
+   procedure message_receive_finalise (context : rx_message_context_handle);  -- ../ibv_message_bw_interface.h:224
    pragma Import (C, message_receive_finalise, "message_receive_finalise");
 
-   function await_message (context : rx_message_context_handle) return access api_message_buffer;  -- ../ibv_message_bw_interface.h:207
+   function poll_rx_message (context : rx_message_context_handle) return access rx_api_message_buffer;  -- ../ibv_message_bw_interface.h:225
+   pragma Import (C, poll_rx_message, "poll_rx_message");
+
+   function await_message (context : rx_message_context_handle) return access rx_api_message_buffer;  -- ../ibv_message_bw_interface.h:226
    pragma Import (C, await_message, "await_message");
 
-   procedure free_message (context : rx_message_context_handle; api_buffer : access api_message_buffer);  -- ../ibv_message_bw_interface.h:208
+   procedure free_message (api_buffer : access rx_api_message_buffer);  -- ../ibv_message_bw_interface.h:227
    pragma Import (C, free_message, "free_message");
 
 end ibv_message_bw_interface_h;

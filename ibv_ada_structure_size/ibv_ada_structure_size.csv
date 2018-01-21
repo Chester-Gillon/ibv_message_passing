@@ -118,7 +118,13 @@ message_header.sequence_number,32,0
 message_header.message_length,32,4
 message_header.message_id,32,8
 message_header.source_instance,32,12
-api_message_buffer,192
-api_message_buffer.header,64,0
-api_message_buffer.data,64,8
-api_message_buffer.buffer_index,32,16
+tx_api_message_buffer,256
+tx_api_message_buffer.header,64,0
+tx_api_message_buffer.data,64,8
+tx_api_message_buffer.context,64,16
+tx_api_message_buffer.buffer_index,32,24
+rx_api_message_buffer,256
+rx_api_message_buffer.header,64,0
+rx_api_message_buffer.data,64,8
+rx_api_message_buffer.context,64,16
+rx_api_message_buffer.buffer_index,32,24

@@ -66,7 +66,7 @@ typedef struct rx_message_context_s
     /** The maximum number of bytes which can be sent inline on freed_sequence_number_qp */
     uint32_t freed_sequence_number_qp_max_inline_data;
     /** Array of length path_def.num_message_buffers which point at each message in receive_buffer */
-    api_message_buffer *api_message_buffers;
+    rx_api_message_buffer *api_message_buffers;
     /** Array of length path_def.num_message_buffers which contains the internal information used to receive messages */
     rx_message_buffer *rx_message_buffers;
     /** The circular buffer index for the next message message to check for message receipt */
@@ -182,15 +182,16 @@ static void initialise_receive_message_buffers (rx_message_context_handle contex
     uint64_t data_offset;
     uint64_t freed_sequence_number_offset;
 
-    context->api_message_buffers = cache_line_aligned_calloc (context->path_def.num_message_buffers, sizeof (api_message_buffer));
+    context->api_message_buffers = cache_line_aligned_calloc (context->path_def.num_message_buffers, sizeof (rx_api_message_buffer));
     context->rx_message_buffers = cache_line_aligned_calloc (context->path_def.num_message_buffers, sizeof (rx_message_buffer));
     buffer_offset = 0;
     for (buffer_index = 0; buffer_index < context->path_def.num_message_buffers; buffer_index++)
     {
-        api_message_buffer *const api_buffer = &context->api_message_buffers[buffer_index];
+        rx_api_message_buffer *const api_buffer = &context->api_message_buffers[buffer_index];
         rx_message_buffer *const rx_buffer = &context->rx_message_buffers[buffer_index];
 
         /* Set the header, data and freed sequence number offsets for this message */
+        api_buffer->context = context;
         api_buffer->buffer_index = buffer_index;
         header_offset = buffer_offset;
         buffer_offset += align_to_cache_line_size (sizeof (message_header));
@@ -342,74 +343,95 @@ void message_receive_finalise (rx_message_context_handle context)
 }
 
 /**
+ * @brief Poll for receipt of a message
+ * @details The contents of the received message remains valid until the returned buffer is freed by a
+ *          call to free_message(). Flow control prevents a received message from being overwritten until freed
+ * @param[in,out] context The receive context to receive the message on
+ * @return Returns a pointer to the received message buffer, or NULL if no message is currently available
+ */
+rx_api_message_buffer *poll_rx_message (rx_message_context_handle context)
+{
+    const uint32_t buffer_index = context->next_receive_buffer_index;
+    rx_api_message_buffer *api_buffer = &context->api_message_buffers[buffer_index];
+    rx_message_buffer *const rx_buffer = &context->rx_message_buffers[buffer_index];
+    const volatile uint32_t *const receive_sequence_number = &api_buffer->header->sequence_number;
+    bool message_available = false;
+    const uint32_t sampled_sequence_number = *receive_sequence_number;
+
+    if (sampled_sequence_number == rx_buffer->message_available_sequence_number)
+    {
+        message_available = true;
+    }
+    else
+    {
+        CHECK_ASSERT (sampled_sequence_number == rx_buffer->message_not_available_sequence_number);
+    }
+
+    if (message_available)
+    {
+        /* Advance to the next expected receive buffer */
+        context->next_receive_buffer_index = (context->next_receive_buffer_index + 1) % context->path_def.num_message_buffers;
+
+        /* Return the received message */
+        rx_buffer->owned_by_application = true;
+    }
+    else
+    {
+        api_buffer = NULL;
+    }
+
+    return api_buffer;
+}
+
+/**
  * @brief Wait for a message to be received, using a busy-poll
  * @details The contents of the received message remains valid until the returned buffer is freed by a
  *          call to free_message(). Flow control prevents a received message from being overwritten until freed
  * @param[in,out] context The receive context to receive the message on
  * @return Returns a pointer to the received message buffer
  */
-api_message_buffer *await_message (rx_message_context_handle context)
+rx_api_message_buffer *await_message (rx_message_context_handle context)
 {
-    const uint32_t buffer_index = context->next_receive_buffer_index;
-    api_message_buffer *const api_buffer = &context->api_message_buffers[buffer_index];
-    rx_message_buffer *const rx_buffer = &context->rx_message_buffers[buffer_index];
-    const volatile uint32_t *const receive_sequence_number = &api_buffer->header->sequence_number;
-    bool message_available = false;
+    rx_api_message_buffer *api_buffer;
 
-    /* Wait for the sequence number to indicate the next message is available */
     do
     {
-        const uint32_t sampled_sequence_number = *receive_sequence_number;
+        api_buffer = poll_rx_message (context);
+    } while (api_buffer == NULL);
 
-        if (sampled_sequence_number == rx_buffer->message_available_sequence_number)
-        {
-            message_available = true;
-        }
-        else
-        {
-            CHECK_ASSERT (sampled_sequence_number == rx_buffer->message_not_available_sequence_number);
-        }
-    } while (!message_available);
-
-    /* Advance to the next expected receive buffer */
-    context->next_receive_buffer_index = (context->next_receive_buffer_index + 1) % context->path_def.num_message_buffers;
-
-    /* Return the received message */
-    rx_buffer->owned_by_application = true;
     return api_buffer;
 }
 
 /**
  * @brief Mark a receive message buffer after the received message has been freed
  * @details This implements flow control by indicating to sender that the buffer is now free for another message
- * @param[in,out] context_in The receive context to free the message for
  * @param[in,out] api_buffer The received message buffer to free
  */
-void free_message (rx_message_context_handle context, api_message_buffer *const api_buffer)
+void free_message (rx_api_message_buffer *const api_buffer)
 {
-    rx_message_buffer *const rx_buffer = &context->rx_message_buffers[api_buffer->buffer_index];
+    rx_message_buffer *const rx_buffer = &api_buffer->context->rx_message_buffers[api_buffer->buffer_index];
     struct ibv_send_wr *bad_wr = NULL;
     int rc;
 
     CHECK_ASSERT (rx_buffer->owned_by_application);
 
     /* Wait for the freed buffer send work request completion, which is signalled on one message in every num_message_buffers */
-    if (context->freed_sequence_number_cq_pacing == context->path_def.num_message_buffers)
+    if (api_buffer->context->freed_sequence_number_cq_pacing == api_buffer->context->path_def.num_message_buffers)
     {
         int num_completions;
         struct ibv_wc wc;
 
         do
         {
-            num_completions = ibv_poll_cq (context->freed_sequence_number_cq, 1, &wc);
+            num_completions = ibv_poll_cq (api_buffer->context->freed_sequence_number_cq, 1, &wc);
         } while (num_completions == 0);
         CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS));
-        context->freed_sequence_number_cq_pacing = 0;
+        api_buffer->context->freed_sequence_number_cq_pacing = 0;
     }
 
     /* Transmit the freed sequence number to the sender, to indicate the buffer can be reused */
     *rx_buffer->freed_sequence_number = rx_buffer->message_available_sequence_number;
-    if (context->freed_sequence_number_cq_pacing == 0)
+    if (api_buffer->context->freed_sequence_number_cq_pacing == 0)
     {
         rx_buffer->freed_message_wr.send_flags |= IBV_SEND_SIGNALED;
     }
@@ -417,12 +439,12 @@ void free_message (rx_message_context_handle context, api_message_buffer *const 
     {
         rx_buffer->freed_message_wr.send_flags &= ~IBV_SEND_SIGNALED;
     }
-    context->freed_sequence_number_cq_pacing++;
-    rc = ibv_post_send (context->freed_sequence_number_qp, &rx_buffer->freed_message_wr, &bad_wr);
+    api_buffer->context->freed_sequence_number_cq_pacing++;
+    rc = ibv_post_send (api_buffer->context->freed_sequence_number_qp, &rx_buffer->freed_message_wr, &bad_wr);
     CHECK_ASSERT (rc == 0);
 
     /* Advance to the next expected sequence number */
     rx_buffer->message_not_available_sequence_number = rx_buffer->message_available_sequence_number;
-    rx_buffer->message_available_sequence_number += context->path_def.num_message_buffers;
+    rx_buffer->message_available_sequence_number += api_buffer->context->path_def.num_message_buffers;
     rx_buffer->owned_by_application = false;
 }
