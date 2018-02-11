@@ -1,0 +1,21 @@
+project Ibv_Controller_Process is
+
+   for Source_Dirs use (".", "../ibv_message_transport/ada_specs");
+   for Object_Dir use "obj";
+   for Main use ("ibv_controller_process_main.adb");
+
+   package Builder is
+      for Switches ("ada") use ("-g", "-s");
+   end Builder;
+
+   package Compiler is
+      for Switches ("ada") use ("-g");
+   end Compiler;
+
+   package Linker is
+      for Switches ("ada") use ("-g", "-L../ibv_message_transport/Debug",
+                                "-libv_message_transport", "-lrt", "-libverbs", "-lslp");
+   end Linker;
+
+end Ibv_Controller_Process;
+

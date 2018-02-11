@@ -110,12 +110,16 @@ void check_assert (const bool assertion, const char *message)
 }
 
 /**
- * @brief Open an Infiniband device and port to be as the endpoint for transmitting or receiving messages
+ * @brief Open an Infiniband device and port to be used as the endpoint for transmitting or receiving messages
  * @param[out] endpoint The opened endpoint
  * @param[in] path_def Defines which Infiniband device and port to open
+ * @param[in] is_tx_end Determines if the calling thread is the transmit or receive end of the communication path
  */
-void open_ib_port_endpoint (ib_port_endpoint *const endpoint, const communication_path_definition *const path_def)
+void open_ib_port_endpoint (ib_port_endpoint *const endpoint, const communication_path_definition *const path_def,
+                            const bool is_tx_end)
 {
+    const char *const ib_device = is_tx_end ? path_def->source_ib_device : path_def->destination_ib_device;
+    const uint8_t port_num = is_tx_end ? path_def->source_port_num : path_def->destination_port_num;
     int rc;
     int device_index;
 
@@ -136,7 +140,7 @@ void open_ib_port_endpoint (ib_port_endpoint *const endpoint, const communicatio
     endpoint->selected_device = NULL;
     for (device_index = 0; (endpoint->selected_device == NULL) && (device_index < endpoint->num_devices); device_index++)
     {
-        if (strcmp (path_def->ib_device, ibv_get_device_name (endpoint->device_list[device_index])) == 0)
+        if (strcmp (ib_device, ibv_get_device_name (endpoint->device_list[device_index])) == 0)
         {
             endpoint->selected_device = endpoint->device_list[device_index];
         }
@@ -144,7 +148,7 @@ void open_ib_port_endpoint (ib_port_endpoint *const endpoint, const communicatio
 
     if (endpoint->selected_device == NULL)
     {
-        fprintf (stderr, "Infiniband device %s does not exist. Available devices are", path_def->ib_device);
+        fprintf (stderr, "Infiniband device %s does not exist. Available devices are", ib_device);
         for (device_index = 0; device_index < endpoint->num_devices; device_index++)
         {
             fprintf (stderr, " %s", ibv_get_device_name (endpoint->device_list[device_index]));
@@ -177,13 +181,13 @@ void open_ib_port_endpoint (ib_port_endpoint *const endpoint, const communicatio
     }
 
     /* Check the Infiniband port number is valid, and obtain the port attributes */
-    if ((path_def->port_num < 1) || (path_def->port_num > endpoint->device_attributes.phys_port_cnt))
+    if ((port_num < 1) || (port_num > endpoint->device_attributes.phys_port_cnt))
     {
         fprintf (stderr, "Infiniband port %u is out of range for device %s, valid ports are 1..%u\n",
-                 path_def->port_num, path_def->ib_device, endpoint->device_attributes.phys_port_cnt);
+                 port_num, ib_device, endpoint->device_attributes.phys_port_cnt);
         exit (EXIT_FAILURE);
     }
-    rc = ibv_query_port (endpoint->device_context, path_def->port_num, &endpoint->port_attributes);
+    rc = ibv_query_port (endpoint->device_context, port_num, &endpoint->port_attributes);
     if (rc != 0)
     {
         perror ("ibv_query_port failed");
@@ -230,9 +234,11 @@ void intialise_slp_connection (communication_path_slp_connection *const slp_conn
     slp_connection->remote_attributes_obtained = false;
     rc = gethostname (hostname, sizeof (hostname));
     check_assert (rc == 0, "gethostname");
-    sprintf (slp_connection->local_service_url, "%s://%s/name=%s_%d",
-             SLP_SERVICE_NAME, hostname, local_end, path_def->instance);
-    sprintf (slp_connection->remote_service_name, "/name=%s_%d", remote_end, path_def->instance);
+    sprintf (slp_connection->local_service_url, "%s://%s/name=%s_%d_%d_%d",
+             SLP_SERVICE_NAME, hostname, local_end,
+             path_def->source_node, path_def->destination_node, path_def->instance);
+    sprintf (slp_connection->remote_service_name, "/name=%s_%d_%d_%d", remote_end,
+             path_def->source_node, path_def->destination_node, path_def->instance);
     strcpy (slp_connection->remote_service_url, "");
 
     slp_status = SLPOpen (NULL, SLP_FALSE, &slp_connection->handle);
@@ -532,7 +538,8 @@ void create_memory_buffer (memory_buffer *const buffer, const bool is_tx_end,
 
     case BUFFER_ALLOCATION_SHARED_MEMORY:
         /* Create a POSIX shared memory file */
-        sprintf (buffer->pathname, "/ibv_message_bw_%s_%d", is_tx_end ? "tx" : "rx", path_def->instance);
+        sprintf (buffer->pathname, "/ibv_message_bw_%s_%d_%d_%d", is_tx_end ? "tx" : "rx",
+                 path_def->source_node, path_def->destination_node, path_def->instance);
         buffer->fd = shm_open (buffer->pathname, O_RDWR | O_CREAT | O_EXCL, S_IRWXU | S_IRWXG | S_IRWXO);
         if (buffer->fd < 0)
         {
@@ -540,8 +547,8 @@ void create_memory_buffer (memory_buffer *const buffer, const bool is_tx_end,
             exit (EXIT_FAILURE);
         }
 
-        rc = ftruncate (buffer->fd, buffer->size);
-        check_assert (rc == 0, "ftruncate");
+        rc = posix_fallocate (buffer->fd, 0, buffer->size);
+        check_assert (rc == 0, "posix_fallocate");
         rc = fsync (buffer->fd);
         check_assert (rc == 0, "fsync");
         rc = close (buffer->fd);

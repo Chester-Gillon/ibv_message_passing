@@ -811,7 +811,8 @@ static void *message_transmit_thread (void *const arg)
 
     thread_context->test_pattern = thread_context->path_def.instance;
     thread_context->tx_handle = message_transmit_create_local (&thread_context->path_def);
-    message_transmit_attach_remote (thread_context->tx_handle);
+    message_transmit_attach_remote_pre_rtr (thread_context->tx_handle);
+    message_transmit_attach_remote_post_rtr (thread_context->tx_handle);
     rc = getrusage (RUSAGE_THREAD, &thread_context->results.start_usage);
     check_assert (rc == 0, "getrusage");
     thread_context->results.communication_path_connected = true;
@@ -918,7 +919,8 @@ static void *message_receive_thread (void *const arg)
 
     thread_context->test_pattern = thread_context->path_def.instance;
     thread_context->rx_handle = message_receive_create_local (&thread_context->path_def);
-    message_receive_attach_remote (thread_context->rx_handle);
+    message_receive_attach_remote_pre_rtr (thread_context->rx_handle);
+    message_receive_attach_remote_post_rtr (thread_context->rx_handle);
     rc = getrusage (RUSAGE_THREAD, &thread_context->results.start_usage);
     check_assert (rc == 0, "getrusage");
     thread_context->results.communication_path_connected = true;
@@ -1001,8 +1003,8 @@ static void create_message_threads (void)
         transmit_or_receive_context *const tx_or_rx = &thread_contexts[thread_index];
 
         /* Set the path definition which is common to the message transmitter and receiver */
-        path_def.ib_device = arg_ib_devices[thread_index];
-        path_def.port_num = (uint8_t) arg_ib_ports[thread_index];
+        path_def.source_node = 0;
+        path_def.destination_node = 0;
         path_def.instance = arg_path_instances[thread_index];
         path_def.max_message_size = arg_max_message_size;
         path_def.num_message_buffers = arg_num_message_buffers;
@@ -1030,6 +1032,8 @@ static void create_message_threads (void)
             tx_or_rx->rx_thread_context = NULL;
             tx_or_rx->thread_joined = false;
             tx_or_rx->tx_thread_context->path_def = path_def;
+            tx_or_rx->tx_thread_context->path_def.source_ib_device = arg_ib_devices[thread_index];
+            tx_or_rx->tx_thread_context->path_def.source_port_num = (uint8_t) arg_ib_ports[thread_index];
             tx_or_rx->tx_thread_context->verify_data = arg_verify_data;
             if (arg_tx_all_msg_sizes)
             {
@@ -1058,6 +1062,8 @@ static void create_message_threads (void)
             tx_or_rx->rx_thread_context = cache_line_aligned_calloc (1, sizeof (message_receive_thread_context));
             tx_or_rx->thread_joined = false;
             tx_or_rx->rx_thread_context->path_def = path_def;
+            tx_or_rx->rx_thread_context->path_def.destination_ib_device = arg_ib_devices[thread_index];
+            tx_or_rx->rx_thread_context->path_def.destination_port_num = (uint8_t) arg_ib_ports[thread_index];
             initialise_test_results (&tx_or_rx->rx_thread_context->results);
             tx_or_rx->previous_results = tx_or_rx->rx_thread_context->results;
             clock_gettime (CLOCK_MONOTONIC, &tx_or_rx->current_results_time);

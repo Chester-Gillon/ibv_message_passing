@@ -16,6 +16,7 @@
 #include <slp.h>
 
 #include "ibv_message_bw_interface.h"
+#include "ibv_controller_worker_messages.h"
 
 #define PRINT_STRUCT_SIZE(struct_type) \
     printf (#struct_type ",%lu\n", sizeof (struct_type) * 8)
@@ -27,9 +28,13 @@ int main (int argc, char *argv[])
 {
     printf ("Structure name,Size (bits),Offset (bytes)\n");
     PRINT_STRUCT_SIZE (communication_path_definition);
+    PRINT_STRUCT_FIELD (communication_path_definition, source_node);
+    PRINT_STRUCT_FIELD (communication_path_definition, destination_node);
     PRINT_STRUCT_FIELD (communication_path_definition, instance);
-    PRINT_STRUCT_FIELD (communication_path_definition, ib_device);
-    PRINT_STRUCT_FIELD (communication_path_definition, port_num);
+    PRINT_STRUCT_FIELD (communication_path_definition, source_ib_device);
+    PRINT_STRUCT_FIELD (communication_path_definition, destination_ib_device);
+    PRINT_STRUCT_FIELD (communication_path_definition, source_port_num);
+    PRINT_STRUCT_FIELD (communication_path_definition, destination_port_num);
     PRINT_STRUCT_FIELD (communication_path_definition, max_message_size);
     PRINT_STRUCT_FIELD (communication_path_definition, num_message_buffers);
     PRINT_STRUCT_FIELD (communication_path_definition, allocation_type);
@@ -162,6 +167,16 @@ int main (int argc, char *argv[])
     PRINT_STRUCT_FIELD (rx_api_message_buffer, data);
     PRINT_STRUCT_FIELD (rx_api_message_buffer, context);
     PRINT_STRUCT_FIELD (rx_api_message_buffer, buffer_index);
+
+    PRINT_STRUCT_SIZE (worker_ready_msg);
+    PRINT_STRUCT_FIELD (worker_ready_msg, worker_executable_pathname_len);
+    PRINT_STRUCT_FIELD (worker_ready_msg, worker_executable_pathname);
+
+    PRINT_STRUCT_SIZE (request_shutdown_msg);
+    PRINT_STRUCT_FIELD (request_shutdown_msg, num_requests_per_worker);
+
+    PRINT_STRUCT_SIZE (worker_to_controller_msgs);
+    PRINT_STRUCT_SIZE (controller_to_worker_msgs);
 
     return 0;
 }

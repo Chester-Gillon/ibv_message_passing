@@ -2,7 +2,7 @@
  * @file ibv_message_bw_interface.h
  * @date 8 Oct 2017
  * @author Chester Gillon
- * @brief Contains the interface between the source files of the ibv_message_bw program
+ * @brief Contains the interface for the ibv_message_transport library
  */
 
 #ifndef IBV_MESSAGE_BW_INTERFACE_H_
@@ -27,17 +27,25 @@ typedef enum
 /** Defines a communication path for which one ibv_message_bw program is the transmit or receive endpoint */
 typedef struct
 {
+    /** The source node endpoint identity */
+    int source_node;
+    /** The destination endpoint identity */
+    int destination_node;
     /** The numeric instance which the transmit and receive endpoints used to identify the communication path.
-     *  This is used as part of a SLP service URL which is used to publish the information for the endpoints
-     *  to connect the Queue Pairs.
+     *  The source_node, destination_node and instance are used as part of a SLP service URL which is used to
+     *  publish the information for the endpoints to connect the Queue Pairs.
      *
      *  Since there is flow-control sent from the message receiver back to the message sender,
      *  both endpoints need to connect to each other. */
     int instance;
-    /** The name of the Infiniband device used to transmit or receive messages */
-    const char *ib_device;
-    /** The port of the Infiniband device used to transmit or receive messages */
-    uint8_t port_num;
+    /** The name of the Infiniband device used by the source endpoint to transmit messages */
+    const char *source_ib_device;
+    /** The name of the Infiniband device used by the destination endpoint to receive messages */
+    const char *destination_ib_device;
+    /** The port of the Infiniband device used by the source endpoint to receive messages */
+    uint8_t source_port_num;
+    /** The port of the Infiniband device used by the destination endpoint to receive messages */
+    uint8_t destination_port_num;
     /** The maximum message data size sent on the communication path */
     uint32_t max_message_size;
     /** The number of message buffers on the communication path */
@@ -186,13 +194,18 @@ typedef struct
     uint32_t buffer_index;
 } rx_api_message_buffer;
 
+/** Opaque handle for the context used to transmit or receive messages on multiple communication paths for one node */
+struct communication_context_s;
+typedef struct communication_context_s *communication_context_handle;
+
 void check_assert (const bool assertion, const char *message);
 #define CHECK_ASSERT(assertion) check_assert(assertion,#assertion)
 void *page_aligned_alloc (const size_t size);
 void *page_aligned_calloc (const size_t nmemb, const size_t size);
 void *cache_line_aligned_alloc (const size_t size);
 void *cache_line_aligned_calloc (const size_t nmemb, const size_t size);
-void open_ib_port_endpoint (ib_port_endpoint *const endpoint, const communication_path_definition *const path_def);
+void open_ib_port_endpoint (ib_port_endpoint *const endpoint, const communication_path_definition *const path_def,
+                            const bool is_tx_end);
 void close_ib_port_endpoint (ib_port_endpoint *const endpoint);
 void intialise_slp_connection (communication_path_slp_connection *const slp_connection, const bool is_tx_end,
                                const communication_path_definition *const path_def);
@@ -212,7 +225,8 @@ uint32_t get_max_inline_data (struct ibv_qp *const qp);
 void verify_qp_state (const enum ibv_qp_state expected_state, struct ibv_qp *const qp, const char *qp_name);
 
 tx_message_context_handle message_transmit_create_local (const communication_path_definition *const path_def);
-void message_transmit_attach_remote (tx_message_context_handle context);
+void message_transmit_attach_remote_pre_rtr (tx_message_context_handle context);
+void message_transmit_attach_remote_post_rtr (tx_message_context_handle context);
 void message_transmit_finalise (tx_message_context_handle context);
 void await_all_outstanding_messages_freed (tx_message_context_handle context);
 tx_api_message_buffer *get_send_buffer_no_wait (tx_message_context_handle context);
@@ -220,11 +234,20 @@ tx_api_message_buffer *get_send_buffer (tx_message_context_handle context);
 void send_message (const tx_api_message_buffer *const api_buffer);
 
 rx_message_context_handle message_receive_create_local (const communication_path_definition *const path_def);
-void message_receive_attach_remote (rx_message_context_handle context);
+void message_receive_attach_remote_pre_rtr (rx_message_context_handle context);
+void message_receive_attach_remote_post_rtr (rx_message_context_handle context);
 void message_receive_finalise (rx_message_context_handle context);
 rx_api_message_buffer *poll_rx_message (rx_message_context_handle context);
 rx_api_message_buffer *await_message (rx_message_context_handle context);
 void free_message (rx_api_message_buffer *const api_buffer);
+
+void register_path_definition (const communication_path_definition *const path_def);
+communication_context_handle communication_context_initialise (const int node_number);
+tx_message_context_handle get_tx_path_handle (communication_context_handle context,
+                                              const int destination_node, const int instance);
+rx_api_message_buffer *poll_rx_paths (communication_context_handle context);
+rx_api_message_buffer *await_any_rx_message (communication_context_handle context);
+void communication_context_finalise (communication_context_handle context);
 
 /** The assumed cache line size for allocating areas. Should be valid for all Sandy Bridge and Haswell processors */
 #define CACHE_LINE_SIZE_BYTES 64

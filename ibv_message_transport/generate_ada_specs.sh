@@ -2,7 +2,7 @@
 # @file generate_ada_specs.sh
 # @date 14 Jan 2018
 # @author Chester Gillon
-# @details Generate the Ada specification for the ibv_message_be_interface.h C include file.
+# @details Generate the Ada specifications for the ibv_message_be_interface.h and ibv_controller_worker_messages.h C include files.
 #          This makes use of the g++ supplied with GNAT.
 #          The Ada specifications are generated using in C++ mode to preserve the argument names,
 #          but with an extern "C" block inside the ibv_message_bw_interface_ada.h to preserve
@@ -23,6 +23,7 @@ cd ${ADA_SPECS_DIR}
 # the generated ads spec to contain the following invalid ada:
 #   subtype nullptr_t is ;  -- /usr/gnat/lib/gcc/x86_64-pc-linux-gnu/6.3.1/include/stddef.h:436
 ${GNAT_GPLUSPLUS} -fdump-ada-spec -std=c++03 ../ibv_message_bw_interface_ada.h
+${GNAT_GPLUSPLUS} -fdump-ada-spec -std=c++03 ../ibv_controller_worker_messages_ada.h
 
 # The infiniband/verbs.h file has some structure and constant/enumeration names which only differ in case.
 # The resulting generated ada spec is invalid due to conflicting declarations, as ada is case insensitive.

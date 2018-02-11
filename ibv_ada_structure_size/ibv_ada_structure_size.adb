@@ -9,6 +9,7 @@
 with ada.Text_IO;
 with Ada.Strings.Fixed;
 with ibv_message_bw_interface_h;
+with ibv_controller_worker_messages_h;
 
 procedure Ibv_Ada_Structure_Size is
 
@@ -31,9 +32,13 @@ procedure Ibv_Ada_Structure_Size is
       path_def: ibv_message_bw_interface_h.communication_path_definition;
    begin
       print_struct_size (struct_name, path_def'Size);
+      print_struct_field (struct_name, "source_node", path_def.source_node'Size, path_def.source_node'Position);
+      print_struct_field (struct_name, "destination_node", path_def.destination_node'Size, path_def.destination_node'Position);
       print_struct_field (struct_name, "instance", path_def.instance'Size, path_def.instance'Position);
-      print_struct_field (struct_name, "ib_device", path_def.ib_device'Size, path_def.ib_device'Position);
-      print_struct_field (struct_name, "port_num", path_def.port_num'Size, path_def.port_num'Position);
+      print_struct_field (struct_name, "source_ib_device", path_def.source_ib_device'Size, path_def.source_ib_device'Position);
+      print_struct_field (struct_name, "destination_ib_device", path_def.destination_ib_device'Size, path_def.destination_ib_device'Position);
+      print_struct_field (struct_name, "source_port_num", path_def.source_port_num'Size, path_def.source_port_num'Position);
+      print_struct_field (struct_name, "destination_port_num", path_def.destination_port_num'Size, path_def.destination_port_num'Position);
       print_struct_field (struct_name, "max_message_size", path_def.max_message_size'Size, path_def.max_message_size'Position);
       print_struct_field (struct_name, "num_message_buffers", path_def.num_message_buffers'Size, path_def.num_message_buffers'Position);
       print_struct_field (struct_name, "allocation_type", path_def.allocation_type'Size, path_def.allocation_type'Position);
@@ -209,6 +214,37 @@ procedure Ibv_Ada_Structure_Size is
       print_struct_field (struct_name, "buffer_index", buffer.buffer_index'Size, buffer.buffer_index'Position);
    end report_rx_api_message_buffer;
 
+   procedure report_worker_ready_msg is
+      struct_name : constant string := "worker_ready_msg";
+      worker_ready : ibv_controller_worker_messages_h.worker_ready_msg;
+   begin
+      print_struct_size (struct_name, worker_ready'Size);
+      print_struct_field (struct_name, "worker_executable_pathname_len", worker_ready.worker_executable_pathname_len'Size, worker_ready.worker_executable_pathname_len'Position);
+      print_struct_field (struct_name, "worker_executable_pathname", worker_ready.worker_executable_pathname'Size, worker_ready.worker_executable_pathname'Position);
+   end report_worker_ready_msg;
+
+   procedure report_request_shutdown_msg is
+      struct_name : constant string := "request_shutdown_msg";
+      request_shutdown : ibv_controller_worker_messages_h.request_shutdown_msg;
+   begin
+      print_struct_size (struct_name, request_shutdown'Size);
+      print_struct_field (struct_name, "num_requests_per_worker", request_shutdown.num_requests_per_worker'Size, request_shutdown.num_requests_per_worker'Position);
+   end report_request_shutdown_msg;
+
+   procedure report_worker_to_controller_msgs is
+      struct_name : constant string := "worker_to_controller_msgs";
+      msgs : ibv_controller_worker_messages_h.worker_to_controller_msgs;
+   begin
+      print_struct_size (struct_name, msgs'Size);
+   end report_worker_to_controller_msgs;
+
+   procedure report_controller_to_worker_msgs is
+      struct_name : constant string := "controller_to_worker_msgs";
+      msgs : ibv_controller_worker_messages_h.controller_to_worker_msgs;
+   begin
+      print_struct_size (struct_name, msgs'Size);
+   end report_controller_to_worker_msgs;
+
 begin
    ada.Text_IO.Put_Line ("Structure name,Size (bits),Offset (bytes)");
    report_communication_path_definition;
@@ -219,5 +255,9 @@ begin
    report_message_header;
    report_tx_api_message_buffer;
    report_rx_api_message_buffer;
+   report_worker_ready_msg;
+   report_request_shutdown_msg;
+   report_worker_to_controller_msgs;
+   report_controller_to_worker_msgs;
 end Ibv_Ada_Structure_Size;
 

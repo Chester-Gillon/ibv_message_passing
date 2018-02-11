@@ -106,7 +106,7 @@ tx_message_context_handle message_transmit_create_local (const communication_pat
 
     /* Open the Infiniband device port */
     context->path_def = *path_def;
-    open_ib_port_endpoint (&context->endpoint, &context->path_def);
+    open_ib_port_endpoint (&context->endpoint, &context->path_def, is_tx_end);
 
     /* Create and register the transmit memory buffer */
     create_memory_buffer (&context->transmit_buffer, is_tx_end, &context->path_def);
@@ -158,7 +158,7 @@ tx_message_context_handle message_transmit_create_local (const communication_pat
     memset (&qp_attr, 0, sizeof (qp_attr));
     qp_attr.qp_state = IBV_QPS_INIT;
     qp_attr.pkey_index = 0;
-    qp_attr.port_num = context->path_def.port_num;
+    qp_attr.port_num = context->path_def.source_port_num;
     qp_attr.qp_access_flags = IBV_ACCESS_REMOTE_WRITE;
     rc = ibv_modify_qp (context->message_transmit_qp, &qp_attr,
                         IBV_QP_STATE      |
@@ -271,14 +271,11 @@ static void initialise_transmit_message_buffers (tx_message_context_handle conte
 }
 
 /**
- * @details Complete the initialisation of the context for the transmission of messages on a communication path by:
- *          - Transition the transmit Queue Pair, used to send messages, to the Ready To Send State
- *          - Initialise the message transmit buffers
- *
- *          This obtains the Queue Pair and memory region for the receive context from SLP
+ * @detail Perform the first part of the handshake of connection of a transmit communication path by waiting for the
+ *         attributes of the remote endpoint, and then transition the Queue-Pair of this endpoint to the ready-to-receive state.
  * @param[in,out] context The transmit message context to complete the initialisation for
  */
-void message_transmit_attach_remote (tx_message_context_handle context)
+void message_transmit_attach_remote_pre_rtr (tx_message_context_handle context)
 {
     struct ibv_qp_attr qp_attr;
     int rc;
@@ -307,7 +304,7 @@ void message_transmit_attach_remote (tx_message_context_handle context)
     qp_attr.ah_attr.dlid = context->slp_connection.remote_attributes.lid;
     qp_attr.ah_attr.sl = DEFAULT_SERVICE_LEVEL;
     qp_attr.ah_attr.src_path_bits = 0;
-    qp_attr.ah_attr.port_num = context->path_def.port_num;
+    qp_attr.ah_attr.port_num = context->path_def.source_port_num;
     rc = ibv_modify_qp (context->message_transmit_qp, &qp_attr,
                         IBV_QP_STATE              |
                         IBV_QP_AV                 |
@@ -323,8 +320,20 @@ void message_transmit_attach_remote (tx_message_context_handle context)
     }
     verify_qp_state (IBV_QPS_RTR, context->message_transmit_qp, "message_transmit_qp");
 
-    /* Handshake that the memory buffers are ready-to-receive before any transmission can occur */
+    /* Report that this endpoint is ready-to-receive */
     report_local_memory_buffer_rtr_with_slp (&context->slp_connection);
+}
+
+/**
+ * @detail Perform the second part of the handshake of connection of a transmit communication path by waiting for the
+ *         remote endpoint to be ready-to-receive, and then transition the Queue-Pair of this endpoint to the ready-to-send state.
+ * @param[in,out] context The transmit message context to complete the initialisation for
+ */
+void message_transmit_attach_remote_post_rtr (tx_message_context_handle context)
+{
+    struct ibv_qp_attr qp_attr;
+    int rc;
+
     await_remote_memory_buffer_rtr_from_slp (&context->slp_connection);
 
     /* Transition the sender Queue Pair to the Ready to Send state */
