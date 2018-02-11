@@ -202,6 +202,7 @@ rx_api_message_buffer *poll_rx_paths (communication_context_handle context)
         }
         else
         {
+            num_paths_polled++;
             rx_path_index = (rx_path_index + 1) % context->num_rx_paths;
         }
     }

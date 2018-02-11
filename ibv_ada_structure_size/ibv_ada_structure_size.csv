@@ -137,5 +137,12 @@ worker_ready_msg.worker_executable_pathname_len,32,0
 worker_ready_msg.worker_executable_pathname,32768,4
 request_shutdown_msg,96
 request_shutdown_msg.num_requests_per_worker,96,0
+sum_integers_msg,65600
+sum_integers_msg.request_id,32,0
+sum_integers_msg.num_integers_to_sum,32,4
+sum_integers_msg.integers_to_sum,65536,8
+sum_result_msg,64
+sum_result_msg.request_id,32,0
+sum_result_msg.sum,32,4
 worker_to_controller_msgs,32800
-controller_to_worker_msgs,96
+controller_to_worker_msgs,65600

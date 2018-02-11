@@ -76,6 +76,29 @@ static void report_worker_ready (tx_message_context_handle path_to_controller)
 }
 
 /**
+ * @brief Process a CW_SUM_INTEGERS message from the controller, returning a CW_SUM_RESULT message in response
+ * @param[in] sum_integers The message from the controller to process
+ * @param[in] path_to_controller The communication path to the controller
+ */
+static void process_sum_integers_request (const sum_integers_msg *const sum_integers, tx_message_context_handle path_to_controller)
+{
+    tx_api_message_buffer *const tx_buffer = get_send_buffer (path_to_controller);
+    sum_result_msg *const sum_result = tx_buffer->data;
+    uint32_t data_index;
+
+    tx_buffer->header->message_id = CW_SUM_RESULT;
+    tx_buffer->header->source_instance = worker_node_number;
+    tx_buffer->header->message_length = sizeof (sum_result_msg);
+    sum_result->request_id = sum_integers->request_id;
+    sum_result->sum = 0;
+    for (data_index = 0; data_index < sum_integers->num_integers_to_sum; data_index++)
+    {
+        sum_result->sum += sum_integers->integers_to_sum[data_index];
+    }
+    send_message (tx_buffer);
+}
+
+/**
  * @brief Perform the worker test process by executing commands from the controller, exiting when requested to shutdown.
  * @param[in] communication_context Used to receive messages from the controller
  * @param[in] path_to_controller Used to send messages to the controller
@@ -103,6 +126,14 @@ static void perform_worker_test (communication_context_handle communication_cont
                             shutdown_request->num_requests_per_worker[worker_index]);
                 }
                 test_complete = true;
+            }
+            break;
+
+        case CW_SUM_INTEGERS:
+            {
+                const sum_integers_msg *const sum_integers = rx_buffer->data;
+
+                process_sum_integers_request (sum_integers, path_to_controller);
             }
             break;
 

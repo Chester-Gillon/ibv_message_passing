@@ -175,6 +175,15 @@ int main (int argc, char *argv[])
     PRINT_STRUCT_SIZE (request_shutdown_msg);
     PRINT_STRUCT_FIELD (request_shutdown_msg, num_requests_per_worker);
 
+    PRINT_STRUCT_SIZE (sum_integers_msg);
+    PRINT_STRUCT_FIELD (sum_integers_msg, request_id);
+    PRINT_STRUCT_FIELD (sum_integers_msg, num_integers_to_sum);
+    PRINT_STRUCT_FIELD (sum_integers_msg, integers_to_sum);
+
+    PRINT_STRUCT_SIZE (sum_result_msg);
+    PRINT_STRUCT_FIELD (sum_result_msg, request_id);
+    PRINT_STRUCT_FIELD (sum_result_msg, sum);
+
     PRINT_STRUCT_SIZE (worker_to_controller_msgs);
     PRINT_STRUCT_SIZE (controller_to_worker_msgs);
 

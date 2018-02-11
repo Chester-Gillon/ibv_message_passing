@@ -231,6 +231,25 @@ procedure Ibv_Ada_Structure_Size is
       print_struct_field (struct_name, "num_requests_per_worker", request_shutdown.num_requests_per_worker'Size, request_shutdown.num_requests_per_worker'Position);
    end report_request_shutdown_msg;
 
+   procedure report_sum_integers_msg is
+      struct_name : constant string := "sum_integers_msg";
+      sum_integers : ibv_controller_worker_messages_h.sum_integers_msg;
+   begin
+      print_struct_size (struct_name, sum_integers'Size);
+      print_struct_field (struct_name, "request_id", sum_integers.request_id'Size, sum_integers.request_id'Position);
+      print_struct_field (struct_name, "num_integers_to_sum", sum_integers.num_integers_to_sum'Size, sum_integers.num_integers_to_sum'Position);
+      print_struct_field (struct_name, "integers_to_sum", sum_integers.integers_to_sum'Size, sum_integers.integers_to_sum'Position);
+   end report_sum_integers_msg;
+
+   procedure report_sum_result_msg is
+      struct_name : constant string := "sum_result_msg";
+      sum_results : ibv_controller_worker_messages_h.sum_result_msg;
+   begin
+      print_struct_size (struct_name, sum_results'Size);
+      print_struct_field (struct_name, "request_id", sum_results.request_id'Size, sum_results.request_id'Position);
+      print_struct_field (struct_name, "sum", sum_results.sum'Size, sum_results.sum'Position);
+   end report_sum_result_msg;
+
    procedure report_worker_to_controller_msgs is
       struct_name : constant string := "worker_to_controller_msgs";
       msgs : ibv_controller_worker_messages_h.worker_to_controller_msgs;
@@ -257,6 +276,8 @@ begin
    report_rx_api_message_buffer;
    report_worker_ready_msg;
    report_request_shutdown_msg;
+   report_sum_integers_msg;
+   report_sum_result_msg;
    report_worker_to_controller_msgs;
    report_controller_to_worker_msgs;
 end Ibv_Ada_Structure_Size;

@@ -31,7 +31,11 @@ typedef enum
     /** Initial message sent from a worker indicating it is ready to start the test */
     CW_WORKER_READY,
     /** Message sent to the workers to indicate the test is complete, and the worker should shutdown */
-    CW_REQUEST_SHUTDOWN
+    CW_REQUEST_SHUTDOWN,
+    /** Message sent to a worker to request the sum of a number of psuedo-random values */
+    CW_SUM_INTEGERS,
+    /** Message sent from a worker in response to a CW_SUM_INTEGERS message */
+    CW_SUM_RESULT
 } controller_worker_msg_ids;
 
 /** Contents of the CW_WORKER_READY message sent from a worker to the controller */
@@ -50,16 +54,39 @@ typedef struct
     uint32_t num_requests_per_worker[NUM_WORKERS];
 } request_shutdown_msg;
 
+/** Contents of the CW_SUM_INTEGERS message sent from the controller to a worker */
+#define MAX_INTEGERS_TO_SUM 2048
+typedef struct
+{
+    /** Used to identify the work request, to be returned in the CW_SUM_RESULT message */
+    uint32_t request_id;
+    /** How many values in the integers_to_sum array[] to sum */
+    uint32_t num_integers_to_sum;
+    /** Variable length array of integers for the worker to sum */
+    uint32_t integers_to_sum[MAX_INTEGERS_TO_SUM];
+} sum_integers_msg;
+
+/** Contents of the CW_SUM_RESULT message sent from a worker to the controller */
+typedef struct
+{
+    /** From the CW_SUM_INTEGERS message for which this is the reply */
+    uint32_t request_id;
+    /** The sum of the values in the CW_SUM_INTEGERS message */
+    uint32_t sum;
+} sum_result_msg;
+
 /** The different message structures which can be sent from a worker to the controller, for sizing communication paths */
 typedef union
 {
     worker_ready_msg worker_ready;
+    sum_result_msg sum_result;
 } worker_to_controller_msgs;
 
 /** The different message structures which can be sent from the controller to each worker, for sizing communication paths */
 typedef union
 {
     request_shutdown_msg request_shutdown;
+    sum_integers_msg sum_integers;
 } controller_to_worker_msgs;
 
 void register_controller_worker_messages (void);
