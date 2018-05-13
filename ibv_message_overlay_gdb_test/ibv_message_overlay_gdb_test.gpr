@@ -1,0 +1,20 @@
+project Ibv_Message_Overlay_Gdb_Test is
+
+   for Main use ("ibv_message_overlay_gdb_test.adb");
+   for Source_Dirs use (".", "../ibv_message_transport/ada_specs");
+   for Object_Dir use "obj";
+
+   package Compiler is
+      for Default_Switches ("ada") use ("-g", "-gnato", "-gnatwa", "-gnatQ", "-gnat05");
+   end Compiler;
+
+   package Builder is
+      for Default_Switches ("ada") use ("-g");
+   end Builder;
+
+   package Ide is
+      for Compiler_Command ("ada") use "gnatmake";
+      for Compiler_Command ("c") use "gcc";
+   end Ide;
+
+end Ibv_Message_Overlay_Gdb_Test;
