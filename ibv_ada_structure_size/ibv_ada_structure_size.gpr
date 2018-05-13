@@ -4,5 +4,15 @@ project Ibv_Ada_Structure_Size is
    for Object_Dir use "obj";
    for Main use ("ibv_ada_structure_size.adb");
 
-end Ibv_Ada_Structure_Size;
+   package Compiler is
+      for Default_Switches ("ada") use ("-g", "-gnato", "-gnatwa", "-gnatQ", "-gnat05");
+   end Compiler;
 
+   package Builder is
+      for Default_Switches ("ada") use ("-g");
+   end Builder;
+
+   package Ide is
+   end Ide;
+
+end Ibv_Ada_Structure_Size;

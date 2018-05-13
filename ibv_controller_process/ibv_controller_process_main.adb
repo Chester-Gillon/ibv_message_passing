@@ -11,7 +11,7 @@ with ibv_message_bw_interface_h;
 with ibv_controller_worker_messages_h;
 with Ada.Assertions;
 with Ada.Numerics.Discrete_Random;
-with System;
+with stdint_h;
 
 procedure Ibv_Controller_Process_Main is
 
@@ -43,12 +43,12 @@ procedure Ibv_Controller_Process_Main is
          begin
             case ibv_controller_worker_messages_h.controller_worker_msg_ids'Val(rx_buffer.header.message_id) is
                when ibv_controller_worker_messages_h.CW_WORKER_READY =>
-                    ada.Text_IO.Put_Line ("worker " & rx_buffer.header.source_instance'Image & " : " &
+                    ada.Text_IO.Put_Line ("worker " & stdint_h.uint32_t'Image (rx_buffer.header.source_instance) & " : " &
                                             Interfaces.C.To_Ada (Item => msgs.worker_ready.worker_executable_pathname(0..max_name_index), Trim_Nul => false));
 
                when others =>
                   raise Ada.Assertions.Assertion_Error with
-                    "await_workers_ready unexpected message_id " & rx_buffer.header.message_id'Image;
+                    "await_workers_ready unexpected message_id " & stdint_h.uint32_t'Image (rx_buffer.header.message_id);
             end case;
          end;
 
@@ -63,7 +63,6 @@ procedure Ibv_Controller_Process_Main is
    --         data values sent to calculate an expected sum.
    --         This avoids needing to keep track of the outstanding request messages.
    procedure process_sum_result_replies (communication_context : in ibv_message_bw_interface_h.communication_context_handle;
-                                         num_requests_per_worker : in ibv_controller_worker_messages_h.request_shutdown_msg_num_requests_per_worker_array;
                                          num_outstanding_replies : in out natural) is
       rx_buffer : access ibv_message_bw_interface_h.rx_api_message_buffer;
    begin
@@ -90,14 +89,14 @@ procedure Ibv_Controller_Process_Main is
                      end loop;
                      if expected_sum /= natural (msgs.sum_result.sum) then
                         raise Ada.Assertions.Assertion_Error with
-                           "expected_sum=" & expected_sum'Image & " actual_sum=" & msgs.sum_result.sum'Image;
+                           "expected_sum=" & Natural'Image (expected_sum) & " actual_sum=" & stdint_h.uint32_t'Image (msgs.sum_result.sum);
                      end if;
                      num_outstanding_replies := num_outstanding_replies - 1;
                      ibv_message_bw_interface_h.free_message (rx_buffer);
 
                when others =>
                   raise Ada.Assertions.Assertion_Error with
-                    "process_sum_result_replies unexpected message_id " & rx_buffer.header.message_id'Image;
+                    "process_sum_result_replies unexpected message_id " & stdint_h.uint32_t'Image (rx_buffer.header.message_id);
                end case;
             end;
 
@@ -151,12 +150,11 @@ procedure Ibv_Controller_Process_Main is
       worker_node_id := next_worker_random.Random (next_worker_generator);
       while num_unsent_requests > 0 loop
          process_sum_result_replies (communication_context => communication_context,
-                                     num_requests_per_worker => num_requests_per_worker,
                                      num_outstanding_replies => num_outstanding_replies);
          tx_buffer := ibv_message_bw_interface_h.get_send_buffer_no_wait (paths_to_workers(worker_node_id));
          if tx_buffer /= null then
             declare
-               worker_node_index : Natural := natural(worker_node_id) - natural(all_workers'First);
+               worker_node_index : constant Natural := natural(worker_node_id) - natural(all_workers'First);
             begin
                send_sum_integers (tx_buffer => tx_buffer, request_id => next_request_id);
                num_unsent_requests := num_unsent_requests - 1;
@@ -171,7 +169,6 @@ procedure Ibv_Controller_Process_Main is
       -- Wait for outstanding replies from the workers
       while num_outstanding_replies > 0 loop
          process_sum_result_replies (communication_context => communication_context,
-                                     num_requests_per_worker => num_requests_per_worker,
                                      num_outstanding_replies => num_outstanding_replies);
       end loop;
    end perform_sum_integer_test;

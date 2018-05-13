@@ -4,18 +4,20 @@ project Ibv_Controller_Process is
    for Object_Dir use "obj";
    for Main use ("ibv_controller_process_main.adb");
 
-   package Builder is
-      for Switches ("ada") use ("-g", "-s");
-   end Builder;
-
    package Compiler is
-      for Switches ("ada") use ("-g");
+      for Default_Switches ("ada") use ("-g", "-gnato", "-gnatwa", "-gnatQ", "-gnat05");
    end Compiler;
+
+   package Builder is
+      for Default_Switches ("ada") use ("-g");
+   end Builder;
 
    package Linker is
       for Switches ("ada") use ("-g", "-L../ibv_message_transport/Debug",
                                 "-libv_message_transport", "-lrt", "-libverbs", "-lslp");
    end Linker;
 
-end Ibv_Controller_Process;
+   package Ide is
+   end Ide;
 
+end Ibv_Controller_Process;

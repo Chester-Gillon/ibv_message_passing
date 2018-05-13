@@ -16,15 +16,15 @@ procedure Ibv_Ada_Structure_Size is
    procedure print_struct_size (struct_name: in string; struct_size: in Natural) is
    begin
       ada.Text_IO.Put_Line (struct_name & "," &
-                              Ada.Strings.Fixed.Trim (struct_size'Image, Ada.Strings.Left));
+                              Ada.Strings.Fixed.Trim (Natural'Image (struct_size), Ada.Strings.Left));
    end print_struct_size;
 
    procedure print_struct_field (struct_name: in string; field_name: in string;
                                  field_size: in Natural; field_position: in Natural) is
    begin
       ada.Text_IO.Put_Line (struct_name & "." & field_name & "," &
-                              ada.Strings.Fixed.Trim (field_size'Image, Ada.Strings.Left) & "," &
-                              ada.Strings.Fixed.Trim (field_position'Image, Ada.Strings.Left));
+                              ada.Strings.Fixed.Trim (Natural'Image (field_size), Ada.Strings.Left) & "," &
+                              ada.Strings.Fixed.Trim (Natural'Image (field_position), Ada.Strings.Left));
    end print_struct_field;
 
    procedure report_communication_path_definition is
