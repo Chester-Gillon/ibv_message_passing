@@ -11,7 +11,7 @@ for platform in ${platforms}
 do
    build_dir=${SCRIPT_PATH}/bin/${platform}
    rm -rf ${build_dir}
-   mkdir ${build_dir}
+   mkdir -p ${build_dir}
    pushd ${build_dir}
    cmake -G "Unix Makefiles" -DPLATFORM_TYPE=${platform} ${SCRIPT_PATH}/source
    popd
