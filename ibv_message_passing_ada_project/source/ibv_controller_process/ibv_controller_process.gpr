@@ -1,7 +1,8 @@
+with "../ibv_message_transport/ibv_message_transport.gpr";
 project Ibv_Controller_Process is
 
-   for Source_Dirs use (".", "../ibv_message_transport/ada_specs");
-   for Object_Dir use "obj";
+   for Source_Dirs use (".");
+   for Object_Dir use "../../obj/ibv_controller_process";
    for Main use ("ibv_controller_process_main.adb");
 
    package Compiler is
@@ -13,7 +14,7 @@ project Ibv_Controller_Process is
    end Builder;
 
    package Linker is
-      for Switches ("ada") use ("-g", "-L../ibv_message_transport/Debug",
+      for Switches ("ada") use ("-g", "-L../../../ibv_message_passing_c_project/bin/Debug/ibv_message_transport",
                                 "-libv_message_transport", "-lrt", "-libverbs", "-lslp");
    end Linker;
 

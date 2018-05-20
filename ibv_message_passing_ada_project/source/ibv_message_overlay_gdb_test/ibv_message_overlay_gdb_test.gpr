@@ -1,8 +1,9 @@
+with "../ibv_message_transport/ibv_message_transport.gpr";
 project Ibv_Message_Overlay_Gdb_Test is
 
    for Main use ("ibv_message_overlay_gdb_test.adb");
-   for Source_Dirs use (".", "../ibv_message_transport/ada_specs");
-   for Object_Dir use "obj";
+   for Source_Dirs use (".");
+   for Object_Dir use "../../obj/ibv_message_overlay_gdb_test";
 
    package Compiler is
       for Default_Switches ("ada") use ("-g", "-gnato", "-gnatwa", "-gnatQ", "-gnat05");

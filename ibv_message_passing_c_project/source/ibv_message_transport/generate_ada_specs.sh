@@ -8,8 +8,12 @@
 #          but with an extern "C" block inside the ibv_message_bw_interface_ada.h to preserve
 #          the C linkage naming.
 
-DIRECTORY=$(cd `dirname $0` && pwd)
-ADA_SPECS_DIR=${DIRECTORY}/ada_specs
+# Get the absolute path of the workspace root directory, which is a parent directory of this script.
+SCRIPT=$(readlink -f $0)
+SCRIPT_PATH=`dirname ${SCRIPT}`
+WORKSPACE_PATH=$(readlink -f ${SCRIPT_PATH}/../../..)
+
+ADA_SPECS_DIR=${WORKSPACE_PATH}/ibv_message_passing_ada_project/source/ibv_message_transport
 
 GNAT_GPLUSPLUS=/usr/gnat/bin/g++
 
@@ -22,8 +26,8 @@ cd ${ADA_SPECS_DIR}
 # This is becuase the nullptr_t typedef enabled by the c++11 standard causes
 # the generated ads spec to contain the following invalid ada:
 #   subtype nullptr_t is ;  -- /usr/gnat/lib/gcc/x86_64-pc-linux-gnu/6.3.1/include/stddef.h:436
-${GNAT_GPLUSPLUS} -fdump-ada-spec -std=c++03 ../ibv_message_bw_interface_ada.h
-${GNAT_GPLUSPLUS} -fdump-ada-spec -std=c++03 ../ibv_controller_worker_messages_ada.h
+${GNAT_GPLUSPLUS} -fdump-ada-spec -std=c++03 ${SCRIPT_PATH}/ibv_message_bw_interface_ada.h
+${GNAT_GPLUSPLUS} -fdump-ada-spec -std=c++03 ${SCRIPT_PATH}/ibv_controller_worker_messages_ada.h
 
 # The infiniband/verbs.h file has some structure and constant/enumeration names which only differ in case.
 # The resulting generated ada spec is invalid due to conflicting declarations, as ada is case insensitive.
