@@ -1,23 +1,7 @@
+-- This is the root project to be used by GNATbench to be able to browse the Ada source files
 with "source/ibv_ada_structure_size/ibv_ada_structure_size.gpr";
 with "source/ibv_message_transport/ibv_message_transport.gpr";
 with "source/ibv_controller_process/ibv_controller_process.gpr";
 with "source/ibv_message_overlay_gdb_test/ibv_message_overlay_gdb_test.gpr";
 project Ibv_Message_Passing_Ada_Project is
-
-   for Source_Dirs use (".");
-   for Object_Dir use "obj";
-
-   package Compiler is
-      for Default_Switches ("ada") use ("-g", "-gnato", "-gnatwa", "-gnatQ", "-gnat05");
-   end Compiler;
-
-   package Builder is
-      for Default_Switches ("ada") use ("-g");
-   end Builder;
-
-   package Ide is
-      for Compiler_Command ("ada") use "gnatmake";
-      for Compiler_Command ("c") use "gcc";
-   end Ide;
-
 end Ibv_Message_Passing_Ada_Project;

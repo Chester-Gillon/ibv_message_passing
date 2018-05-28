@@ -1,0 +1,6 @@
+-- This is the root project used by gnatmake to build all the Ada executables
+aggregate project Ibv_Message_Passing_Ada_Project_Link is
+   for Project_Files use ("source/ibv_ada_structure_size/ibv_ada_structure_size.gpr",
+                          "source/ibv_controller_process/ibv_controller_process.gpr",
+                          "source/ibv_message_overlay_gdb_test/ibv_message_overlay_gdb_test.gpr");
+end Ibv_Message_Passing_Ada_Project_Link;
