@@ -11,6 +11,10 @@
 --          1) When single stepping the program when get to the first statement with msgs in scope, in the Variables
 --             window double-click on msgs to try and expand the contents (which fails).
 --          2) On the next single step, when msgs is still in scope, GDB crashes with a SISEGV.
+--
+--          Following an upgrade to GNAT Community 2018 which uses GDB 8.1:
+--          - GDB no longer crashes
+--          - msgs can be expanded and the contents viewed.
 with System;
 with Interfaces.C;
 use Interfaces.C;

@@ -6,7 +6,7 @@ project Ibv_Ada_Structure_Size is
    for Main use ("ibv_ada_structure_size.adb");
 
    package Compiler is
-      for Default_Switches ("ada") use ("-g", "-gnato", "-gnatwa", "-gnatQ", "-gnat05");
+      for Default_Switches ("ada") use ("-g", "-gnato", "-gnatwa", "-gnatQ", "-gnat2012");
    end Compiler;
 
    package Builder is

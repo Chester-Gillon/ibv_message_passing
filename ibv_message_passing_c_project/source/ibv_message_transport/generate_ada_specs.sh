@@ -15,7 +15,7 @@ WORKSPACE_PATH=$(readlink -f ${SCRIPT_PATH}/../../..)
 
 ADA_SPECS_DIR=${WORKSPACE_PATH}/ibv_message_passing_ada_project/source/ibv_message_transport
 
-GNAT_GPLUSPLUS=/usr/gnat/bin/g++
+GNAT_GPLUSPLUS=/opt/GNAT/2018/bin/g++
 
 [ -d ${ADA_SPECS_DIR} ] || mkdir ${ADA_SPECS_DIR}
 cd ${ADA_SPECS_DIR}
@@ -36,3 +36,7 @@ sed -i 's/IBV_QP_CAP/IBV_QP_CAP_ENUM/g' infiniband_verbs_h.ads
 sed -i 's/IBV_QP_STATE/IBV_QP_STATE_CONST/g' infiniband_verbs_h.ads
 sed -i 's/IBV_FLOW_SPEC_ETH/IBV_FLOW_SPEC_ETH_CONST/g' infiniband_verbs_h.ads
 sed -i 's/IBV_FLOW_SPEC_IPV4/IBV_FLOW_SPEC_IPV4_CONST/g' infiniband_verbs_h.ads
+
+# -fdump-ada-spec inserts a pragma to select Ada 2005, but GNAT Community Edition 2018 no longer recognises switches or pragmas
+# to select Ada2005 or earlier. Therefore, change to Ada 2012 to prevent warnings about an unrecognised pragma.
+sed -i 's/pragma Ada_2005;/pragma Ada_2012;/g' *.ads

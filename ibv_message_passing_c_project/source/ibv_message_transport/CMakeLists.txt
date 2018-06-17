@@ -13,15 +13,19 @@ add_library (ibv_message_transport "ibv_controller_worker_messages.c"
 set (GENERATE_SPEC_DIR "${CMAKE_SOURCE_DIR}/../../ibv_message_passing_ada_project/source/ibv_message_transport")
 
 # Run the generate_ada_specs.sh script to generate the Ada interface specs if either:
-# - The top level .ads files don't exist (covers the case of a clean build)
-# - The implicit depedencies of the top level C include files used as the source for the Ada interface specs
-#   (covers the case of re-generating after a change to the C interface)
+# a. The top level .ads files don't exist (covers the case of a clean build)
+# b. The implicit depedencies of the top level C include files used as the source for the Ada interface specs
+#    (covers the case of re-generating after a change to the C interface)
+# c. The ibv_message_transport library has been re-built. This is because the ibv_message_transport library is "externally built"
+#    as far as the Ada gpr project files are concerned. By re-generating the Ada interface specs if the implementation of the
+#    ibv_message_transport library has changed triggers the Ada executables which use the library to be re-built. 
 set (INTERFACE_LIB_INTERFACE "${GENERATE_SPEC_DIR}/ibv_message_bw_interface_h.ads")
 set (MESSAGES_INTERFACE "${GENERATE_SPEC_DIR}/ibv_controller_worker_messages_h.ads")
 add_custom_command (OUTPUT "${INTERFACE_LIB_INTERFACE}" "${MESSAGES_INTERFACE}"
                     COMMAND "${PROJECT_SOURCE_DIR}/generate_ada_specs.sh"
                     IMPLICIT_DEPENDS C "${PROJECT_SOURCE_DIR}/ibv_message_bw_interface_ada.h"
                     IMPLICIT_DEPENDS C "${PROJECT_SOURCE_DIR}/ibv_controller_worker_messages_ada.h"
+                    DEPENDS ibv_message_transport
                     COMMENT "Generating Ada specs")
 add_custom_target (ibv_message_transport_ada_spec ALL
                    DEPENDS "${INTERFACE_LIB_INTERFACE}" "${MESSAGES_INTERFACE}")

@@ -1,4 +1,5 @@
 with "../ibv_message_transport/ibv_message_transport.gpr";
+with "../ibv_message_transport/ibv_message_transport_c_lib.gpr";
 project Ibv_Controller_Process is
 
    for Source_Dirs use (".");
@@ -6,7 +7,7 @@ project Ibv_Controller_Process is
    for Main use ("ibv_controller_process_main.adb");
 
    package Compiler is
-      for Default_Switches ("ada") use ("-g", "-gnato", "-gnatwa", "-gnatQ", "-gnat05");
+      for Default_Switches ("ada") use ("-g", "-gnato", "-gnatwa", "-gnatQ", "-gnat2012");
    end Compiler;
 
    package Builder is
@@ -14,8 +15,7 @@ project Ibv_Controller_Process is
    end Builder;
 
    package Linker is
-      for Switches ("ada") use ("-g", "-L../../../ibv_message_passing_c_project/bin/Debug/ibv_message_transport",
-                                "-libv_message_transport", "-lrt", "-libverbs", "-lslp");
+      for Switches ("ada") use ("-g", "-lrt", "-libverbs", "-lslp");
    end Linker;
 
    package Ide is
