@@ -1,0 +1,47 @@
+abstract project Shared is
+   type Mode_Type is ("Debug", "Release", "Coverage");  -- all possible values
+   Mode : Mode_Type := external ("mode", "Debug");      -- a typed variable
+   for Source_Files use (); -- no sources
+
+   package Compiler is
+      case Mode is
+         when "Debug" =>
+            for Switches ("Ada")
+                use ("-g");
+         when "Release" =>
+            for Switches ("Ada")
+                use ("-g", "-O2");
+         when "Coverage" =>
+            for Switches ("Ada")
+                use ("-g", "--coverage");
+      end case;
+   end Compiler;
+
+   package Builder is
+      case Mode is
+         when "Debug" =>
+            for Switches ("Ada")
+               use ("-g");
+         when "Release" =>
+            for Switches ("Ada")
+               use ("-g");
+         when "Coverage" =>
+            for Switches ("Ada")
+               use ("-g", "--coverage");
+      end case;
+   end Builder;
+
+   package Linker is
+      case Mode is
+         when "Debug" =>
+            for Leading_Switches ("Ada")
+               use ();
+         when "Release" =>
+            for Leading_Switches ("Ada")
+               use ();
+         when "Coverage" =>
+            for Leading_Switches ("Ada")
+               use ("--coverage");
+      end case;
+   end Linker;
+end Shared;

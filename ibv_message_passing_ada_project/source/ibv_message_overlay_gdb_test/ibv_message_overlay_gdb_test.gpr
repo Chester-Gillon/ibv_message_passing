@@ -1,17 +1,14 @@
 with "../ibv_message_transport/ibv_message_transport.gpr";
+with "../../shared.gpr";
 project Ibv_Message_Overlay_Gdb_Test is
 
    for Main use ("ibv_message_overlay_gdb_test.adb");
    for Source_Dirs use (".");
-   for Object_Dir use "../../obj/ibv_message_overlay_gdb_test";
+   for Object_Dir use "../../obj/" & Shared.mode & "/ibv_message_overlay_gdb_test";
 
-   package Compiler is
-      for Default_Switches ("ada") use ("-g", "-gnato", "-gnatwa", "-gnatQ", "-gnat2012");
-   end Compiler;
-
-   package Builder is
-      for Default_Switches ("ada") use ("-g");
-   end Builder;
+   package Compiler renames Shared.Compiler;
+   package Builder renames Shared.Builder;
+   package Linker renames Shared.Linker;
 
    package Ide is
       for Compiler_Command ("ada") use "gnatmake";

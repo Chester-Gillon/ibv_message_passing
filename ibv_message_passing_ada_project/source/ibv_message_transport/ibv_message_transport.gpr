@@ -1,15 +1,12 @@
+with "../../shared.gpr";
 project Ibv_Message_Transport is
 
    for Source_Dirs use (".");
-   for Object_Dir use "../../obj/ibv_message_transport";
+   for Object_Dir use "../../obj/" & Shared.mode & "/ibv_message_transport";
 
-   package Compiler is
-      for Default_Switches ("ada") use ("-g", "-gnato", "-gnatwa", "-gnatQ", "-gnat2012");
-   end Compiler;
-
-   package Builder is
-      for Default_Switches ("ada") use ("-g");
-   end Builder;
+   package Compiler renames Shared.Compiler;
+   package Builder renames Shared.Builder;
+   package Linker renames Shared.Linker;
 
    package Ide is
    end Ide;

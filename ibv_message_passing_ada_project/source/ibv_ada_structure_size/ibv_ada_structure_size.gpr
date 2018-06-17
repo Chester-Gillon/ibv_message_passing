@@ -1,17 +1,14 @@
 with "../ibv_message_transport/ibv_message_transport.gpr";
+with "../../shared.gpr";
 project Ibv_Ada_Structure_Size is
 
    for Source_Dirs use (".");
-   for Object_Dir use "../../obj/ibv_ada_structure_size";
+   for Object_Dir use "../../obj/" & Shared.mode & "/ibv_ada_structure_size";
    for Main use ("ibv_ada_structure_size.adb");
 
-   package Compiler is
-      for Default_Switches ("ada") use ("-g", "-gnato", "-gnatwa", "-gnatQ", "-gnat2012");
-   end Compiler;
-
-   package Builder is
-      for Default_Switches ("ada") use ("-g");
-   end Builder;
+   package Compiler renames Shared.Compiler;
+   package Builder renames Shared.Builder;
+   package Linker renames Shared.Linker;
 
    package Ide is
    end Ide;

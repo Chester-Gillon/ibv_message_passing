@@ -1,20 +1,17 @@
 with "../ibv_message_transport/ibv_message_transport.gpr";
 with "../ibv_message_transport/ibv_message_transport_c_lib.gpr";
+with "../../shared.gpr";
 project Ibv_Controller_Process is
 
    for Source_Dirs use (".");
-   for Object_Dir use "../../obj/ibv_controller_process";
+   for Object_Dir use "../../obj/" & Shared.mode & "/ibv_controller_process";
    for Main use ("ibv_controller_process_main.adb");
 
-   package Compiler is
-      for Default_Switches ("ada") use ("-g", "-gnato", "-gnatwa", "-gnatQ", "-gnat2012");
-   end Compiler;
-
-   package Builder is
-      for Default_Switches ("ada") use ("-g");
-   end Builder;
+   package Compiler renames Shared.Compiler;
+   package Builder renames Shared.Builder;
 
    package Linker is
+      for Leading_Switches ("ada") use Shared.Linker'Leading_Switches ("Ada");
       for Switches ("ada") use ("-g", "-lrt", "-libverbs", "-lslp");
    end Linker;
 

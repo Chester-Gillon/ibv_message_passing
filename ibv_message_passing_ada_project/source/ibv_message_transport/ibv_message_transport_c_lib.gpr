@@ -1,7 +1,8 @@
 -- Declare the ibv_message_transport library built from C as an Externally Built library for linking with the Ada executables.
+with "../../shared.gpr";
 Project ibv_message_transport_c_lib is
    For Externally_Built use "true";
-   For Library_Dir use "../../../ibv_message_passing_c_project/bin/Debug/ibv_message_transport";
+   For Library_Dir use "../../../ibv_message_passing_c_project/bin/" & Shared.Mode & "/ibv_message_transport";
    For Library_Name use "ibv_message_transport";
    For Source_Dirs use ();
    For Library_Kind use "static";
