@@ -3,4 +3,5 @@ RemoteSystemsTempFiles/
 .settings/
 bin/
 obj/
+/coverage_results/
 
