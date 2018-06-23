@@ -13,7 +13,7 @@ abstract project Shared is
                 use ("-g", "-O2");
          when "Coverage" =>
             for Switches ("Ada")
-                use ("-g", "--coverage");
+                use ("-g", "--coverage", "-save-temps");
       end case;
    end Compiler;
 
