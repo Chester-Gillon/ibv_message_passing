@@ -4,9 +4,12 @@
 -- @details The main for the controller process written in Ada with communicates with
 --          worker processing written in C via the ibv_message_transport library.
 
+pragma Restrictions (No_Exceptions);
 with ada.Text_IO;
 with Interfaces.C;
 use Interfaces.C;
+with Interfaces.C.Strings;
+with Interfaces.C.Extensions;
 with ibv_message_bw_interface_h;
 with ibv_controller_worker_messages_h;
 with Ada.Assertions;
@@ -47,8 +50,8 @@ procedure Ibv_Controller_Process_Main is
                                             Interfaces.C.To_Ada (Item => msgs.worker_ready.worker_executable_pathname(0..max_name_index), Trim_Nul => false));
 
                when others =>
-                  raise Ada.Assertions.Assertion_Error with
-                    "await_workers_ready unexpected message_id " & stdint_h.uint32_t'Image (rx_buffer.header.message_id);
+                  ibv_message_bw_interface_h.check_assert (assertion => Interfaces.C.Extensions.bool (false),
+                                                           message => Interfaces.C.Strings.New_String ("await_workers_ready unexpected message"));
             end case;
          end;
 
@@ -88,15 +91,15 @@ procedure Ibv_Controller_Process_Main is
                         expected_sum := expected_sum + natural (data_to_sum_random.Random (data_generator));
                      end loop;
                      if expected_sum /= natural (msgs.sum_result.sum) then
-                        raise Ada.Assertions.Assertion_Error with
-                           "expected_sum=" & Natural'Image (expected_sum) & " actual_sum=" & stdint_h.uint32_t'Image (msgs.sum_result.sum);
+                        ibv_message_bw_interface_h.check_assert (assertion => Interfaces.C.Extensions.bool (false),
+                                                                 message => Interfaces.C.Strings.New_String ("process_sum_result_replies wrong sum"));
                      end if;
                      num_outstanding_replies := num_outstanding_replies - 1;
                      ibv_message_bw_interface_h.free_message (rx_buffer);
 
-               when others =>
-                  raise Ada.Assertions.Assertion_Error with
-                    "process_sum_result_replies unexpected message_id " & stdint_h.uint32_t'Image (rx_buffer.header.message_id);
+                  when others =>
+                     ibv_message_bw_interface_h.check_assert (assertion => Interfaces.C.Extensions.bool (false),
+                                                              message => Interfaces.C.Strings.New_String ("process_sum_result_replies unexpected message"));
                end case;
             end;
 
