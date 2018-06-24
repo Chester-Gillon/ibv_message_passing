@@ -13,7 +13,17 @@ abstract project Shared is
                 use ("-g", "-O2");
          when "Coverage" =>
             for Switches ("Ada")
-                use ("-g", "--coverage", "-fprofile-update=atomic", "-save-temps");
+                use ("-g", "--coverage", "-fprofile-update=atomic", "-save-temps",
+                     -- The following optimisation options are used to reduce the number of branches in the coverage data due to
+                     -- Ada exceptions.
+                     -- Taken from https://stackoverflow.com/questions/42003783/lcov-gcov-branch-coverage-with-c-producing-branches-all-over-the-place/48478706
+                     -- which was suggested for C++ exceptions.
+                     --
+                     -- With Ada completely disabling exceptions for the whole program does not seem possible when using the
+                     -- native RTS.
+                     -- ibv_controller_process_main.adb has been changed to use the C check_assert() function rather than
+                     -- raising an Ada exception to handle fatal errors.
+                     "-O1", "-fno-omit-frame-pointer", "-fno-optimize-sibling-calls");
       end case;
    end Compiler;
 
