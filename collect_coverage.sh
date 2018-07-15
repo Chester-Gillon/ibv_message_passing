@@ -7,6 +7,10 @@
 # Delete any previous coverage data
 find . -name '*.gcda' | xargs rm
 
+# Run a test of programs without any explict if's
+ibv_message_passing_ada_project/obj/Coverage/ibv_ada_structure_size/ibv_ada_structure_size > ibv_message_passing_ada_project/source/ibv_ada_structure_size/ibv_ada_structure_size.csv
+ibv_message_passing_ada_project/obj/Coverage/ibv_message_overlay_gdb_test/ibv_message_overlay_gdb_test
+
 # Run the test with three worker C processes and one controller Ada process
 ibv_message_passing_c_project/bin/Coverage/ibv_worker_process/ibv_worker_process 1 &
 ibv_message_passing_c_project/bin/Coverage/ibv_worker_process/ibv_worker_process 2 &
