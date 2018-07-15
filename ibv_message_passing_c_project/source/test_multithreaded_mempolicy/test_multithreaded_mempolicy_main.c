@@ -252,6 +252,7 @@ int main (int argc, char *argv[])
     mempolicy_thread_context threads[NUM_MEMPOLICY_THREADS];
     unsigned int iteration;
     const int unsigned_long_bits = sizeof (unsigned long) * 8;
+    char text_buffer[2048];
 
     /* Get the number of NUMA nodes */
     rc = numa_available ();
@@ -261,8 +262,9 @@ int main (int argc, char *argv[])
         exit (EXIT_FAILURE);
     }
     num_nodes = numa_num_configured_nodes ();
-    printf ("Num NUMA nodes = %u\n", num_nodes);
-    printf ("numa_max_possible_node=%d\n", numa_max_possible_node ());
+    snprintf (text_buffer, sizeof (text_buffer), "Num NUMA nodes = %u\nnuma_max_possible_node=%d\n",
+    		  num_nodes, numa_max_possible_node ());
+    printf ("%s", text_buffer);
     maxnode = numa_max_possible_node() + 1;
     nodemask_array_length = (maxnode + unsigned_long_bits - 1) / unsigned_long_bits;
     if (num_nodes > unsigned_long_bits)
