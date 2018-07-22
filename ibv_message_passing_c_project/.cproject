@@ -25,6 +25,7 @@
 									<listOptionValue builtIn="false" value="/usr/include/infiniband"/>
 									<listOptionValue builtIn="false" value="/usr/include/glib-2.0"/>
 									<listOptionValue builtIn="false" value="/usr/lib/x86_64-linux-gnu/glib-2.0/include"/>
+									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.656804869" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_GNU_SOURCE"/>
@@ -36,6 +37,7 @@
 									<listOptionValue builtIn="false" value="/usr/include/infiniband"/>
 									<listOptionValue builtIn="false" value="/usr/include/glib-2.0"/>
 									<listOptionValue builtIn="false" value="/usr/lib/x86_64-linux-gnu/glib-2.0/include"/>
+									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.2085142445" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_GNU_SOURCE"/>
@@ -54,6 +56,7 @@
 									<listOptionValue builtIn="false" value="/usr/include/infiniband"/>
 									<listOptionValue builtIn="false" value="/usr/include/glib-2.0"/>
 									<listOptionValue builtIn="false" value="/usr/lib/x86_64-linux-gnu/glib-2.0/include"/>
+									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.1905004801" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>
@@ -87,6 +90,7 @@
 									<listOptionValue builtIn="false" value="/usr/include/infiniband"/>
 									<listOptionValue builtIn="false" value="/usr/include/glib-2.0"/>
 									<listOptionValue builtIn="false" value="/usr/lib/x86_64-linux-gnu/glib-2.0/include"/>
+									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.415227066" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_GNU_SOURCE"/>
@@ -98,6 +102,7 @@
 									<listOptionValue builtIn="false" value="/usr/include/infiniband"/>
 									<listOptionValue builtIn="false" value="/usr/include/glib-2.0"/>
 									<listOptionValue builtIn="false" value="/usr/lib/x86_64-linux-gnu/glib-2.0/include"/>
+									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.698761629" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_GNU_SOURCE"/>
@@ -116,6 +121,7 @@
 									<listOptionValue builtIn="false" value="/usr/include/infiniband"/>
 									<listOptionValue builtIn="false" value="/usr/include/glib-2.0"/>
 									<listOptionValue builtIn="false" value="/usr/lib/x86_64-linux-gnu/glib-2.0/include"/>
+									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.1836244549" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>
@@ -149,6 +155,7 @@
 									<listOptionValue builtIn="false" value="/usr/include/infiniband"/>
 									<listOptionValue builtIn="false" value="/usr/include/glib-2.0"/>
 									<listOptionValue builtIn="false" value="/usr/lib/x86_64-linux-gnu/glib-2.0/include"/>
+									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.71572491" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_GNU_SOURCE"/>
@@ -160,6 +167,7 @@
 									<listOptionValue builtIn="false" value="/usr/include/infiniband"/>
 									<listOptionValue builtIn="false" value="/usr/include/glib-2.0"/>
 									<listOptionValue builtIn="false" value="/usr/lib/x86_64-linux-gnu/glib-2.0/include"/>
+									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.667159463" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_GNU_SOURCE"/>
@@ -178,6 +186,7 @@
 									<listOptionValue builtIn="false" value="/usr/include/infiniband"/>
 									<listOptionValue builtIn="false" value="/usr/include/glib-2.0"/>
 									<listOptionValue builtIn="false" value="/usr/lib/x86_64-linux-gnu/glib-2.0/include"/>
+									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.929424994" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>
@@ -209,16 +218,22 @@
 	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
 	<storageModule moduleId="scannerConfiguration">
 		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
-		<scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.base.1791038667;cdt.managedbuild.toolchain.gnu.base.1791038667.1008445206;cdt.managedbuild.tool.gnu.c.compiler.base.1764411354;cdt.managedbuild.tool.gnu.c.compiler.input.2132483613">
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.base.1791038667.1065438801;cdt.managedbuild.toolchain.gnu.base.1791038667.1065438801.;cdt.managedbuild.tool.gnu.cpp.compiler.base.1057452114;cdt.managedbuild.tool.gnu.cpp.compiler.input.84524472">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
 		</scannerConfigBuildInfo>
-		<scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.base.1791038667.2099872294;cdt.managedbuild.toolchain.gnu.base.1791038667.2099872294.;cdt.managedbuild.tool.gnu.cpp.compiler.base.1187007094;cdt.managedbuild.tool.gnu.cpp.compiler.input.1938437558">
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.base.1791038667.2099872294;cdt.managedbuild.toolchain.gnu.base.1791038667.2099872294.;cdt.managedbuild.tool.gnu.c.compiler.base.1175076736;cdt.managedbuild.tool.gnu.c.compiler.input.1017723373">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
 		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.base.1791038667;cdt.managedbuild.toolchain.gnu.base.1791038667.1008445206;cdt.managedbuild.tool.gnu.cpp.compiler.base.2017209448;cdt.managedbuild.tool.gnu.cpp.compiler.input.591780775">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
 		</scannerConfigBuildInfo>
-		<scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.base.1791038667.2099872294;cdt.managedbuild.toolchain.gnu.base.1791038667.2099872294.;cdt.managedbuild.tool.gnu.c.compiler.base.1175076736;cdt.managedbuild.tool.gnu.c.compiler.input.1017723373">
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.base.1791038667.1065438801;cdt.managedbuild.toolchain.gnu.base.1791038667.1065438801.;cdt.managedbuild.tool.gnu.c.compiler.base.612872706;cdt.managedbuild.tool.gnu.c.compiler.input.1030229657">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.base.1791038667;cdt.managedbuild.toolchain.gnu.base.1791038667.1008445206;cdt.managedbuild.tool.gnu.c.compiler.base.1764411354;cdt.managedbuild.tool.gnu.c.compiler.input.2132483613">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.toolchain.gnu.base.1791038667.2099872294;cdt.managedbuild.toolchain.gnu.base.1791038667.2099872294.;cdt.managedbuild.tool.gnu.cpp.compiler.base.1187007094;cdt.managedbuild.tool.gnu.cpp.compiler.input.1938437558">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
 		</scannerConfigBuildInfo>
 	</storageModule>

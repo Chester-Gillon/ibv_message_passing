@@ -1,0 +1,24 @@
+By default /dev/ptp0 was only accessable by root, so had to give read/write permission with:
+$ sudo chmod o+rw /dev/ptp0
+
+phc_open opened the PTP device with flags O_RDWR
+
+Results of running after update time of 9 hours 52 minutes, which had not attempted to synchronise the PTP clock:
+$ ibv_message_passing_c_project/bin/Debug/read_ptp/read_ptp /dev/ptp0 
+phc_has_pps=0
+phc_max_adj=23999999
+CLOCK_REALTIME : res tv_sec=0 tv_nsec=1
+CLOCK_REALTIME : now tv_sec=1532207767 tv_nsec=770909425
+CLOCK_MONOTONIC : res tv_sec=0 tv_nsec=1
+CLOCK_MONOTONIC : now tv_sec=35588 tv_nsec=315719437
+/dev/ptp0 : res tv_sec=0 tv_nsec=1
+/dev/ptp0 : now tv_sec=1532207786 tv_nsec=71788659
+
+The seconds value for CLOCK_MONOTONIC matches the uptime.
+
+The seconds value for the PTP clock is approx 19 seconds ahead of CLOCK_REALTIME.
+Not sure if a different start time, or difference in clock frequency.
+
+When debugging found that:
+a) clock_gettime (CLOCK_REALTIME) and clock_gettime (CLOCK_MONOTONIC) didn't result in a syscall
+b) clock_gettime for the ptp0 clock ID results in syscall (__NR_clock_gettime)
