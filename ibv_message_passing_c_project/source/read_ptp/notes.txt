@@ -1,3 +1,5 @@
+== Reading /dev/ptp? ==
+
 By default /dev/ptp0 was only accessable by root, so had to give read/write permission with:
 $ sudo chmod o+rw /dev/ptp0
 
@@ -22,3 +24,145 @@ Not sure if a different start time, or difference in clock frequency.
 When debugging found that:
 a) clock_gettime (CLOCK_REALTIME) and clock_gettime (CLOCK_MONOTONIC) didn't result in a syscall
 b) clock_gettime for the ptp0 clock ID results in syscall (__NR_clock_gettime)
+
+
+== Disabling NTP to stop interferring with phc2sys trying to set CLOCK_REALTIME ==
+
+When NTP was active, when phc2sys went to synchronise CLOCK_REALTIME to the PTP clock
+phc2sys reported that had reached the "s2" synchronised state, but that where was an offset of several seconds
+and was attempting to slew the clock at the maximum frequency offset. E.g.:
+ Aug  8 10:13:53 BeagleBoard-X15 phc2sys: [687.556] phc offset 33279660093 s2 freq +100000000 delay   1610
+
+The "Network time on" field from timedatectl indicates if NTP is synchronising time:
+ debian@BeagleBoard-X15:~$ timedatectl status
+      Local time: Wed 2018-08-08 10:18:52 UTC
+  Universal time: Wed 2018-08-08 10:18:52 UTC
+        RTC time: Wed 2018-08-08 10:18:52
+       Time zone: Etc/UTC (UTC, +0000)
+ Network time on: no
+NTP synchronized: no
+ RTC in local TZ: no
+
+The following was used to disable NTP:
+$ sudo timedatectl set-ntp false
+
+
+ == Commands to allow linuxptp to synchronise clocks ==
+
+On Ubuntu 16.04.LTS x86_64 used as the master:
+$ ptp4l -i eno1
+$ phc2sys -s /dev/ptp0 -r -w
+
+On EVMK2H with ti-processor-sdk-linux-rt-k2hk-evm-04.03.00.05 used as a slave:
+$ ptp4l -i eth1 -s
+$ phc2sys -s /dev/ptp0 -r -w
+
+On BeagleBoard-X15 with linuxptp-1.6 built from source as a slave:
+$ sudo linuxptp-1.6/phc2sys -s /dev/ptp0 -r -w
+$ sudo linuxptp-1.6/ptp4l -i eth0 -s
+
+
+== Overhead in reading /dev/ptp? when the above commands used to synchronise PTP and realtime clocks ==
+
+1) On x86_64:
+$ ibv_message_passing_c_project/bin/Release/read_ptp/read_ptp /dev/ptp0
+phc_has_pps=0
+phc_max_adj=23999999
+CLOCK_REALTIME : res tv_sec=0 tv_nsec=1
+CLOCK_REALTIME : now tv_sec=1533734981 tv_nsec=959368983
+CLOCK_MONOTONIC : res tv_sec=0 tv_nsec=1
+CLOCK_MONOTONIC : now tv_sec=23818 tv_nsec=730129883
+/dev/ptp0 : res tv_sec=0 tv_nsec=1
+/dev/ptp0 : now tv_sec=1533735017 tv_nsec=959384914
+
+1000000 iterations of clock_gettime(CLOCK_REALTIME) used:
+  minor page faults=0 (154 -> 154)
+  major page faults=0 (0 -> 0)
+  voluntary context switches=0 (1 -> 1)
+  involuntary context switches=0 (2 -> 2)
+  user time=0.032000 system time=0.000000
+
+1000000 iterations of clock_gettime(CLOCK_MONOTONIC) used:
+  minor page faults=0 (154 -> 154)
+  major page faults=0 (0 -> 0)
+  voluntary context switches=0 (1 -> 1)
+  involuntary context switches=0 (2 -> 2)
+  user time=0.024000 system time=0.000000
+
+1000000 iterations of clock_gettime(/dev/ptp0) used:
+  minor page faults=0 (154 -> 154)
+  major page faults=0 (0 -> 0)
+  voluntary context switches=0 (1 -> 1)
+  involuntary context switches=5 (2 -> 7)
+  user time=0.088000 system time=2.856000
+
+
+2) On BeagleBoard-X15 (which allows CPU frequency from 1.0 to 1.5 GHz):
+debian@BeagleBoard-X15:~/linuxptp-1.6$ gcc -O3 -I. read_ptp.c phc.c -o read_ptp
+debian@BeagleBoard-X15:~/linuxptp-1.6$ sudo chmod o+rw /dev/ptp0
+[sudo] password for debian:
+debian@BeagleBoard-X15:~/linuxptp-1.6$ ./read_ptp /dev/ptp0
+mlockall: Cannot allocate memory
+phc_has_pps=0
+phc_max_adj=1000000
+CLOCK_REALTIME : res tv_sec=0 tv_nsec=1
+CLOCK_REALTIME : now tv_sec=1533735286 tv_nsec=199395657
+CLOCK_MONOTONIC : res tv_sec=0 tv_nsec=1
+CLOCK_MONOTONIC : now tv_sec=11827 tv_nsec=376855701
+/dev/ptp0 : res tv_sec=0 tv_nsec=1
+/dev/ptp0 : now tv_sec=1533735322 tv_nsec=199443997
+
+1000000 iterations of clock_gettime(CLOCK_REALTIME) used:
+  minor page faults=0 (99 -> 99)
+  major page faults=0 (0 -> 0)
+  voluntary context switches=0 (1 -> 1)
+  involuntary context switches=26 (10 -> 36)
+  user time=0.156852 system time=0.000000
+
+1000000 iterations of clock_gettime(CLOCK_MONOTONIC) used:
+  minor page faults=0 (99 -> 99)
+  major page faults=0 (0 -> 0)
+  voluntary context switches=0 (1 -> 1)
+  involuntary context switches=18 (36 -> 54)
+  user time=0.152787 system time=0.000000
+
+1000000 iterations of clock_gettime(/dev/ptp0) used:
+  minor page faults=0 (99 -> 99)
+  major page faults=0 (0 -> 0)
+  voluntary context switches=0 (1 -> 1)
+  involuntary context switches=373 (54 -> 427)
+  user time=0.217161 system time=1.925253
+
+
+3) On EVMK2H:
+root@k2hk-evm:~/linuxptp-1.6# gcc -O3 -I. read_ptp.c phc.c -o read_ptp
+root@k2hk-evm:~/linuxptp-1.6# ./read_ptp /dev/ptp0
+phc_has_pps=0
+phc_max_adj=1000000
+CLOCK_REALTIME : res tv_sec=0 tv_nsec=1
+CLOCK_REALTIME : now tv_sec=1533735590 tv_nsec=461298057
+CLOCK_MONOTONIC : res tv_sec=0 tv_nsec=1
+CLOCK_MONOTONIC : now tv_sec=16033 tv_nsec=219882384
+/dev/ptp0 : res tv_sec=0 tv_nsec=1
+/dev/ptp0 : now tv_sec=1533735626 tv_nsec=461341388
+
+1000000 iterations of clock_gettime(CLOCK_REALTIME) used:
+  minor page faults=0 (164 -> 164)
+  major page faults=0 (0 -> 0)
+  voluntary context switches=0 (11 -> 11)
+  involuntary context switches=21 (4 -> 25)
+  user time=0.190000 system time=0.000000
+
+1000000 iterations of clock_gettime(CLOCK_MONOTONIC) used:
+  minor page faults=0 (164 -> 164)
+  major page faults=0 (0 -> 0)
+  voluntary context switches=0 (11 -> 11)
+  involuntary context switches=19 (25 -> 44)
+  user time=0.180000 system time=0.000000
+
+1000000 iterations of clock_gettime(/dev/ptp0) used:
+  minor page faults=0 (164 -> 164)
+  major page faults=0 (0 -> 0)
+  voluntary context switches=0 (11 -> 11)
+  involuntary context switches=178 (44 -> 222)
+  user time=0.210000 system time=1.550000
