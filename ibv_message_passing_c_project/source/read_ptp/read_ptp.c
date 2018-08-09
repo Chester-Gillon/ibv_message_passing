@@ -8,7 +8,7 @@
  *          For comparison, also measures CLOCK_REALTIME and CLOCK_MONOTONIC in the same way.
  */
 
-#include <stdint.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -18,6 +18,86 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <phc.h>
+#include <linux/perf_event.h>
+
+
+/**
+ * @brief Call clock_getime(), checking the result
+ * @param[in] id Which clock to read
+ * @param[out] now The current time
+ */
+static void checked_gettime (const clockid_t id, struct timespec *const now)
+{
+    int rc;
+
+    rc = clock_gettime (id, now);
+    if (rc != 0)
+    {
+        perror ("clock_gettime");
+        exit (EXIT_FAILURE);
+    }
+}
+
+
+/**
+ * @brief Return the elapsed time in nanoseconds between two time stamps
+ * @param[in] start_time The start time for the elapsed duration
+ * @param[in] end_time The end time for the elapsed duration
+ * @return Returns the elapsed time in nanoseconds
+ */
+static uint64_t get_elapsed_ns (const struct timespec *const start_time, const struct timespec *const end_time)
+{
+    const uint64_t nsecs_per_sec = 1000000000;
+    const uint64_t start_time_ns = (start_time->tv_sec * nsecs_per_sec) + start_time->tv_nsec;
+    const uint64_t end_time_ns = (end_time->tv_sec * nsecs_per_sec) + end_time->tv_nsec;
+
+    return end_time_ns - start_time_ns;
+}
+
+
+/**
+ * @brief Open a file descriptor to read the hardware CPU counter from perf events
+ * @return The file descriptor to read the perf event
+ */
+static int open_cycle_counter_fd (void)
+{
+    int fd;
+    struct perf_event_attr attr =
+    {
+        .type = PERF_TYPE_HARDWARE,
+        .config = PERF_COUNT_HW_CPU_CYCLES
+    };
+
+    fd = syscall (__NR_perf_event_open, &attr, 0, -1, -1, 0);
+    if (fd == -1)
+    {
+        perror ("__NR_perf_event_open");
+        exit (EXIT_FAILURE);
+    }
+
+    return fd;
+}
+
+
+/**
+ * @brief Read the current value of the cycle counter
+ * @param[in] cycle_counter_fd The file descriptor returned by open_cycle_counter_fd()
+ * @return The current cycle counter value
+ */
+static uint64_t get_cycle_counter (const int cycle_counter_fd)
+{
+    uint64_t count;
+    ssize_t bytes_read;
+
+    bytes_read = read (cycle_counter_fd, &count, sizeof (count));
+    if (bytes_read < sizeof (count))
+    {
+        perror ("read");
+        exit (EXIT_FAILURE);
+    }
+
+    return count;
+}
 
 
 /**
@@ -56,12 +136,7 @@ static void display_clock_info (const clockid_t id, const char *const clock_name
     }
     printf ("%s : res tv_sec=%ld tv_nsec=%ld\n", clock_name, clock_res.tv_sec, clock_res.tv_nsec);
 
-    rc = clock_gettime (id, &now);
-    if (rc != 0)
-    {
-        perror ("clock_getres");
-        exit (EXIT_FAILURE);
-    }
+    checked_gettime (id, &now);
     printf ("%s : now tv_sec=%ld tv_nsec=%ld\n", clock_name, now.tv_sec, now.tv_nsec);
 }
 
@@ -88,12 +163,7 @@ static void time_clock_read (const clockid_t id, const char *const clock_name)
     }
     for (iteration = 0; iteration < num_iterations; iteration++)
     {
-        rc = clock_gettime (id, &now);
-        if (rc != 0)
-        {
-            perror ("clock_gettime");
-            exit (EXIT_FAILURE);
-        }
+        checked_gettime (id, &now);
     }
     getrusage (RUSAGE_SELF, &stop_usage);
     if (rc != 0)
@@ -121,9 +191,79 @@ static void time_clock_read (const clockid_t id, const char *const clock_name)
 }
 
 
+/**
+ * @brief Display an estimate of the CPU frequency
+ * @details This is done by measuring the change in the hardware CPU counter perf event while waiting for one
+ *          second to elapse while reading a POSIX clock.
+ * @param[in] id Which POSIX clock ID to read
+ * @param[in] clock_name The name to display for ID
+ * @param[in] cycle_counter_fd The file descriptor returned by open_cycle_counter_fd()
+ */
+static void estimate_cpu_frequency (const clockid_t id, const char *const clock_name, const int cycle_counter_fd)
+{
+    struct timespec start_time;
+    struct timespec end_time;
+    struct timespec now;
+    uint64_t start_counter;
+    uint64_t end_counter;
+
+    checked_gettime (id, &start_time);
+    start_counter = get_cycle_counter (cycle_counter_fd);
+    end_time = start_time;
+    end_time.tv_sec++;
+    do
+    {
+        checked_gettime (id, &now);
+    } while ((now.tv_sec < end_time.tv_sec) ||
+             ((now.tv_sec == end_time.tv_sec) && (now.tv_nsec < end_time.tv_nsec)));
+    end_counter = get_cycle_counter (cycle_counter_fd);
+
+    printf ("One second of elapsed time using %s took %" PRIu64 " HW CPU cycles (%" PRIu64 " -> %" PRIu64 ")\n",
+            clock_name, end_counter - start_counter, start_counter, end_counter);
+}
+
+
+/**
+ * @brief Measure the rate of two different clocks, by comparing the rate of the "other" clock to the "reference" clock
+ * @param[in] ref_id The reference clock
+ * @param[in] ref_clock_name Used to identify ref_id
+ * @param[in] other_id The clock to compare to the reference
+ * @param[in] other_clock_name Used to identify other_id
+ */
+static void compare_clock_rates (const clockid_t ref_id, const char *const ref_clock_name,
+                                 const clockid_t other_id, const char *const other_clock_name)
+{
+    struct timespec other_start_time;
+    struct timespec other_end_time;
+    struct timespec ref_start_time;
+    struct timespec ref_end_time;
+    struct timespec ref_now;
+    double ref_elapsed_ns;
+    double other_elapsed_ns;
+
+    checked_gettime (ref_id, &ref_start_time);
+    checked_gettime (other_id, &other_start_time);
+    ref_end_time = ref_start_time;
+    ref_end_time.tv_sec++;
+    do
+    {
+        checked_gettime (ref_id, &ref_now);
+    } while ((ref_now.tv_sec < ref_end_time.tv_sec) ||
+             ((ref_now.tv_sec == ref_end_time.tv_sec) && (ref_now.tv_nsec < ref_end_time.tv_nsec)));
+    checked_gettime (other_id, &other_end_time);
+
+    ref_elapsed_ns = get_elapsed_ns (&ref_start_time, &ref_now);
+    other_elapsed_ns = get_elapsed_ns (&other_start_time, &other_end_time);
+    printf ("While reference %s advanced %.9f seconds, %s advanced %.9f seconds (or %.1f ppm difference)\n",
+            ref_clock_name, ref_elapsed_ns / 1E9, other_clock_name, other_elapsed_ns / 1E9,
+            ((other_elapsed_ns / ref_elapsed_ns) - 1.0) * 1E6);
+}
+
+
 int main (int argc, char *argv[])
 {
     clockid_t ptp_id;
+    int cycle_counter_fd;
     int rc;
 
     if (argc != 2)
@@ -149,15 +289,24 @@ int main (int argc, char *argv[])
     printf ("phc_has_pps=%d\n", phc_has_pps (ptp_id));
     printf ("phc_max_adj=%d\n", phc_max_adj (ptp_id));
 
+    cycle_counter_fd = open_cycle_counter_fd ();
+
     display_clock_info (CLOCK_REALTIME, "CLOCK_REALTIME");
     display_clock_info (CLOCK_MONOTONIC, "CLOCK_MONOTONIC");
     display_clock_info (ptp_id, ptp_dev_name);
 
     time_clock_read (CLOCK_REALTIME, "CLOCK_REALTIME");
+    estimate_cpu_frequency (CLOCK_REALTIME, "CLOCK_REALTIME", cycle_counter_fd);
     time_clock_read (CLOCK_MONOTONIC, "CLOCK_MONOTONIC");
+    estimate_cpu_frequency (CLOCK_MONOTONIC, "CLOCK_MONOTONIC", cycle_counter_fd);
     time_clock_read (ptp_id, ptp_dev_name);
+    estimate_cpu_frequency (ptp_id, ptp_dev_name, cycle_counter_fd);
+
+    compare_clock_rates (CLOCK_REALTIME, "CLOCK_REALTIME", CLOCK_MONOTONIC, "CLOCK_MONOTONIC");
+    compare_clock_rates (CLOCK_REALTIME, "CLOCK_REALTIME", ptp_id, ptp_dev_name);
 
     phc_close (ptp_id);
+    close (cycle_counter_fd);
 
     return EXIT_SUCCESS;
 }

@@ -64,16 +64,17 @@ $ sudo linuxptp-1.6/ptp4l -i eth0 -s
 
 == Overhead in reading /dev/ptp? when the above commands used to synchronise PTP and realtime clocks ==
 
-1) On x86_64:
+1) On x86_64 i5-2310:
+a) When the intel_pstate controlling the frequency, and no specfic limits set:
 $ ibv_message_passing_c_project/bin/Release/read_ptp/read_ptp /dev/ptp0
 phc_has_pps=0
 phc_max_adj=23999999
 CLOCK_REALTIME : res tv_sec=0 tv_nsec=1
-CLOCK_REALTIME : now tv_sec=1533734981 tv_nsec=959368983
+CLOCK_REALTIME : now tv_sec=1533756327 tv_nsec=70751510
 CLOCK_MONOTONIC : res tv_sec=0 tv_nsec=1
-CLOCK_MONOTONIC : now tv_sec=23818 tv_nsec=730129883
+CLOCK_MONOTONIC : now tv_sec=45163 tv_nsec=841519150
 /dev/ptp0 : res tv_sec=0 tv_nsec=1
-/dev/ptp0 : now tv_sec=1533735017 tv_nsec=959384914
+/dev/ptp0 : now tv_sec=1533756363 tv_nsec=70773602
 
 1000000 iterations of clock_gettime(CLOCK_REALTIME) used:
   minor page faults=0 (154 -> 154)
@@ -81,88 +82,208 @@ CLOCK_MONOTONIC : now tv_sec=23818 tv_nsec=730129883
   voluntary context switches=0 (1 -> 1)
   involuntary context switches=0 (2 -> 2)
   user time=0.032000 system time=0.000000
+One second of elapsed time using CLOCK_REALTIME took 3132600308 HW CPU cycles (64521116 -> 3197121424)
 
 1000000 iterations of clock_gettime(CLOCK_MONOTONIC) used:
   minor page faults=0 (154 -> 154)
   major page faults=0 (0 -> 0)
   voluntary context switches=0 (1 -> 1)
-  involuntary context switches=0 (2 -> 2)
-  user time=0.024000 system time=0.000000
+  involuntary context switches=0 (5 -> 5)
+  user time=0.020000 system time=0.000000
+One second of elapsed time using CLOCK_MONOTONIC took 3165380509 HW CPU cycles (3261322018 -> 6426702527)
 
 1000000 iterations of clock_gettime(/dev/ptp0) used:
   minor page faults=0 (154 -> 154)
   major page faults=0 (0 -> 0)
   voluntary context switches=0 (1 -> 1)
-  involuntary context switches=5 (2 -> 7)
-  user time=0.088000 system time=2.856000
+  involuntary context switches=2 (7 -> 9)
+  user time=0.188000 system time=2.760000
+One second of elapsed time using /dev/ptp0 took 3449077694 HW CPU cycles (15691034683 -> 19140112377)
+While reference CLOCK_REALTIME advanced 1.000000018 seconds, CLOCK_MONOTONIC advanced 1.000000012 seconds (or -0.0 ppm difference)
+While reference CLOCK_REALTIME advanced 1.000000013 seconds, /dev/ptp0 advanced 1.020530438 seconds (or 20530.4 ppm difference)
 
 
-2) On BeagleBoard-X15 (which allows CPU frequency from 1.0 to 1.5 GHz):
-debian@BeagleBoard-X15:~/linuxptp-1.6$ gcc -O3 -I. read_ptp.c phc.c -o read_ptp
-debian@BeagleBoard-X15:~/linuxptp-1.6$ sudo chmod o+rw /dev/ptp0
+2) On BeagleBoard-X15 with a 1.5 GHz CPU frequency:
+debian@BeagleBoard-X15:~/linuxptp-1.6$ gcc -Wall -O3 -I. read_ptp.c phc.c -o read_ptp
+debian@BeagleBoard-X15:~/linuxptp-1.6$ sudo ./read_ptp /dev/ptp0
 [sudo] password for debian:
-debian@BeagleBoard-X15:~/linuxptp-1.6$ ./read_ptp /dev/ptp0
-mlockall: Cannot allocate memory
 phc_has_pps=0
 phc_max_adj=1000000
 CLOCK_REALTIME : res tv_sec=0 tv_nsec=1
-CLOCK_REALTIME : now tv_sec=1533735286 tv_nsec=199395657
+CLOCK_REALTIME : now tv_sec=1533754308 tv_nsec=882659345
 CLOCK_MONOTONIC : res tv_sec=0 tv_nsec=1
-CLOCK_MONOTONIC : now tv_sec=11827 tv_nsec=376855701
+CLOCK_MONOTONIC : now tv_sec=30850 tv_nsec=60120340
 /dev/ptp0 : res tv_sec=0 tv_nsec=1
-/dev/ptp0 : now tv_sec=1533735322 tv_nsec=199443997
+/dev/ptp0 : now tv_sec=1533754344 tv_nsec=882708668
 
 1000000 iterations of clock_gettime(CLOCK_REALTIME) used:
-  minor page faults=0 (99 -> 99)
+  minor page faults=0 (157 -> 157)
   major page faults=0 (0 -> 0)
   voluntary context switches=0 (1 -> 1)
-  involuntary context switches=26 (10 -> 36)
-  user time=0.156852 system time=0.000000
+  involuntary context switches=28 (3 -> 31)
+  user time=0.152422 system time=0.001635
+One second of elapsed time using CLOCK_REALTIME took 1492373426 HW CPU cycles (225956465 -> 1718329891)
 
 1000000 iterations of clock_gettime(CLOCK_MONOTONIC) used:
-  minor page faults=0 (99 -> 99)
+  minor page faults=0 (157 -> 157)
   major page faults=0 (0 -> 0)
   voluntary context switches=0 (1 -> 1)
-  involuntary context switches=18 (36 -> 54)
-  user time=0.152787 system time=0.000000
+  involuntary context switches=13 (179 -> 192)
+  user time=0.147840 system time=0.000000
+One second of elapsed time using CLOCK_MONOTONIC took 1480492978 HW CPU cycles (1940355425 -> 3420848403)
 
 1000000 iterations of clock_gettime(/dev/ptp0) used:
-  minor page faults=0 (99 -> 99)
+  minor page faults=0 (157 -> 157)
   major page faults=0 (0 -> 0)
   voluntary context switches=0 (1 -> 1)
-  involuntary context switches=373 (54 -> 427)
-  user time=0.217161 system time=1.925253
+  involuntary context switches=311 (382 -> 693)
+  user time=0.032439 system time=2.108534
+One second of elapsed time using /dev/ptp0 took 1494971903 HW CPU cycles (6632798076 -> 8127769979)
+While reference CLOCK_REALTIME advanced 1.000000006 seconds, CLOCK_MONOTONIC advanced 0.999999843 seconds (or -0.2 ppm difference)
+While reference CLOCK_REALTIME advanced 1.000000050 seconds, /dev/ptp0 advanced 1.000001134 seconds (or 1.1 ppm difference)
 
 
-3) On EVMK2H:
-root@k2hk-evm:~/linuxptp-1.6# gcc -O3 -I. read_ptp.c phc.c -o read_ptp
+3) On EVMK2H (with a 1.4 GHz CPU frequency):
+root@k2hk-evm:~/linuxptp-1.6# gcc -Wall -O3 -I. read_ptp.c phc.c -o read_ptp
 root@k2hk-evm:~/linuxptp-1.6# ./read_ptp /dev/ptp0
 phc_has_pps=0
 phc_max_adj=1000000
 CLOCK_REALTIME : res tv_sec=0 tv_nsec=1
-CLOCK_REALTIME : now tv_sec=1533735590 tv_nsec=461298057
+CLOCK_REALTIME : now tv_sec=1533754282 tv_nsec=81610757
 CLOCK_MONOTONIC : res tv_sec=0 tv_nsec=1
-CLOCK_MONOTONIC : now tv_sec=16033 tv_nsec=219882384
+CLOCK_MONOTONIC : now tv_sec=34724 tv_nsec=840198153
 /dev/ptp0 : res tv_sec=0 tv_nsec=1
-/dev/ptp0 : now tv_sec=1533735626 tv_nsec=461341388
+/dev/ptp0 : now tv_sec=1533754318 tv_nsec=81654304
 
 1000000 iterations of clock_gettime(CLOCK_REALTIME) used:
-  minor page faults=0 (164 -> 164)
+  minor page faults=0 (154 -> 154)
   major page faults=0 (0 -> 0)
-  voluntary context switches=0 (11 -> 11)
-  involuntary context switches=21 (4 -> 25)
-  user time=0.190000 system time=0.000000
+  voluntary context switches=0 (7 -> 7)
+  involuntary context switches=19 (1 -> 20)
+  user time=0.180000 system time=0.000000
+One second of elapsed time using CLOCK_REALTIME took 1399418770 HW CPU cycles (258067438 -> 1657486208)
 
 1000000 iterations of clock_gettime(CLOCK_MONOTONIC) used:
-  minor page faults=0 (164 -> 164)
+  minor page faults=0 (154 -> 154)
   major page faults=0 (0 -> 0)
-  voluntary context switches=0 (11 -> 11)
-  involuntary context switches=19 (25 -> 44)
-  user time=0.180000 system time=0.000000
+  voluntary context switches=0 (7 -> 7)
+  involuntary context switches=19 (122 -> 141)
+  user time=0.190000 system time=0.000000
+One second of elapsed time using CLOCK_MONOTONIC took 1399567224 HW CPU cycles (1917972705 -> 3317539929)
 
 1000000 iterations of clock_gettime(/dev/ptp0) used:
-  minor page faults=0 (164 -> 164)
+  minor page faults=0 (154 -> 154)
   major page faults=0 (0 -> 0)
-  voluntary context switches=0 (11 -> 11)
-  involuntary context switches=178 (44 -> 222)
-  user time=0.210000 system time=1.550000
+  voluntary context switches=0 (7 -> 7)
+  involuntary context switches=170 (241 -> 411)
+  user time=0.170000 system time=1.530000
+One second of elapsed time using /dev/ptp0 took 1399548358 HW CPU cycles (5694762783 -> 7094311141)
+While reference CLOCK_REALTIME advanced 1.000000132 seconds, CLOCK_MONOTONIC advanced 1.000000042 seconds (or -0.1 ppm difference)
+While reference CLOCK_REALTIME advanced 1.000000008 seconds, /dev/ptp0 advanced 0.999999535 seconds (or -0.5 ppm difference)
+
+
+== Glitches in synchronised time ==
+
+a) After running the read_ptp program, noticed the EVMK2H and BeagleBoard-X15 syslog was reporting a large offset
+and were adjusting their clock frequencies at a high rate.
+
+Looking at the BeagleBoard-X15 syslog around when the large offset appeared:
+Aug  8 18:40:00 BeagleBoard-X15 ptp4l: [30141.193] master offset         -7 s2 freq  +16526 path delay      3447
+Aug  8 18:40:00 BeagleBoard-X15 phc2sys: [30141.441] phc offset      -116 s2 freq  +16480 delay   1789
+Aug  8 18:40:01 BeagleBoard-X15 ptp4l: [30142.193] master offset         15 s2 freq  +16546 path delay      3504
+Aug  8 18:40:01 BeagleBoard-X15 phc2sys: [30142.441] phc offset      -132 s2 freq  +16430 delay   1789
+Aug  8 18:40:02 BeagleBoard-X15 ptp4l: [30143.193] master offset        359 s2 freq  +16894 path delay      3504
+Aug  8 18:40:02 BeagleBoard-X15 phc2sys: [30143.442] phc offset      -171 s2 freq  +16351 delay   1789
+Aug  8 18:40:03 BeagleBoard-X15 ptp4l: [30144.193] master offset          4 s2 freq  +16647 path delay      3511
+Aug  8 18:40:03 BeagleBoard-X15 phc2sys: [30144.442] phc offset       392 s2 freq  +16863 delay   1626
+Aug  8 18:40:04 BeagleBoard-X15 ptp4l: [30145.193] master offset   31024551 s2 freq +1000000 path delay      3511
+Aug  8 18:40:04 BeagleBoard-X15 phc2sys: [30145.442] phc offset    245456 s2 freq +262044 delay   1626
+Aug  8 18:40:05 BeagleBoard-X15 ptp4l: [30146.233] master offset  123651474 s2 freq +1000000 path delay      3496
+Aug  8 18:40:05 BeagleBoard-X15 phc2sys: [30146.442] phc offset    983579 s2 freq +1073804 delay   1789
+Aug  8 18:40:06 BeagleBoard-X15 ptp4l: [30147.332] master offset  221286603 s2 freq +1000000 path delay      3496
+Aug  8 18:40:06 BeagleBoard-X15 phc2sys: [30147.442] phc offset    907843 s2 freq +1293142 delay   1787
+Aug  8 18:40:07 BeagleBoard-X15 ptp4l: [30148.437] master offset  319517648 s2 freq +1000000 path delay      3496
+Aug  8 18:40:07 BeagleBoard-X15 phc2sys: [30148.443] phc offset    614066 s2 freq +1271718 delay   1787
+Aug  8 18:40:08 BeagleBoard-X15 phc2sys: [30149.443] phc offset    341861 s2 freq +1183732 delay   1624
+Aug  8 18:40:08 BeagleBoard-X15 ptp4l: [30149.545] master offset  364957096 s2 freq +1000000 path delay  -5105100
+Aug  8 18:40:09 BeagleBoard-X15 phc2sys: [30150.443] phc offset    157537 s2 freq +1101967 delay   1787
+Aug  8 18:40:09 BeagleBoard-X15 ptp4l: [30150.586] master offset  363932435 s2 freq +1000000 path delay  -5105100
+Aug  8 18:40:10 BeagleBoard-X15 phc2sys: [30151.443] phc offset     55259 s2 freq +1046950 delay   1787
+Aug  8 18:40:10 BeagleBoard-X15 ptp4l: [30151.586] master offset  362947860 s2 freq +1000000 path delay  -5105100
+Aug  8 18:40:11 BeagleBoard-X15 phc2sys: [30152.443] phc offset      8412 s2 freq +1016681 delay   1787
+Aug  8 18:40:11 BeagleBoard-X15 ptp4l: [30152.576] master offset  361973778 s2 freq +1000000 path delay  -5105055
+Aug  8 18:40:12 BeagleBoard-X15 phc2sys: [30153.444] phc offset     -8292 s2 freq +1002500 delay   1787
+Aug  8 18:40:12 BeagleBoard-X15 ptp4l: [30153.564] master offset  361000682 s2 freq +1000000 path delay  -5105055
+Aug  8 18:40:13 BeagleBoard-X15 phc2sys: [30154.444] phc offset    -10630 s2 freq +997675 delay   1787
+Aug  8 18:40:13 BeagleBoard-X15 ptp4l: [30154.556] master offset  360021754 s2 freq +1000000 path delay  -5102330
+Aug  8 18:40:14 BeagleBoard-X15 phc2sys: [30155.444] phc offset     -8393 s2 freq +996723 delay   1787
+Aug  8 18:40:14 BeagleBoard-X15 ptp4l: [30155.550] master offset  353901882 s2 freq +1000000 path delay     38435
+Aug  8 18:40:15 BeagleBoard-X15 phc2sys: [30156.444] phc offset     -5025 s2 freq +997573 delay   1787
+
+And it took about an hour before the frequency adjustment went below the maximum:
+Aug  8 19:41:40 BeagleBoard-X15 ptp4l: [33841.360] master offset    3851244 s2 freq +1000000 path delay    312868
+Aug  8 19:41:40 BeagleBoard-X15 phc2sys: [33842.160] phc offset       214 s2 freq +1000191 delay   1787
+Aug  8 19:41:41 BeagleBoard-X15 ptp4l: [33842.359] master offset    2867765 s2 freq +1000000 path delay    312868
+Aug  8 19:41:41 BeagleBoard-X15 phc2sys: [33843.160] phc offset        41 s2 freq +1000082 delay   1787
+Aug  8 19:41:42 BeagleBoard-X15 ptp4l: [33843.358] master offset    1853819 s2 freq +1000000 path delay    343289
+Aug  8 19:41:42 BeagleBoard-X15 phc2sys: [33844.160] phc offset       -48 s2 freq +1000006 delay   1787
+Aug  8 19:41:43 BeagleBoard-X15 ptp4l: [33844.357] master offset     870415 s2 freq +887059 path delay    343289
+Aug  8 19:41:43 BeagleBoard-X15 phc2sys: [33845.161] phc offset    -90924 s2 freq +909115 delay   1950
+Aug  8 19:41:44 BeagleBoard-X15 ptp4l: [33845.356] master offset      29219 s2 freq +306987 path delay    313933
+Aug  8 19:41:44 BeagleBoard-X15 phc2sys: [33846.161] phc offset   -580743 s2 freq +392019 delay   1788
+Aug  8 19:41:45 BeagleBoard-X15 ptp4l: [33846.355] master offset    -261363 s2 freq  +25171 path delay    313933
+Aug  8 19:41:45 BeagleBoard-X15 phc2sys: [33847.161] phc offset   -893756 s2 freq  -95217 delay   1788
+
+The syslog from the x86_64 master around the time the BeagleBoard-X15 reported the large offset.
+Allowing for the hour difference due to the master being on daylight savings, the master and slave saw the glitch
+in the same second:
+Aug  8 19:40:01 Sandy-Ubuntu phc2sys: [42437.969] phc offset      -607 s2 freq   -6287 delay   2591
+Aug  8 19:40:02 Sandy-Ubuntu phc2sys: [42438.969] phc offset       638 s2 freq   -5224 delay   2454
+Aug  8 19:40:03 Sandy-Ubuntu phc2sys: [42439.969] phc offset       -16 s2 freq   -5687 delay   2322
+Aug  8 19:40:04 Sandy-Ubuntu phc2sys: [42440.969] phc offset  47587733 s2 freq +47582057 delay   4563
+Aug  8 19:40:05 Sandy-Ubuntu phc2sys: [42441.969] phc offset  91882708 s2 freq +100000000 delay   3807
+Aug  8 19:40:06 Sandy-Ubuntu phc2sys: [42442.969] phc offset  80758405 s2 freq +95029049 delay   4269
+Aug  8 19:40:07 Sandy-Ubuntu phc2sys: [42443.969] phc offset  74872117 s2 freq +100000000 delay   4405
+
+The glitch also appeared in the EMVK2H syslog, but rebooted while investigating and the results were not saved.
+
+
+b) Monitored syslog after running read_ptp on the master, and around the time the program was run the master
+and slaves reported a glitch:
+Aug  8 22:10:50 Sandy-Ubuntu phc2sys: [51487.374] phc offset       -75 s2 freq   -5752 delay   2297
+Aug  8 22:10:51 Sandy-Ubuntu phc2sys: [51488.374] phc offset      -552 s2 freq   -6251 delay   2471
+Aug  8 22:10:52 Sandy-Ubuntu phc2sys: [51489.374] phc offset       394 s2 freq   -5471 delay   2466
+Aug  8 22:10:53 Sandy-Ubuntu phc2sys: [51490.375] phc offset       734 s2 freq   -5013 delay   2400
+Aug  8 22:10:54 Sandy-Ubuntu phc2sys: [51491.375] phc offset       150 s2 freq   -5376 delay   2276
+Aug  8 22:10:55 Sandy-Ubuntu phc2sys: [51492.375] phc offset  34648143 s2 freq +34642662 delay   4877
+Aug  8 22:10:56 Sandy-Ubuntu phc2sys: [51493.375] phc offset  92357050 s2 freq +100000000 delay   3861
+Aug  8 22:10:57 Sandy-Ubuntu phc2sys: [51494.375] phc offset  81604608 s2 freq +91993569 delay   3580
+Aug  8 22:10:58 Sandy-Ubuntu phc2sys: [51495.375] phc offset  79591791 s2 freq +100000000 delay   4486
+Aug  8 22:10:59 Sandy-Ubuntu phc2sys: [51496.375] phc offset   5134694 s2 freq +40005038 delay   2186
+Aug  8 22:11:00 Sandy-Ubuntu phc2sys: [51497.375] phc offset -36483179 s2 freq  -72427 delay   2308
+
+Aug  8 21:10:54 k2hk-evm ptp4l: [5627.214] master offset        -41 s2 freq   -2937 path delay     17148
+Aug  8 21:10:54 k2hk-evm phc2sys: [5627.413] CLOCK_REALTIME phc offset       323 s2 freq   -2680 delay   1080
+Aug  8 21:10:55 k2hk-evm ptp4l: [5628.214] master offset   17745806 s2 freq +1000000 path delay     17148
+Aug  8 21:10:55 k2hk-evm phc2sys: [5628.413] CLOCK_REALTIME phc offset    199660 s2 freq +196754 delay   1055
+Aug  8 21:10:56 k2hk-evm ptp4l: [5629.243] master offset  109727286 s2 freq +1000000 path delay     17148
+Aug  8 21:10:56 k2hk-evm phc2sys: [5629.413] CLOCK_REALTIME phc offset   1002616 s2 freq +1059608 delay   1065
+Aug  8 21:10:57 k2hk-evm ptp4l: [5630.339] master offset  207618771 s2 freq +1000000 path delay     17148
+Aug  8 21:10:57 k2hk-evm phc2sys: [5630.413] CLOCK_REALTIME phc offset    950912 s2 freq +1308688 delay   1044
+Aug  8 21:10:58 k2hk-evm phc2sys: [5631.413] CLOCK_REALTIME phc offset    642109 s2 freq +1285159 delay   1064
+Aug  8 21:10:58 k2hk-evm ptp4l: [5631.441] master offset  306008862 s2 freq +1000000 path delay     17148
+Aug  8 21:10:59 k2hk-evm phc2sys: [5632.413] CLOCK_REALTIME phc offset    356166 s2 freq +1191849 delay   1079
+
+ 
+Aug  8 21:10:54 BeagleBoard-X15 phc2sys: [39195.260] phc offset       -35 s2 freq  +16514 delay   1789
+Aug  8 21:10:54 BeagleBoard-X15 ptp4l: [39195.595] master offset        -82 s2 freq  +16544 path delay      3456
+Aug  8 21:10:55 BeagleBoard-X15 phc2sys: [39196.260] phc offset       311 s2 freq  +16850 delay   1789
+Aug  8 21:10:55 BeagleBoard-X15 ptp4l: [39196.594] master offset   17745780 s2 freq +1000000 path delay      3456
+Aug  8 21:10:56 BeagleBoard-X15 phc2sys: [39197.260] phc offset    654560 s2 freq +671192 delay   1789
+Aug  8 21:10:56 BeagleBoard-X15 ptp4l: [39197.624] master offset  109747397 s2 freq +1000000 path delay      3456
+Aug  8 21:10:57 BeagleBoard-X15 phc2sys: [39198.260] phc offset    988176 s2 freq +1201176 delay   1788
+Aug  8 21:10:57 BeagleBoard-X15 ptp4l: [39198.720] master offset  207660293 s2 freq +1000000 path delay      3350
+Aug  8 21:10:58 BeagleBoard-X15 phc2sys: [39199.261] phc offset    787720 s2 freq +1297173 delay   1787
+Aug  8 21:10:58 BeagleBoard-X15 ptp4l: [39199.821] master offset  306072003 s2 freq +1000000 path delay      3272
+Aug  8 21:10:59 BeagleBoard-X15 phc2sys: [39200.261] phc offset    490380 s2 freq +1236149 delay   1624
+ 
