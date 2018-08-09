@@ -23,7 +23,7 @@ Not sure if a different start time, or difference in clock frequency.
 
 When debugging found that:
 a) clock_gettime (CLOCK_REALTIME) and clock_gettime (CLOCK_MONOTONIC) didn't result in a syscall
-b) clock_gettime for the ptp0 clock ID results in syscall (__NR_clock_gettime)
+b) clock_gettime (CLOCK_MONOTONIC_RAW) and the ptp0 clock ID results in syscall (__NR_clock_gettime)
 
 
 == Disabling NTP to stop interferring with phc2sys trying to set CLOCK_REALTIME ==
@@ -70,77 +70,158 @@ $ ibv_message_passing_c_project/bin/Release/read_ptp/read_ptp /dev/ptp0
 phc_has_pps=0
 phc_max_adj=23999999
 CLOCK_REALTIME : res tv_sec=0 tv_nsec=1
-CLOCK_REALTIME : now tv_sec=1533756327 tv_nsec=70751510
+CLOCK_REALTIME : now tv_sec=1533830972 tv_nsec=433019521
 CLOCK_MONOTONIC : res tv_sec=0 tv_nsec=1
-CLOCK_MONOTONIC : now tv_sec=45163 tv_nsec=841519150
+CLOCK_MONOTONIC : now tv_sec=33412 tv_nsec=688864485
+CLOCK_MONOTONIC_RAW : res tv_sec=0 tv_nsec=1
+CLOCK_MONOTONIC_RAW : now tv_sec=33415 tv_nsec=756528246
 /dev/ptp0 : res tv_sec=0 tv_nsec=1
-/dev/ptp0 : now tv_sec=1533756363 tv_nsec=70773602
+/dev/ptp0 : now tv_sec=1533831008 tv_nsec=433033204
 
 1000000 iterations of clock_gettime(CLOCK_REALTIME) used:
   minor page faults=0 (154 -> 154)
   major page faults=0 (0 -> 0)
   voluntary context switches=0 (1 -> 1)
   involuntary context switches=0 (2 -> 2)
-  user time=0.032000 system time=0.000000
-One second of elapsed time using CLOCK_REALTIME took 3132600308 HW CPU cycles (64521116 -> 3197121424)
+  user time=0.028000 system time=0.000000
+One second of elapsed time using CLOCK_REALTIME took 3099061150 HW CPU cycles (63554459 -> 3162615609)
+  while CLOCK_MONOTONIC_RAW advanced 999999266 nsecs, CLOCK_MONOTONIC advanced 1000004926 nsecs and CLOCKREAL_TIME advanced 1000005079 nsecs
 
 1000000 iterations of clock_gettime(CLOCK_MONOTONIC) used:
   minor page faults=0 (154 -> 154)
   major page faults=0 (0 -> 0)
   voluntary context switches=0 (1 -> 1)
-  involuntary context switches=0 (5 -> 5)
+  involuntary context switches=0 (6 -> 6)
   user time=0.020000 system time=0.000000
-One second of elapsed time using CLOCK_MONOTONIC took 3165380509 HW CPU cycles (3261322018 -> 6426702527)
+One second of elapsed time using CLOCK_MONOTONIC took 3111104412 HW CPU cycles (3225127827 -> 6336232239)
+  while CLOCK_MONOTONIC_RAW advanced 999998514 nsecs, CLOCK_MONOTONIC advanced 1000004373 nsecs and CLOCKREAL_TIME advanced 1000004451 nsecs
+
+1000000 iterations of clock_gettime(CLOCK_MONOTONIC_RAW) used:
+  minor page faults=0 (154 -> 154)
+  major page faults=0 (0 -> 0)
+  voluntary context switches=0 (1 -> 1)
+  involuntary context switches=2 (14 -> 16)
+  user time=0.104000 system time=0.196000
+One second of elapsed time using CLOCK_MONOTONIC_RAW took 3153238833 HW CPU cycles (7281721362 -> 10434960195)
+  while CLOCK_MONOTONIC_RAW advanced 1000003753 nsecs, CLOCK_MONOTONIC advanced 1000009786 nsecs and CLOCKREAL_TIME advanced 1000009871 nsecs
 
 1000000 iterations of clock_gettime(/dev/ptp0) used:
   minor page faults=0 (154 -> 154)
   major page faults=0 (0 -> 0)
   voluntary context switches=0 (1 -> 1)
-  involuntary context switches=2 (7 -> 9)
-  user time=0.188000 system time=2.760000
-One second of elapsed time using /dev/ptp0 took 3449077694 HW CPU cycles (15691034683 -> 19140112377)
-While reference CLOCK_REALTIME advanced 1.000000018 seconds, CLOCK_MONOTONIC advanced 1.000000012 seconds (or -0.0 ppm difference)
-While reference CLOCK_REALTIME advanced 1.000000013 seconds, /dev/ptp0 advanced 1.020530438 seconds (or 20530.4 ppm difference)
+  involuntary context switches=20 (21 -> 41)
+  user time=0.136000 system time=2.804000
+One second of elapsed time using /dev/ptp0 took 3385297464 HW CPU cycles (19574691821 -> 22959989285)
+  while CLOCK_MONOTONIC_RAW advanced 1098877503 nsecs, CLOCK_MONOTONIC advanced 995098410 nsecs and CLOCKREAL_TIME advanced 995098547 nsecs
+While reference CLOCK_REALTIME advanced 1.000000014 seconds, CLOCK_MONOTONIC advanced 1.000000009 seconds (or -0.0 ppm difference)
+While reference CLOCK_REALTIME advanced 1.000000006 seconds, CLOCK_MONOTONIC_RAW advanced 1.028934514 seconds (or 28934.5 ppm difference)
+While reference CLOCK_REALTIME advanced 1.000000005 seconds, /dev/ptp0 advanced 0.996614000 seconds (or -3386.0 ppm difference)
+
+a) When the governor and the frequency fixed at 1.8 GHz:
+$ ibv_message_passing_c_project/bin/Release/read_ptp/read_ptp /dev/ptp0
+phc_has_pps=0
+phc_max_adj=23999999
+CLOCK_REALTIME : res tv_sec=0 tv_nsec=1
+CLOCK_REALTIME : now tv_sec=1533836106 tv_nsec=802486582
+CLOCK_MONOTONIC : res tv_sec=0 tv_nsec=1
+CLOCK_MONOTONIC : now tv_sec=1614 tv_nsec=53853982
+CLOCK_MONOTONIC_RAW : res tv_sec=0 tv_nsec=1
+CLOCK_MONOTONIC_RAW : now tv_sec=1614 tv_nsec=48287506
+/dev/ptp0 : res tv_sec=0 tv_nsec=1
+/dev/ptp0 : now tv_sec=1533836142 tv_nsec=802507375
+
+1000000 iterations of clock_gettime(CLOCK_REALTIME) used:
+  minor page faults=0 (156 -> 156)
+  major page faults=0 (0 -> 0)
+  voluntary context switches=0 (6 -> 6)
+  involuntary context switches=0 (1 -> 1)
+  user time=0.032000 system time=0.000000
+One second of elapsed time using CLOCK_REALTIME took 1803123750 HW CPU cycles (63342119 -> 1866465869)
+  while CLOCK_MONOTONIC_RAW advanced 999999095 nsecs, CLOCK_MONOTONIC advanced 1000005428 nsecs and CLOCKREAL_TIME advanced 1000005613 nsecs
+
+1000000 iterations of clock_gettime(CLOCK_MONOTONIC) used:
+  minor page faults=0 (156 -> 156)
+  major page faults=0 (0 -> 0)
+  voluntary context switches=0 (6 -> 6)
+  involuntary context switches=0 (2 -> 2)
+  user time=0.036000 system time=0.000000
+One second of elapsed time using CLOCK_MONOTONIC took 1802481105 HW CPU cycles (1928662325 -> 3731143430)
+  while CLOCK_MONOTONIC_RAW advanced 1000000426 nsecs, CLOCK_MONOTONIC advanced 1000006457 nsecs and CLOCKREAL_TIME advanced 1000006583 nsecs
+
+1000000 iterations of clock_gettime(CLOCK_MONOTONIC_RAW) used:
+  minor page faults=0 (156 -> 156)
+  major page faults=0 (0 -> 0)
+  voluntary context switches=0 (6 -> 6)
+  involuntary context switches=6 (8 -> 14)
+  user time=0.168000 system time=0.352000
+One second of elapsed time using CLOCK_MONOTONIC_RAW took 1812152015 HW CPU cycles (4676517128 -> 6488669143)
+  while CLOCK_MONOTONIC_RAW advanced 1000005497 nsecs, CLOCK_MONOTONIC advanced 1000012215 nsecs and CLOCKREAL_TIME advanced 1000012436 nsecs
+
+1000000 iterations of clock_gettime(/dev/ptp0) used:
+  minor page faults=0 (156 -> 156)
+  major page faults=0 (0 -> 0)
+  voluntary context switches=0 (6 -> 6)
+  involuntary context switches=4 (16 -> 20)
+  user time=0.172000 system time=3.204000
+One second of elapsed time using /dev/ptp0 took 1959432600 HW CPU cycles (12575290899 -> 14534723499)
+  while CLOCK_MONOTONIC_RAW advanced 1085292654 nsecs, CLOCK_MONOTONIC advanced 990727328 nsecs and CLOCKREAL_TIME advanced 990727501 nsecs
+While reference CLOCK_REALTIME advanced 1.000000005 seconds, CLOCK_MONOTONIC advanced 1.000000009 seconds (or 0.0 ppm difference)
+While reference CLOCK_REALTIME advanced 1.000000023 seconds, CLOCK_MONOTONIC_RAW advanced 1.023496177 seconds (or 23496.2 ppm difference)
+While reference CLOCK_REALTIME advanced 1.000000033 seconds, /dev/ptp0 advanced 0.990308500 seconds (or -9691.5 ppm difference)
 
 
 2) On BeagleBoard-X15 with a 1.5 GHz CPU frequency:
-debian@BeagleBoard-X15:~/linuxptp-1.6$ gcc -Wall -O3 -I. read_ptp.c phc.c -o read_ptp
+debian@BeagleBoard-X15:~/linuxptp-1.6$ gcc -Wall -O3 -I. read_ptp.c phc.c -o red_ptp
 debian@BeagleBoard-X15:~/linuxptp-1.6$ sudo ./read_ptp /dev/ptp0
-[sudo] password for debian:
 phc_has_pps=0
 phc_max_adj=1000000
 CLOCK_REALTIME : res tv_sec=0 tv_nsec=1
-CLOCK_REALTIME : now tv_sec=1533754308 tv_nsec=882659345
+CLOCK_REALTIME : now tv_sec=1533823754 tv_nsec=472005847
 CLOCK_MONOTONIC : res tv_sec=0 tv_nsec=1
-CLOCK_MONOTONIC : now tv_sec=30850 tv_nsec=60120340
+CLOCK_MONOTONIC : now tv_sec=1454 tv_nsec=792149872
+CLOCK_MONOTONIC_RAW : res tv_sec=0 tv_nsec=1
+CLOCK_MONOTONIC_RAW : now tv_sec=1454 tv_nsec=792397379
 /dev/ptp0 : res tv_sec=0 tv_nsec=1
-/dev/ptp0 : now tv_sec=1533754344 tv_nsec=882708668
+/dev/ptp0 : now tv_sec=1533823790 tv_nsec=472074749
 
 1000000 iterations of clock_gettime(CLOCK_REALTIME) used:
-  minor page faults=0 (157 -> 157)
+  minor page faults=0 (155 -> 155)
   major page faults=0 (0 -> 0)
   voluntary context switches=0 (1 -> 1)
-  involuntary context switches=28 (3 -> 31)
-  user time=0.152422 system time=0.001635
-One second of elapsed time using CLOCK_REALTIME took 1492373426 HW CPU cycles (225956465 -> 1718329891)
+  involuntary context switches=40 (3 -> 43)
+  user time=0.152023 system time=0.000354
+One second of elapsed time using CLOCK_REALTIME took 1484181845 HW CPU cycles (226057445 -> 1710239290)
+  while CLOCK_MONOTONIC_RAW advanced 1000030256 nsecs, CLOCK_MONOTONIC advanced 1000015456 nsecs and CLOCKREAL_TIME advanced 1000016106 nsecs
 
 1000000 iterations of clock_gettime(CLOCK_MONOTONIC) used:
-  minor page faults=0 (157 -> 157)
+  minor page faults=0 (155 -> 155)
   major page faults=0 (0 -> 0)
   voluntary context switches=0 (1 -> 1)
-  involuntary context switches=13 (179 -> 192)
-  user time=0.147840 system time=0.000000
-One second of elapsed time using CLOCK_MONOTONIC took 1480492978 HW CPU cycles (1940355425 -> 3420848403)
+  involuntary context switches=14 (252 -> 266)
+  user time=0.152716 system time=0.000000
+One second of elapsed time using CLOCK_MONOTONIC took 1473086853 HW CPU cycles (1939549957 -> 3412636810)
+  while CLOCK_MONOTONIC_RAW advanced 1000028466 nsecs, CLOCK_MONOTONIC advanced 1000013872 nsecs and CLOCKREAL_TIME advanced 1000014360 nsecs
+
+1000000 iterations of clock_gettime(CLOCK_MONOTONIC_RAW) used:
+  minor page faults=0 (155 -> 155)
+  major page faults=0 (0 -> 0)
+  voluntary context switches=0 (1 -> 1)
+  involuntary context switches=180 (514 -> 694)
+  user time=0.146384 system time=0.468854
+One second of elapsed time using CLOCK_MONOTONIC_RAW took 1482382350 HW CPU cycles (4335509643 -> 5817891993)
+  while CLOCK_MONOTONIC_RAW advanced 1000008296 nsecs, CLOCK_MONOTONIC advanced 999992941 nsecs and CLOCKREAL_TIME advanced 999993754 nsecs
 
 1000000 iterations of clock_gettime(/dev/ptp0) used:
-  minor page faults=0 (157 -> 157)
+  minor page faults=0 (155 -> 155)
   major page faults=0 (0 -> 0)
   voluntary context switches=0 (1 -> 1)
-  involuntary context switches=311 (382 -> 693)
-  user time=0.032439 system time=2.108534
-One second of elapsed time using /dev/ptp0 took 1494971903 HW CPU cycles (6632798076 -> 8127769979)
-While reference CLOCK_REALTIME advanced 1.000000006 seconds, CLOCK_MONOTONIC advanced 0.999999843 seconds (or -0.2 ppm difference)
-While reference CLOCK_REALTIME advanced 1.000000050 seconds, /dev/ptp0 advanced 1.000001134 seconds (or 1.1 ppm difference)
+  involuntary context switches=247 (956 -> 1203)
+  user time=0.187180 system time=1.962080
+One second of elapsed time using /dev/ptp0 took 1495533701 HW CPU cycles (9042216513 -> 10537750214)
+  while CLOCK_MONOTONIC_RAW advanced 1000031557 nsecs, CLOCK_MONOTONIC advanced 1000016479 nsecs and CLOCKREAL_TIME advanced 1000016968 nsecs
+While reference CLOCK_REALTIME advanced 1.000000142 seconds, CLOCK_MONOTONIC advanced 1.000000141 seconds (or -0.0 ppm difference)
+While reference CLOCK_REALTIME advanced 1.000000024 seconds, CLOCK_MONOTONIC_RAW advanced 1.000016430 seconds (or 16.4 ppm difference)
+While reference CLOCK_REALTIME advanced 1.000000060 seconds, /dev/ptp0 advanced 1.000004478 seconds (or 4.4 ppm difference)
 
 
 3) On EVMK2H (with a 1.4 GHz CPU frequency):
@@ -149,37 +230,52 @@ root@k2hk-evm:~/linuxptp-1.6# ./read_ptp /dev/ptp0
 phc_has_pps=0
 phc_max_adj=1000000
 CLOCK_REALTIME : res tv_sec=0 tv_nsec=1
-CLOCK_REALTIME : now tv_sec=1533754282 tv_nsec=81610757
+CLOCK_REALTIME : now tv_sec=1533823924 tv_nsec=392514041
 CLOCK_MONOTONIC : res tv_sec=0 tv_nsec=1
-CLOCK_MONOTONIC : now tv_sec=34724 tv_nsec=840198153
+CLOCK_MONOTONIC : now tv_sec=1594 tv_nsec=370172309
+CLOCK_MONOTONIC_RAW : res tv_sec=0 tv_nsec=1
+CLOCK_MONOTONIC_RAW : now tv_sec=1594 tv_nsec=369760945
 /dev/ptp0 : res tv_sec=0 tv_nsec=1
-/dev/ptp0 : now tv_sec=1533754318 tv_nsec=81654304
+/dev/ptp0 : now tv_sec=1533823960 tv_nsec=392303848
 
 1000000 iterations of clock_gettime(CLOCK_REALTIME) used:
-  minor page faults=0 (154 -> 154)
+  minor page faults=0 (164 -> 164)
   major page faults=0 (0 -> 0)
-  voluntary context switches=0 (7 -> 7)
-  involuntary context switches=19 (1 -> 20)
-  user time=0.180000 system time=0.000000
-One second of elapsed time using CLOCK_REALTIME took 1399418770 HW CPU cycles (258067438 -> 1657486208)
+  voluntary context switches=0 (10 -> 10)
+  involuntary context switches=19 (8 -> 27)
+  user time=0.190000 system time=0.000000
+One second of elapsed time using CLOCK_REALTIME took 1395437386 HW CPU cycles (258099382 -> 1653536768)
+  while CLOCK_MONOTONIC_RAW advanced 999948465 nsecs, CLOCK_MONOTONIC advanced 1000010314 nsecs and CLOCKREAL_TIME advanced 1000010964 nsecs
 
 1000000 iterations of clock_gettime(CLOCK_MONOTONIC) used:
-  minor page faults=0 (154 -> 154)
+  minor page faults=0 (164 -> 164)
   major page faults=0 (0 -> 0)
-  voluntary context switches=0 (7 -> 7)
-  involuntary context switches=19 (122 -> 141)
+  voluntary context switches=0 (10 -> 10)
+  involuntary context switches=20 (134 -> 154)
   user time=0.190000 system time=0.000000
-One second of elapsed time using CLOCK_MONOTONIC took 1399567224 HW CPU cycles (1917972705 -> 3317539929)
+One second of elapsed time using CLOCK_MONOTONIC took 1397386921 HW CPU cycles (1914122701 -> 3311509622)
+  while CLOCK_MONOTONIC_RAW advanced 1000127900 nsecs, CLOCK_MONOTONIC advanced 1000007195 nsecs and CLOCKREAL_TIME advanced 1000007750 nsecs
+
+1000000 iterations of clock_gettime(CLOCK_MONOTONIC_RAW) used:
+  minor page faults=0 (164 -> 164)
+  major page faults=0 (0 -> 0)
+  voluntary context switches=0 (10 -> 10)
+  involuntary context switches=51 (262 -> 313)
+  user time=0.100000 system time=0.380000
+One second of elapsed time using CLOCK_MONOTONIC_RAW took 1397300066 HW CPU cycles (3993139665 -> 5390439731)
+  while CLOCK_MONOTONIC_RAW advanced 1000006165 nsecs, CLOCK_MONOTONIC advanced 999889465 nsecs and CLOCKREAL_TIME advanced 999890075 nsecs
 
 1000000 iterations of clock_gettime(/dev/ptp0) used:
-  minor page faults=0 (154 -> 154)
+  minor page faults=0 (164 -> 164)
   major page faults=0 (0 -> 0)
-  voluntary context switches=0 (7 -> 7)
-  involuntary context switches=170 (241 -> 411)
-  user time=0.170000 system time=1.530000
-One second of elapsed time using /dev/ptp0 took 1399548358 HW CPU cycles (5694762783 -> 7094311141)
-While reference CLOCK_REALTIME advanced 1.000000132 seconds, CLOCK_MONOTONIC advanced 1.000000042 seconds (or -0.1 ppm difference)
-While reference CLOCK_REALTIME advanced 1.000000008 seconds, /dev/ptp0 advanced 0.999999535 seconds (or -0.5 ppm difference)
+  voluntary context switches=0 (10 -> 10)
+  involuntary context switches=182 (418 -> 600)
+  user time=0.160000 system time=1.550000
+One second of elapsed time using /dev/ptp0 took 1397342593 HW CPU cycles (7784683578 -> 9182026171)
+  while CLOCK_MONOTONIC_RAW advanced 1000012175 nsecs, CLOCK_MONOTONIC advanced 999999377 nsecs and CLOCKREAL_TIME advanced 1000000122 nsecs
+While reference CLOCK_REALTIME advanced 1.000000064 seconds, CLOCK_MONOTONIC advanced 0.999999984 seconds (or -0.1 ppm difference)
+While reference CLOCK_REALTIME advanced 1.000000066 seconds, CLOCK_MONOTONIC_RAW advanced 0.999993300 seconds (or -6.8 ppm difference)
+While reference CLOCK_REALTIME advanced 1.000000055 seconds, /dev/ptp0 advanced 0.999996032 seconds (or -4.0 ppm difference)
 
 
 == Glitches in synchronised time ==

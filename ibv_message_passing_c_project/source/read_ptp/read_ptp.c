@@ -9,6 +9,7 @@
  */
 
 #include <inttypes.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -195,18 +196,28 @@ static void time_clock_read (const clockid_t id, const char *const clock_name)
  * @brief Display an estimate of the CPU frequency
  * @details This is done by measuring the change in the hardware CPU counter perf event while waiting for one
  *          second to elapse while reading a POSIX clock.
+ *          It assumes that frequency scaling doesn't the CPU frequency while this function is running.
  * @param[in] id Which POSIX clock ID to read
  * @param[in] clock_name The name to display for ID
  * @param[in] cycle_counter_fd The file descriptor returned by open_cycle_counter_fd()
  */
 static void estimate_cpu_frequency (const clockid_t id, const char *const clock_name, const int cycle_counter_fd)
 {
+    struct timespec monotonic_start_time;
+    struct timespec monotonic_end_time;
+    struct timespec monotonic_raw_start_time;
+    struct timespec monotonic_raw_end_time;
+    struct timespec realtime_start_time;
+    struct timespec realtime_end_time;
     struct timespec start_time;
     struct timespec end_time;
     struct timespec now;
     uint64_t start_counter;
     uint64_t end_counter;
 
+    checked_gettime (CLOCK_REALTIME, &realtime_start_time);
+    checked_gettime (CLOCK_MONOTONIC, &monotonic_start_time);
+    checked_gettime (CLOCK_MONOTONIC_RAW, &monotonic_raw_start_time);
     checked_gettime (id, &start_time);
     start_counter = get_cycle_counter (cycle_counter_fd);
     end_time = start_time;
@@ -217,9 +228,19 @@ static void estimate_cpu_frequency (const clockid_t id, const char *const clock_
     } while ((now.tv_sec < end_time.tv_sec) ||
              ((now.tv_sec == end_time.tv_sec) && (now.tv_nsec < end_time.tv_nsec)));
     end_counter = get_cycle_counter (cycle_counter_fd);
+    checked_gettime (CLOCK_MONOTONIC_RAW, &monotonic_raw_end_time);
+    checked_gettime (CLOCK_MONOTONIC, &monotonic_end_time);
+    checked_gettime (CLOCK_REALTIME, &realtime_end_time);
 
     printf ("One second of elapsed time using %s took %" PRIu64 " HW CPU cycles (%" PRIu64 " -> %" PRIu64 ")\n",
             clock_name, end_counter - start_counter, start_counter, end_counter);
+
+    const uint64_t elapsed_realtime = get_elapsed_ns (&realtime_start_time, &realtime_end_time);
+    const uint64_t elapsed_monotonic = get_elapsed_ns (&monotonic_start_time, &monotonic_end_time);
+    const uint64_t elapsed_raw_monotonic = get_elapsed_ns (&monotonic_raw_start_time, &monotonic_raw_end_time);
+
+    printf ("  while CLOCK_MONOTONIC_RAW advanced %" PRIu64 " nsecs, CLOCK_MONOTONIC advanced %" PRIu64 " nsecs and CLOCKREAL_TIME advanced %" PRIu64 " nsecs\n",
+            elapsed_raw_monotonic, elapsed_monotonic, elapsed_realtime);
 }
 
 
@@ -293,16 +314,20 @@ int main (int argc, char *argv[])
 
     display_clock_info (CLOCK_REALTIME, "CLOCK_REALTIME");
     display_clock_info (CLOCK_MONOTONIC, "CLOCK_MONOTONIC");
+    display_clock_info (CLOCK_MONOTONIC_RAW, "CLOCK_MONOTONIC_RAW");
     display_clock_info (ptp_id, ptp_dev_name);
 
     time_clock_read (CLOCK_REALTIME, "CLOCK_REALTIME");
     estimate_cpu_frequency (CLOCK_REALTIME, "CLOCK_REALTIME", cycle_counter_fd);
     time_clock_read (CLOCK_MONOTONIC, "CLOCK_MONOTONIC");
     estimate_cpu_frequency (CLOCK_MONOTONIC, "CLOCK_MONOTONIC", cycle_counter_fd);
+    time_clock_read (CLOCK_MONOTONIC_RAW, "CLOCK_MONOTONIC_RAW");
+    estimate_cpu_frequency (CLOCK_MONOTONIC_RAW, "CLOCK_MONOTONIC_RAW", cycle_counter_fd);
     time_clock_read (ptp_id, ptp_dev_name);
     estimate_cpu_frequency (ptp_id, ptp_dev_name, cycle_counter_fd);
 
     compare_clock_rates (CLOCK_REALTIME, "CLOCK_REALTIME", CLOCK_MONOTONIC, "CLOCK_MONOTONIC");
+    compare_clock_rates (CLOCK_REALTIME, "CLOCK_REALTIME", CLOCK_MONOTONIC_RAW, "CLOCK_MONOTONIC_RAW");
     compare_clock_rates (CLOCK_REALTIME, "CLOCK_REALTIME", ptp_id, ptp_dev_name);
 
     phc_close (ptp_id);
