@@ -113,14 +113,16 @@ static void *avx_test_load_thread (void *const arg)
         sum = _mm256_setzero_ps ();
         for (vector_index = 0; vector_index < num_vectors; vector_index += 8)
         {
-            sum = _mm256_add_ps (sum,
-                      _mm256_add_ps (
-                          _mm256_add_ps (
-                              _mm256_add_ps (vectors_to_sum[vector_index    ], vectors_to_sum[vector_index + 1]),
-                              _mm256_add_ps (vectors_to_sum[vector_index + 2], vectors_to_sum[vector_index + 3])),
-                          _mm256_add_ps (
-                              _mm256_add_ps (vectors_to_sum[vector_index + 4], vectors_to_sum[vector_index + 5]),
-                              _mm256_add_ps (vectors_to_sum[vector_index + 7], vectors_to_sum[vector_index + 7]))));
+            sum = _mm256_fmadd_ps (
+                _mm256_fmadd_ps (_mm256_fmadd_ps (vectors_to_sum[vector_index+1], vectors_to_sum[vector_index+2], vectors_to_sum[vector_index+3]),
+                                 _mm256_fmadd_ps (vectors_to_sum[vector_index+2], vectors_to_sum[vector_index+3], vectors_to_sum[vector_index+4]),
+                                                  vectors_to_sum[vector_index+5]),
+                _mm256_fmadd_ps (_mm256_fmadd_ps (vectors_to_sum[vector_index+3], vectors_to_sum[vector_index+4], vectors_to_sum[vector_index+5]),
+                                 _mm256_fmadd_ps (vectors_to_sum[vector_index+4], vectors_to_sum[vector_index+5], vectors_to_sum[vector_index+6]),
+                                                  vectors_to_sum[vector_index+7]),
+                _mm256_fmadd_ps (_mm256_fmadd_ps (vectors_to_sum[vector_index+3], vectors_to_sum[vector_index+2], vectors_to_sum[vector_index+1]),
+                                 _mm256_fmadd_ps (vectors_to_sum[vector_index+4], vectors_to_sum[vector_index+5], vectors_to_sum[vector_index+3]),
+                                                  vectors_to_sum[vector_index+5]));
         }
         num_test_iterations++;
     }
