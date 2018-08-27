@@ -35,6 +35,7 @@ add_subdirectory ("${PROJECT_SOURCE_DIR}/ibv_functional_loopback_test")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/ibv_pingpong_measurements")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/virtual_inheritence")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/gdb_unblock_sigchld")
+add_subdirectory ("${PROJECT_SOURCE_DIR}/vector_test_load")
 
 # Location of the source code for the linuxptp package, to gain access to the phc.[ch]
 set (LINUXPTP_ROOT "$ENV{HOME}/linuxptp-1.6")
