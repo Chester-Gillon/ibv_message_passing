@@ -26,7 +26,7 @@
 
 
 /* The vector test size in bytes, less than the L1D cache size to try and keep the test in the L1 cache */
-#define VECTOR_TEST_SIZE_BYTES 30016
+#define VECTOR_TEST_SIZE_BYTES 30208
 
 
 /* Size of the stacks for the test threads, dominated by VECTOR_TEST_SIZE_BYTES */
@@ -111,9 +111,16 @@ static void *avx_test_load_thread (void *const arg)
     while (!test_complete)
     {
         sum = _mm256_setzero_ps ();
-        for (vector_index = 0; vector_index < num_vectors; vector_index++)
+        for (vector_index = 0; vector_index < num_vectors; vector_index += 8)
         {
-            sum = _mm256_add_ps (sum, vectors_to_sum[vector_index]);
+            sum = _mm256_add_ps (sum,
+                      _mm256_add_ps (
+                          _mm256_add_ps (
+                              _mm256_add_ps (vectors_to_sum[vector_index    ], vectors_to_sum[vector_index + 1]),
+                              _mm256_add_ps (vectors_to_sum[vector_index + 2], vectors_to_sum[vector_index + 3])),
+                          _mm256_add_ps (
+                              _mm256_add_ps (vectors_to_sum[vector_index + 4], vectors_to_sum[vector_index + 5]),
+                              _mm256_add_ps (vectors_to_sum[vector_index + 7], vectors_to_sum[vector_index + 7]))));
         }
         num_test_iterations++;
     }
