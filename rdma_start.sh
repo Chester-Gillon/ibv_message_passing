@@ -19,3 +19,11 @@ sudo modprobe iw_c2
 
 # Give the user permission to access the performance counters
 sudo chmod 666 /dev/infiniband/umad?
+
+# Start opensm on all Infiniband ports
+PORTS=`/usr/sbin/ibstat -p`
+for PORT in ${PORTS} ;
+do
+   echo "Starting opensm on ${PORT}: "
+   sudo /usr/sbin/opensm -g ${PORT} -B -f /var/log/opensm.${PORT}.log
+done
