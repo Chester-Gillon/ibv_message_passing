@@ -11,6 +11,10 @@ with Ada.Strings.Fixed;
 with ibv_message_bw_interface_h;
 with ibv_controller_worker_messages_h;
 
+-- Disable this warning since the functions declare variables only to use 'Size and 'Position attributes but not actually
+-- read the contents.
+pragma Warnings (Off, "variable ""*"" is read but never assigned");
+
 procedure Ibv_Ada_Structure_Size is
 
    procedure print_struct_size (struct_name: in string; struct_size: in Natural) is
