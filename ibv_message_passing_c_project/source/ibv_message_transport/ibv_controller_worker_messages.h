@@ -89,6 +89,6 @@ typedef union
     sum_integers_msg sum_integers;
 } controller_to_worker_msgs;
 
-void register_controller_worker_messages (void);
+void register_controller_worker_messages (const bool controller_and_workers_on_separate_pcs);
 
 #endif /* IBV_CONTROLLER_WORKER_MESSAGES_H_ */

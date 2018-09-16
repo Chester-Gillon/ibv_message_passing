@@ -15,6 +15,7 @@ with ibv_controller_worker_messages_h;
 with Ada.Assertions;
 with Ada.Numerics.Discrete_Random;
 with stdint_h;
+with Ada.Command_Line;
 
 procedure Ibv_Controller_Process_Main is
 
@@ -200,9 +201,13 @@ procedure Ibv_Controller_Process_Main is
    communication_context : ibv_message_bw_interface_h.communication_context_handle;
    paths_to_workers : paths_to_workers_array;
    num_requests_per_worker : ibv_controller_worker_messages_h.request_shutdown_msg_num_requests_per_worker_array := (others => 0);
+   controller_and_workers_on_separate_pcs : Interfaces.C.Extensions.bool := Interfaces.C.Extensions.bool (false);
 begin
    -- Initialise, establishing connection with the workers
-   ibv_controller_worker_messages_h.register_controller_worker_messages;
+   if Ada.Command_Line.Argument_Count >= 1 then
+      controller_and_workers_on_separate_pcs := Interfaces.C.Extensions.bool'Value(Ada.Command_Line.Argument (1));
+   end if;
+   ibv_controller_worker_messages_h.register_controller_worker_messages (controller_and_workers_on_separate_pcs);
    communication_context :=
      ibv_message_bw_interface_h.communication_context_initialise (Interfaces.C.int (ibv_controller_worker_messages_h.CONTROLLER_NODE_ID));
    for node_id in all_workers loop

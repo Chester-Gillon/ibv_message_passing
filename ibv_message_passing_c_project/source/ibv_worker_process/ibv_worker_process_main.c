@@ -22,8 +22,12 @@
 /** Identifies which worker instance this process is */
 static int worker_node_number;
 
+/** Command line option for configuring the communication paths */
+static bool controller_and_workers_on_separate_pcs;
+
 /** The absolute pathname of the executable for this process */
-char worker_executable_pathname[PATH_MAX];
+static char worker_executable_pathname[PATH_MAX];
+
 
 /**
  * @brief Parse the command line arguments for the worker process
@@ -36,9 +40,9 @@ static void parse_command_line_arguments (int argc, char *argv[])
     const char *worker_node_number_string;
     char junk;
 
-    if (argc != 2)
+    if ((argc < 2) || (argc > 3))
     {
-        fprintf (stderr, "Usage: %s <worker_node_number>\n", program_name);
+        fprintf (stderr, "Usage: %s <worker_node_number> [<controller_and_workers_on_separate_pcs>]\n", program_name);
         exit (EXIT_FAILURE);
     }
 
@@ -48,6 +52,11 @@ static void parse_command_line_arguments (int argc, char *argv[])
     {
         fprintf (stderr, "%s is not a valid worker_node_number\n", worker_node_number_string);
         exit (EXIT_FAILURE);
+    }
+
+    if (argc > 2)
+    {
+        controller_and_workers_on_separate_pcs = atoi (argv[2]);
     }
 
     if (realpath (program_name, worker_executable_pathname) == NULL)
@@ -152,7 +161,7 @@ int main (int argc, char *argv[])
     tx_message_context_handle path_to_controller;
 
     parse_command_line_arguments (argc, argv);
-    register_controller_worker_messages ();
+    register_controller_worker_messages (controller_and_workers_on_separate_pcs);
     communication_context = communication_context_initialise (worker_node_number);
     path_to_controller = get_tx_path_handle (communication_context, CONTROLLER_NODE_ID, WORKER_TO_CONTROLLER_PATH);
     report_worker_ready (path_to_controller);
