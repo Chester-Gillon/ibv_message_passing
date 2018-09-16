@@ -323,19 +323,14 @@ static SLPBoolean slp_service_url_callback (const SLPHandle handle, const char *
                                             const SLPError error_code, void *const cookie)
 {
     communication_path_slp_connection *const slp_connection = (communication_path_slp_connection *) cookie;
-    SLPError slp_status;
-    SLPSrvURL *parsed_surl;
+    const char *match;
 
     if ((error_code == SLP_OK) && (strlen (slp_connection->remote_service_url) == 0))
     {
-        slp_status = SLPParseSrvURL (service_url, &parsed_surl);
-        if (slp_status == SLP_OK)
+        match = strstr (service_url, slp_connection->remote_service_name);
+        if ((match != NULL) && (strlen (match) == strlen (slp_connection->remote_service_name)))
         {
-            if (strcmp (slp_connection->remote_service_name, parsed_surl->s_pcSrvPart) == 0)
-            {
-                strcpy (slp_connection->remote_service_url, service_url);
-            }
-            SLPFree (parsed_surl);
+            strcpy (slp_connection->remote_service_url, service_url);
         }
     }
 
