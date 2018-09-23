@@ -363,9 +363,9 @@ rx_api_message_buffer *poll_rx_message (rx_message_context_handle context)
     const uint32_t buffer_index = context->next_receive_buffer_index;
     rx_api_message_buffer *api_buffer = &context->api_message_buffers[buffer_index];
     rx_message_buffer *const rx_buffer = &context->rx_message_buffers[buffer_index];
-    const volatile uint32_t *const receive_sequence_number = &api_buffer->header->sequence_number;
+    const uint32_t *const receive_sequence_number = &api_buffer->header->sequence_number;
     bool message_available = false;
-    const uint32_t sampled_sequence_number = *receive_sequence_number;
+    const uint32_t sampled_sequence_number = __atomic_load_n (receive_sequence_number, __ATOMIC_ACQUIRE);
 
     if (sampled_sequence_number == rx_buffer->message_available_sequence_number)
     {
@@ -439,7 +439,7 @@ void free_message (rx_api_message_buffer *const api_buffer)
     }
 
     /* Transmit the freed sequence number to the sender, to indicate the buffer can be reused */
-    *rx_buffer->freed_sequence_number = rx_buffer->message_available_sequence_number;
+    __atomic_store_n (rx_buffer->freed_sequence_number, rx_buffer->message_available_sequence_number, __ATOMIC_RELEASE);
     if (api_buffer->context->freed_sequence_number_cq_pacing == 0)
     {
         rx_buffer->freed_message_wr.send_flags |= IBV_SEND_SIGNALED;

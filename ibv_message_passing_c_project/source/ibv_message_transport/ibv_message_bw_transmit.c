@@ -49,7 +49,7 @@ typedef struct
      *  - If true in use by the application for populating the message contents to be sent */
     bool owned_by_application;
     /** Points at the transmit buffer for the location of the freed sequence number */
-    volatile uint32_t *freed_sequence_number;
+    uint32_t *freed_sequence_number;
 } tx_message_buffer;
 
 /** Contains the context used to transmit messages on one communication path over a pair of connected Infiniband ports */
@@ -219,7 +219,7 @@ static void initialise_transmit_message_buffers (tx_message_context_handle conte
         api_buffer->data = &context->transmit_buffer.buffer[data_offset];
         freed_sequence_number_offset = buffer_offset;
         buffer_offset += align_to_cache_line_size (sizeof (uint32_t));
-        tx_buffer->freed_sequence_number = (volatile uint32_t *) &context->transmit_buffer.buffer[freed_sequence_number_offset];
+        tx_buffer->freed_sequence_number = (uint32_t *) &context->transmit_buffer.buffer[freed_sequence_number_offset];
 
         /* Set a scatter-gather entry to transmit the maximum message data size, actual length will be set at run time */
         data_sge->lkey = context->transmit_mr->lkey;
@@ -414,7 +414,7 @@ static bool is_buffer_free (tx_message_context_handle context, const uint32_t bu
 
     if (tx_buffer->await_buffer_freed)
     {
-        const uint32_t sampled_sequence_number = *tx_buffer->freed_sequence_number;
+        const uint32_t sampled_sequence_number = __atomic_load_n (tx_buffer->freed_sequence_number, __ATOMIC_ACQUIRE);
 
         if (sampled_sequence_number == tx_buffer->message_freed_sequence_number)
         {
@@ -565,7 +565,7 @@ void send_message (const tx_api_message_buffer *const api_buffer)
     }
 
     /* Complete the message to be sent */
-    api_buffer->header->sequence_number = tx_buffer->next_transmit_sequence_number;
+    __atomic_store_n (&api_buffer->header->sequence_number, tx_buffer->next_transmit_sequence_number, __ATOMIC_RELEASE);
     tx_buffer->transmit_sges[MESSAGE_DATA_WQE_INDEX].length = api_buffer->header->message_length;
     if (api_buffer->context->message_transmit_cq_pacing == 0)
     {
