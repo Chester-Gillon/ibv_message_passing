@@ -5,9 +5,9 @@
  * @brief The master program for time synchronisation measurement
  */
 
-#include <stdlib.h>
-#include <stdbool.h>
 #include <inttypes.h>
+#include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>

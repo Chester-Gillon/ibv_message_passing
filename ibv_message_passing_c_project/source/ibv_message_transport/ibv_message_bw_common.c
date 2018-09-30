@@ -5,9 +5,9 @@
  * @brief Contains functions common the message transmitter and receiver for the ibv_message_bw program
  */
 
-#include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>

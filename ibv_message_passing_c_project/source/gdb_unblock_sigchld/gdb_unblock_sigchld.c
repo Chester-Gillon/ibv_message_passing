@@ -9,6 +9,7 @@
  *          signals before starting gdb to work-around the problem.
  */
 
+#include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>

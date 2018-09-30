@@ -6,8 +6,9 @@
  *          to the process or calling thread.
  */
 
-#include <stdlib.h>
+#include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <semaphore.h>

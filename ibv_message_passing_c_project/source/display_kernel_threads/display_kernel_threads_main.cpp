@@ -11,6 +11,7 @@
 #define _GNU_SOURCE
 #endif
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

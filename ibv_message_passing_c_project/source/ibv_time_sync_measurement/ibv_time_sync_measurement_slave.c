@@ -5,9 +5,9 @@
  * @brief The slave program for time synchronisation measurement
  */
 
-#include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 

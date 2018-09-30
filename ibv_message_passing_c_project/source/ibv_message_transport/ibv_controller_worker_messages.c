@@ -5,9 +5,9 @@
  * @brief Defines messages used for a controller and workers example of multiple processes communicating
  */
 
-#include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 

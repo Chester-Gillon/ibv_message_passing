@@ -6,9 +6,9 @@
  *          assuming a dual port Infiniband adapter with port 1 looped to port 2.
  */
 
-#include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>

@@ -6,9 +6,9 @@
  *          via the ibv_message_transport library.
  */
 
-#include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>

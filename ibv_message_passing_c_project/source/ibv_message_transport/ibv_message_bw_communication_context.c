@@ -5,9 +5,9 @@
  * @brief Contains functions which allow multiple communication paths to be used by a program
  */
 
-#include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <limits.h>
 
 #include <infiniband/verbs.h>

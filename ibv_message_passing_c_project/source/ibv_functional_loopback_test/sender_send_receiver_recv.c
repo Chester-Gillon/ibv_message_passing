@@ -19,10 +19,10 @@
  *          or Packet Sequence Number details between the sender and receiver (which are in the same process).
  */
 
-#include <stdlib.h>
-#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>

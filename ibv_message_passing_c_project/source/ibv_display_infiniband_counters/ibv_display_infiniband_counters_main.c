@@ -5,6 +5,7 @@
  * @brief Program which demonstrates programatically reading the counters for all Infiniband ports in a host
  */
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

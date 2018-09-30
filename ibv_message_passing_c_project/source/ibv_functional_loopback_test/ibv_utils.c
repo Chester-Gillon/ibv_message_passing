@@ -5,11 +5,12 @@
  * @brief Utility functions for Infiniband tests
  */
 
+#include <stdint.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <stdbool.h>
 #include <limits.h>
 #include <unistd.h>
 #include <sys/resource.h>
