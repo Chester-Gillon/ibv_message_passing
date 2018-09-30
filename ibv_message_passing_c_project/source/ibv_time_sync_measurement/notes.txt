@@ -68,7 +68,7 @@ time_sync_started_blast_master_to_slave.csv
 ===========================================
 
 Before this test was started:
-- The PTM synchronisation had already been started on the master and slave.
+- The PTP synchronisation had already been started on the master and slave.
 - tcpBlaster sending 116750256 bytes/sec from master to slave.
 
 The time offset measured with a 2-3us round trip delay was -6832 to -4869 ns.
@@ -78,7 +78,7 @@ time_sync_started_blast_master_bidir_slave.csv
 ==============================================
 
 Before this test was started:
-- The PTM synchronisation had already been started on the master and slave.
+- The PTP synchronisation had already been started on the master and slave.
 - tcpBlaster sending 93124595 bytes/sec from master to slave.
 - tcpBlaster sending 92123768 bytes/sec from slave to master.
 
@@ -98,3 +98,24 @@ Within 3 seconds after the time had synchronised the time offset measured with a
 
 Using a zero offset for phc2sys has removed the issue where the CLOCK_REALTIME on the master went backwards by 36 seconds upon
 starting PTP.
+
+
+time_sync_started_ib_port_1_load.csv
+====================================
+
+Before this test was started:
+- The PTP synchronisation had already been started on the master and slave.
+- ibv_message_bw sending 3189.7 Mbytes/second from master Infiniband port 1 to slave Infiniband port 1
+
+The round trip delay of 20 <= us < 21 had the most samples, and the time offset measured was 3424 to 15880 ns
+
+
+time_sync_started_ib_port_1-2_load.csv
+======================================
+
+Before this test was started:
+- The PTP synchronisation had already been started on the master and slave.
+- ibv_message_bw sending 3027.0 Mbytes/second from master Infiniband port 1 to slave Infiniband port 1
+- ibv_message_bw sending 2682.3 Mbytes/second from slave Infiniband port 2 to master Infiniband port 2
+
+The round trip delay of 18 <= us < 19 had the most samples, and the time offset measured was -1486 to 13426 ns
