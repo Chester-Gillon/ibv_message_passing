@@ -30,6 +30,31 @@ changed to introduce an offset of around 35 seconds which presuambly adjusted CL
 On a normal boot not sure how much offset there is between CLOCK_REALTIME and PTP time, but shows the master should really be
 using CLOCK_MONOTONIC to measure the round-trip delay.
 
+On a repeat of the test, the offset between the master and slave was -7.15 seconds before PTP started, but at the point PTP
+was started the master still geot 37 times more samples when using CLOCK_REALTIME. The syslog entry from the master was:
+Sep 30 15:43:23 haswell-ubuntu ptp4l: [670.736] assuming the grand master role
+Sep 30 15:43:24 haswell-ubuntu phc2sys: [671.619] Waiting for ptp4l...
+Sep 30 15:43:25 haswell-ubuntu phc2sys: [672.619] phc offset 36000010101 s0 freq      +0 delay   2960
+Sep 30 15:42:50 haswell-ubuntu phc2sys: [673.619] phc offset 36000011093 s1 freq    +992 delay   2880
+Sep 30 15:42:50 haswell-ubuntu systemd[1471]: Time has been changed
+Sep 30 15:42:50 haswell-ubuntu systemd[1]: Time has been changed
+Sep 30 15:42:51 haswell-ubuntu phc2sys: [674.619] phc offset       -88 s2 freq    +904 delay   3000
+
+The the phc offset of 36 seconds causes the master CLOCK_REALTIME to go backwards.
+Where 36 seconds is the offset between TAI (PTP time) and UTC (CLOCK_REALTIME) :
+$ sudo pmc -u -b 0 'get TIME_PROPERTIES_DATA_SET'
+[sudo] password for mr_halfword: 
+sending: GET TIME_PROPERTIES_DATA_SET
+    ecb1d7.fffe.3e5ff1-0 seq 0 RESPONSE MANAGEMENT TIME_PROPERTIES_DATA_SET 
+        currentUtcOffset      36
+        leap61                0
+        leap59                0
+        currentUtcOffsetValid 0
+        ptpTimescale          1
+        timeTraceable         0
+        frequencyTraceable    0
+        timeSource            0xa0
+
 
 time_sync_started.csv
 =====================
@@ -59,3 +84,17 @@ Before this test was started:
 
 The time offset measured with a 2-3us round trip delay was -14058 to 13827 ns.
 
+
+time_sync_starts_zero_offset.csv
+================================
+
+This is a repeat of the time_sync_starts.csv test, but the addition of the phc2sys -O 0 option on the master and slave to use a
+zero TAI to UTC offset.
+
+The PTP synchronisation was started on the master and slave during this test.
+
+Before the time had synchronised there was a 35.82 second offset.
+Within 3 seconds after the time had synchronised the time offset measured with a 2-3us round trip delay was 4345 to 7573 ns.
+
+Using a zero offset for phc2sys has removed the issue where the CLOCK_REALTIME on the master went backwards by 36 seconds upon
+starting PTP.
