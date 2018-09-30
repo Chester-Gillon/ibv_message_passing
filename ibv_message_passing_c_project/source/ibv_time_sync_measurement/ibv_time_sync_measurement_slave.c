@@ -9,15 +9,24 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <limits.h>
 
 #include <infiniband/verbs.h>
 #include <slp.h>
+#include <sys/mman.h>
 
 #include "ibv_message_bw_interface.h"
 #include "ibv_time_sync_measurement_messages.h"
 
 
+/**
+ * @brief Run the time synchronisation slave until told by the master to exit.
+ * @details The slave doesn't maintain any statistics on the time synchronisation, since all statistics are maintained by the
+ *          master.
+ * @param[in] argc, argv
+ *            Command line arguments are not used, as the Infiniband ports used are hard coded.
+ */
 int main (int argc, char *argv[])
 {
     communication_context_handle communication_context;
@@ -27,6 +36,13 @@ int main (int argc, char *argv[])
     bool test_complete;
     slave_current_time_msg *slave_time_msg;
     int rc;
+
+    rc = mlockall (MCL_CURRENT | MCL_FUTURE);
+    if (rc != 0)
+    {
+        perror ("mlockall");
+        exit (EXIT_FAILURE);
+    }
 
     /* Initialise communication paths */
     register_time_sync_measurement_messages ();
