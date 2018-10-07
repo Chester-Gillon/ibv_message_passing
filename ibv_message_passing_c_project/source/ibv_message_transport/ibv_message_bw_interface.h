@@ -46,6 +46,8 @@ typedef struct
     uint8_t source_port_num;
     /** The port of the Infiniband device used by the destination endpoint to receive messages */
     uint8_t destination_port_num;
+    /** The Infiniband Service Level used on the communication path */
+    uint8_t service_level;
     /** The maximum message data size sent on the communication path */
     uint32_t max_message_size;
     /** The number of message buffers on the communication path */

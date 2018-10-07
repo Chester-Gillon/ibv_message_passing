@@ -43,6 +43,7 @@ procedure Ibv_Ada_Structure_Size is
       print_struct_field (struct_name, "destination_ib_device", path_def.destination_ib_device'Size, path_def.destination_ib_device'Position);
       print_struct_field (struct_name, "source_port_num", path_def.source_port_num'Size, path_def.source_port_num'Position);
       print_struct_field (struct_name, "destination_port_num", path_def.destination_port_num'Size, path_def.destination_port_num'Position);
+      print_struct_field (struct_name, "service_level", path_def.service_level'Size, path_def.service_level'Position);
       print_struct_field (struct_name, "max_message_size", path_def.max_message_size'Size, path_def.max_message_size'Position);
       print_struct_field (struct_name, "num_message_buffers", path_def.num_message_buffers'Size, path_def.num_message_buffers'Position);
       print_struct_field (struct_name, "allocation_type", path_def.allocation_type'Size, path_def.allocation_type'Position);

@@ -7,6 +7,7 @@ communication_path_definition.source_ib_device,64,16
 communication_path_definition.destination_ib_device,64,24
 communication_path_definition.source_port_num,8,32
 communication_path_definition.destination_port_num,8,33
+communication_path_definition.service_level,8,34
 communication_path_definition.max_message_size,32,36
 communication_path_definition.num_message_buffers,32,40
 communication_path_definition.allocation_type,32,44

@@ -302,7 +302,7 @@ void message_transmit_attach_remote_pre_rtr (tx_message_context_handle context)
     qp_attr.min_rnr_timer = 12; /* 0.64 milliseconds delay */
     qp_attr.ah_attr.is_global = false;
     qp_attr.ah_attr.dlid = context->slp_connection.remote_attributes.lid;
-    qp_attr.ah_attr.sl = DEFAULT_SERVICE_LEVEL;
+    qp_attr.ah_attr.sl = context->path_def.service_level;
     qp_attr.ah_attr.src_path_bits = 0;
     qp_attr.ah_attr.port_num = context->path_def.source_port_num;
     rc = ibv_modify_qp (context->message_transmit_qp, &qp_attr,

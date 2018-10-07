@@ -60,6 +60,7 @@ void register_controller_worker_messages (const bool controller_and_workers_on_s
             path_def.destination_ib_device = "mlx4_0";
             path_def.destination_port_num = 2;
         }
+        path_def.service_level = DEFAULT_SERVICE_LEVEL;
         path_def.max_message_size = sizeof (controller_to_worker_msgs);
         path_def.num_message_buffers = NUM_MESSAGE_BUFFERS;
         register_path_definition (&path_def);
@@ -85,6 +86,7 @@ void register_controller_worker_messages (const bool controller_and_workers_on_s
             path_def.destination_ib_device = "mlx4_0";
             path_def.destination_port_num = 1;
         }
+        path_def.service_level = DEFAULT_SERVICE_LEVEL;
         path_def.max_message_size = sizeof (worker_to_controller_msgs);
         path_def.num_message_buffers = NUM_MESSAGE_BUFFERS;
         register_path_definition (&path_def);

@@ -50,6 +50,10 @@ static char *arg_ib_devices[MAX_THREADS];
 static unsigned int num_ib_ports;
 static uint32_t arg_ib_ports[MAX_THREADS];
 
+/** Optional command line argument which specifies the service levels used for each thread */
+static unsigned int num_ib_service_levels;
+static uint32_t arg_ib_service_levels[MAX_THREADS];
+
 /** Optional command line argument which sets which CPU core each transmit or receive thread has its affinity set to */
 static int num_cores;
 static int arg_cores[MAX_THREADS];
@@ -219,6 +223,7 @@ static const struct option command_line_options[] =
     {"thread", required_argument, NULL, 0},
     {"ib-dev", required_argument, NULL, 0},
     {"ib-port", required_argument, NULL, 0},
+    {"ib-sl", required_argument, NULL, 0},
     {"core", required_argument, NULL, 0},
     {"max-msg-size", required_argument, NULL, 0},
     {"num-buffers", required_argument, NULL, 0},
@@ -253,6 +258,7 @@ static void display_usage (void)
     printf ("             Receive or transmit messages on the path with numeric <instance>\n");
     printf ("  --ib-dev=<dev>    Use IB device <dev>\n");
     printf ("  --ib-port=<port>  Use <port> of IB device\n");
+    printf ("  --ib-sl=<sl>  Use <sl> as the IB service level\n");
     printf ("  --core=<core>     Set the affinity of the tx / rx thread to the CPU <core>\n");
     printf ("\n");
     printf ("Options which apply to all threads, having a single value:\n");
@@ -387,6 +393,44 @@ static void process_ib_port_argument (const struct option *const optdef)
     free (arg_copy);
 }
 
+
+/**
+ * @brief Process the ib-sl command line option which is a comma-separated list
+ * @param[in] optdef Option definition
+ */
+static void process_ib_service_level_argument (const struct option *const optdef)
+{
+    char *arg_copy;
+    char *saveptr;
+    char *token;
+    char junk;
+    uint32_t ib_sl;
+
+    arg_copy = strdup (optarg);
+    token = strtok_r (arg_copy, DELIMITER, &saveptr);
+    while (token != NULL)
+    {
+        if ((sscanf (token, "%u%c", &ib_sl, &junk) != 1) || (ib_sl > 15))
+        {
+            fprintf (stderr, "Invalid %s %s\n", optdef->name, token);
+            exit (EXIT_FAILURE);
+        }
+        if (num_ib_service_levels < MAX_THREADS)
+        {
+            arg_ib_service_levels[num_ib_service_levels] = ib_sl;
+            num_ib_service_levels++;
+        }
+        else
+        {
+            fprintf (stderr, "Too many %s instances\n", optdef->name);
+            exit (EXIT_FAILURE);
+        }
+        token = strtok_r (NULL, DELIMITER, &saveptr);
+    }
+    free (arg_copy);
+}
+
+
 /**
  * @brief Process the core command line argument which is a comma-separated list
  * @param[in] optdef Option definition
@@ -518,6 +562,10 @@ static void parse_command_line_arguments (const int argc, char *argv[])
             {
                 process_ib_port_argument (optdef);
             }
+            else if (strcmp (optdef->name, "ib-sl") == 0)
+            {
+                process_ib_service_level_argument (optdef);
+            }
             else if (strcmp (optdef->name, "core") == 0)
             {
                 process_core_argument (optdef);
@@ -591,6 +639,11 @@ static void parse_command_line_arguments (const int argc, char *argv[])
     if ((num_threads != num_ib_devices) || (num_threads != num_ib_ports))
     {
         fprintf (stderr, "The number of ib-dev and ib-port instances must be the same as the number of threads\n");
+        exit (EXIT_FAILURE);
+    }
+    if ((num_ib_service_levels != 0) && (num_ib_service_levels != num_threads))
+    {
+        fprintf (stderr, "When the ib-sl argument is specified the number of instances must be the same as the number of threads\n");
         exit (EXIT_FAILURE);
     }
     if ((num_cores != 0) && (num_cores != num_threads))
@@ -1011,6 +1064,14 @@ static void create_message_threads (void)
         path_def.allocation_type = arg_buffer_allocation_type;
         path_def.tx_polls_for_errors = arg_tx_error_poll;
         path_def.tx_checks_memory_buffer_size = arg_tx_checks_memory_buffer_size;
+        if (num_ib_service_levels > 0)
+        {
+            path_def.service_level = arg_ib_service_levels[thread_index];
+        }
+        else
+        {
+            path_def.service_level = DEFAULT_SERVICE_LEVEL;
+        }
 
         /* Set CPU affinity for the thread which sends or receives messages, if specified as a command line option */
         rc = pthread_attr_init (&thread_attr);
