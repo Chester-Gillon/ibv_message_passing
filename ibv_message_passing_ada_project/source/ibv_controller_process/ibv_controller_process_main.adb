@@ -47,7 +47,7 @@ procedure Ibv_Controller_Process_Main is
          begin
             case ibv_controller_worker_messages_h.controller_worker_msg_ids'Val(rx_buffer.header.message_id) is
                when ibv_controller_worker_messages_h.CW_WORKER_READY =>
-                    ada.Text_IO.Put_Line ("worker " & stdint_h.uint32_t'Image (rx_buffer.header.source_instance) & " : " &
+                    ada.Text_IO.Put_Line ("worker " & Interfaces.C.Unsigned'Image (rx_buffer.header.source_instance) & " : " &
                                             Interfaces.C.To_Ada (Item => msgs.worker_ready.worker_executable_pathname(0..max_name_index), Trim_Nul => false));
 
                when others =>

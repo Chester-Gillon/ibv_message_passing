@@ -42,10 +42,11 @@ static const enum_list_entry ibv_atomic_cap_enums[] =
 };
 
 /** Enumerations for ibv_device_cap_flags
- *  @todo This list of enumerations was taken from the verbs.h installed from libibverbs-dev_1.1.8-1.1ubuntu2_amd64.deb
+ *  @todo This list of enumerations was taken from the verbs.h installed from libibverbs-dev_17.1-1
  *        With a Mellanox Technologies MT26428 the following bits are set in device_cap_flags for which there is no enumeration:
  *        - BIT15 - IB_DEVICE_LOCAL_DMA_LKEY in some versions of ib_verbs.h
- *        - BIT19 - IB_DEVICE_UD_IP_CSUM is some versions of ib_verbs.h
+ *        - BIT18 - IBV_DEVICE_IP_CSUM in some versions of ib_verbs.h
+ *        - BIT19 - IB_DEVICE_UD_IP_CSUM in some versions of ib_verbs.h
  *        - BIT21 - IBV_DEVICE_MEM_MGT_EXTENSIONS in some other versions of verbs.h
  *        - BIT22 - IB_DEVICE_BLOCK_MULTICAST_LOOPBACK in some versions of ib_verbs.h
  *        - BIT26 - IBV_DEVICE_RAW_IP_CSUM in some other versions of verbs.h
@@ -67,7 +68,6 @@ static const enum_list_entry ibv_device_cap_flags_enums[] =
     ENUM_LIST_INIT (IBV_DEVICE_RC_RNR_NAK_GEN),
     ENUM_LIST_INIT (IBV_DEVICE_SRQ_RESIZE),
     ENUM_LIST_INIT (IBV_DEVICE_N_NOTIFY_CQ),
-    ENUM_LIST_INIT (IBV_DEVICE_IP_CSUM),
     ENUM_LIST_INIT (IBV_DEVICE_XRC),
     ENUM_LIST_INIT (IBV_DEVICE_MANAGED_FLOW_STEERING),
     ENUM_LIST_END
@@ -283,7 +283,7 @@ void display_ibv_device_attributes (const struct ibv_context *const device, cons
 {
     printf ("Attributes of device %s:\n", ibv_get_device_name (device->device));
     printf (" num_comp_vectors=%d fw_ver=%s\n", device->num_comp_vectors, device_attr->fw_ver);
-    printf (" node_guid=0x%lx sys_image_guid=0x%lx\n", device_attr->node_guid, device_attr->sys_image_guid);
+    printf (" node_guid=0x%llx sys_image_guid=0x%llx\n", device_attr->node_guid, device_attr->sys_image_guid);
     printf (" max_mr_size=%lu page_size_cap=%lu vendor_id=0x%x vendor_part_id=0x%x hw_ver=%u\n",
             device_attr->max_mr_size, device_attr->page_size_cap, device_attr->vendor_id, device_attr->vendor_part_id, device_attr->hw_ver);
     printf (" max_qp=%d max_qp_wr=%d max_sge=%d max_sge_rd=%d\n",
