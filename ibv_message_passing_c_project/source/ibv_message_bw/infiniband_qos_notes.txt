@@ -1,0 +1,181 @@
+Tests with opensm default QOS settings.
+=======================================
+
+
+Default SL2VL mapping for ConnectX-2 ports with 4 VLs:
+$ smpquery SL2VL 1 1
+# SL2VL table: Lid 1
+#                 SL: | 0| 1| 2| 3| 4| 5| 6| 7| 8| 9|10|11|12|13|14|15|
+ports: in  0, out  0: | 0| 1| 2| 3| 0| 1| 2| 3| 0| 1| 2| 3| 0| 1| 2| 3|
+
+Default setting for VLHighLimit:
+$ smpquery PI 1 1  | grep VL
+VLCap:...........................VL0-3
+VLHighLimit:.....................4
+VLArbHighCap:....................8
+VLArbLowCap:.....................8
+VLStallCount:....................0
+OperVLs:.........................VL0-3
+
+Default of no high-priority arbitration:
+$ smpquery VLArb 1 1
+# VLArbitration tables: Lid 1 port 1 LowCap 8 HighCap 8
+# Low priority VL Arbitration Table:
+VL    : |0x0 |0x1 |0x2 |0x3 |0x4 |0x5 |0x6 |0x7 |
+WEIGHT: |0x20|0x20|0x20|0x20|0x20|0x20|0x20|0x20|
+# High priority VL Arbitration Table:
+VL    : |0x0 |0x1 |0x2 |0x3 |0x4 |0x5 |0x6 |0x7 |
+WEIGHT: |0x0 |0x0 |0x0 |0x0 |0x0 |0x0 |0x0 |0x0 |
+
+
+a) Three paths using SL0 with 4096 byte messages:
+$ ibv_message_bw/ibv_message_bw --thread=tx:0,tx:1,tx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=0,0,0 --max-msg-size=4096
+$ ibv_message_bw/ibv_message_bw --thread=rx:0,rx:1,rx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=0,0,0 --max-msg-size=4096
+
+All three paths shared the same bandwidth:
+Rx_0 received 10538319872 data bytes in 2572832 messages over last 10.0 seconds
+Rx_1 received 10538385408 data bytes in 2572848 messages over last 10.0 seconds
+Rx_2 received 10538319872 data bytes in 2572832 messages over last 10.0 seconds
+
+
+b) Three paths with 4096 byte messages, two at SL0 and one at SL1:
+$ ibv_message_bw/ibv_message_bw --thread=tx:0,tx:1,tx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=0,0,1 --max-msg-size=4096
+$ ibv_message_bw/ibv_message_bw --thread=rx:0,rx:1,rx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=0,0,1 --max-msg-size=4096
+
+The path with SL1 took approx twice the bandwidth of the paths with SL0:
+Rx_0 received 8047464448 data bytes in 1964713 messages over last 10.0 seconds
+Rx_1 received 8047517696 data bytes in 1964726 messages over last 10.0 seconds
+Rx_2 received 15523225600 data bytes in 3789850 messages over last 10.0 seconds
+
+
+c) Three paths using SL0 with 8M byte messages:
+$ ibv_message_bw/ibv_message_bw --thread=tx:0,tx:1,tx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=0,0,0 --max-msg-size=8388608
+$ ibv_message_bw/ibv_message_bw --thread=rx:0,rx:1,rx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=0,0,0 --max-msg-size=8388608
+
+All three paths shared the same bandwidth:
+Rx_0 received 10645143552 data bytes in 1269 messages over last 10.0 seconds
+Rx_1 received 10645143552 data bytes in 1269 messages over last 10.0 seconds
+Rx_2 received 10645143552 data bytes in 1269 messages over last 10.0 seconds
+
+
+d) Three paths with 8M byte messages, two at SL0 and one at SL1:
+$ ibv_message_bw/ibv_message_bw --thread=tx:0,tx:1,tx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=0,0,1 --max-msg-size=8388608
+$ ibv_message_bw/ibv_message_bw --thread=rx:0,rx:1,rx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=0,0,1 --max-msg-size=8388608
+
+The path with SL1 took approx twice the bandwidth of the paths with SL0:
+Rx_0 received 7985954816 data bytes in 952 messages over last 10.0 seconds
+Rx_1 received 7985954816 data bytes in 952 messages over last 10.0 seconds
+Rx_2 received 15963521024 data bytes in 1903 messages over last 10.0 seconds
+
+
+Tests with modified QOS settings
+================================
+
+Modified settings were created in /etc/opensm/opensm.conf 
+# QOS options
+qos_high_limit 255
+qos_vlarb_high 0:255,0:255,0:255,0:255,0:255,0:255,0:255,0:255
+qos_vlarb_low 1:128,1:128,1:128,1:128,1:128,1:128,1:128,2:64
+
+And the command in /etc/init.d/opensm was modified to add the -Q option to cause opensm to program the QOS options:
+    start-stop-daemon --start --quiet --make-pidfile  --pidfile /var/run/opensm-$PORT --background --exec /usr/sbin/opensm -- -Q -g $PORT -f /var/log/opensm.$PORT.log
+
+The SL2VL table remains unmodified:
+$ smpquery SL2VL 1 1
+# SL2VL table: Lid 1
+#                 SL: | 0| 1| 2| 3| 4| 5| 6| 7| 8| 9|10|11|12|13|14|15|
+ports: in  0, out  0: | 0| 1| 2| 3| 0| 1| 2| 3| 0| 1| 2| 3| 0| 1| 2| 3|
+
+Setting for setting for VLHighLimit has been changed:
+$ smpquery PI 1 1  | grep VL
+VLCap:...........................VL0-3
+VLHighLimit:.....................255
+VLArbHighCap:....................8
+VLArbLowCap:.....................8
+VLStallCount:....................0
+OperVLs:.........................VL0-3
+
+VL0 is now high priority, VL1 and VL2 are low priority and VL3 is not enabled:
+$ smpquery VLArb 1 1
+# VLArbitration tables: Lid 1 port 1 LowCap 8 HighCap 8
+# Low priority VL Arbitration Table:
+VL    : |0x1 |0x1 |0x1 |0x1 |0x1 |0x1 |0x1 |0x2 |
+WEIGHT: |0x80|0x80|0x80|0x80|0x80|0x80|0x80|0x40|
+# High priority VL Arbitration Table:
+VL    : |0x0 |0x0 |0x0 |0x0 |0x0 |0x0 |0x0 |0x0 |
+WEIGHT: |0xFF|0xFF|0xFF|0xFF|0xFF|0xFF|0xFF|0xFF|
+
+
+a) Three paths using SL0 with 4096 byte messages:
+$ ibv_message_bw/ibv_message_bw --thread=tx:0,tx:1,tx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=0,0,0 --max-msg-size=4096
+$ ibv_message_bw/ibv_message_bw --thread=rx:0,rx:1,rx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=0,0,0 --max-msg-size=4096
+
+
+All three paths shared the same bandwidth, but the overall bandwidth is lower than with the original default QOS settings:
+Rx_0 received 6427049984 data bytes in 1569104 messages over last 10.0 seconds
+Rx_1 received 6426992640 data bytes in 1569090 messages over last 10.0 seconds
+Rx_2 received 6427107328 data bytes in 1569118 messages over last 10.0 seconds
+
+
+b) Three paths with 4096 byte messages, two at SL0 and one at SL1:
+$ ibv_message_bw/ibv_message_bw --thread=tx:0,tx:1,tx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=0,0,1 --max-msg-size=4096
+$ ibv_message_bw/ibv_message_bw --thread=rx:0,rx:1,rx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=0,0,1 --max-msg-size=4096
+
+
+The path with SL1 took approx twice the bandwidth of the paths with SL0, as with the default QOS settings:
+Rx_0 received 7703953408 data bytes in 1880848 messages over last 10.0 seconds
+Rx_1 received 7704010752 data bytes in 1880862 messages over last 10.0 seconds
+Rx_2 received 15367987200 data bytes in 3751950 messages over last 10.0 seconds
+
+
+c) Three paths using SL0 with 8M byte messages:
+$ ibv_message_bw/ibv_message_bw --thread=tx:0,tx:1,tx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=0,0,0 --max-msg-size=8388608
+$ ibv_message_bw/ibv_message_bw --thread=rx:0,rx:1,rx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=0,0,0 --max-msg-size=8388608
+
+
+All three paths shared the same bandwidth, but the overall bandwidth is lower than with the original default QOS settings:
+Rx_0 received 6979321856 data bytes in 832 messages over last 10.0 seconds
+Rx_1 received 6979321856 data bytes in 832 messages over last 10.0 seconds
+Rx_2 received 6979321856 data bytes in 832 messages over last 10.0 seconds
+
+
+d) Three paths with 8M byte messages, two at SL0 and one at SL1:
+$ ibv_message_bw/ibv_message_bw --thread=tx:0,tx:1,tx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=0,0,1 --max-msg-size=8388608
+$ ibv_message_bw/ibv_message_bw --thread=rx:0,rx:1,rx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=0,0,1 --max-msg-size=8388608
+
+The path with SL1 took approx twice the bandwidth of the paths with SL0, as with the default QOS settings:
+Rx_0 received 7902068736 data bytes in 942 messages over last 10.0 seconds
+Rx_1 received 7910457344 data bytes in 943 messages over last 10.0 seconds
+Rx_2 received 15812526080 data bytes in 1885 messages over last 10.0 seconds
+
+
+e) Three paths with 8M byte messages, two at SL1 and one at SL2:
+$ ibv_message_bw/ibv_message_bw --thread=tx:0,tx:1,tx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=1,1,2 --max-msg-size=8388608
+$ ibv_message_bw/ibv_message_bw --thread=rx:0,rx:1,rx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=1,1,2 --max-msg-size=8388608
+
+The path with SL2 took approx twice the bandwidth of the paths with SL1
+Rx_0 received 6845104128 data bytes in 816 messages over last 10.0 seconds
+Rx_1 received 6845104128 data bytes in 816 messages over last 10.0 seconds
+Rx_2 received 13673431040 data bytes in 1630 messages over last 10.0 seconds
+
+
+
+e) Three paths with 8M byte messages, two at SL2 and one at SL3:
+$ ibv_message_bw/ibv_message_bw --thread=tx:0,tx:1,tx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=2,2,3 --max-msg-size=8388608
+$ ibv_message_bw/ibv_message_bw --thread=rx:0,rx:1,rx:2 --ib-dev=mlx4_0,mlx4_0,mlx4_0 --ib-port=1,1,1 --ib-sl=2,2,3 --max-msg-size=8388608
+
+The paths at SL2 took equal bandwidth, but no messages were reported for the SL3 path:
+Rx_0 connected
+Rx_0 received 8464105472 data bytes in 1009 messages over last 10.0 seconds
+Rx_1 connected
+Rx_1 received 5913968640 data bytes in 705 messages over last 10.0 seconds
+Rx_2 connected
+Rx_0 received 7314866176 data bytes in 872 messages over last 10.0 seconds
+Rx_1 received 7314866176 data bytes in 872 messages over last 10.0 seconds
+Rx_0 received 7314866176 data bytes in 872 messages over last 10.0 seconds
+Rx_1 received 7314866176 data bytes in 872 messages over last 10.0 seconds
+Rx_0 received 7306477568 data bytes in 871 messages over last 10.0 seconds
+Rx_1 received 7314866176 data bytes in 872 messages over last 10.0 seconds
+
+The bnadwidth for the paths at SL2 was the same as the previous test, suggesting SL3 was trying to arbitrate for bandwidth but the packets were
+not getting transmitted.
