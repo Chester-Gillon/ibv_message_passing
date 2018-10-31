@@ -44,6 +44,17 @@ iw_nes
 On the master PC running Ubuntu 18.04 /etc/rc.local is:
 #! /bin/sh -e
 
+# By default the Ubuntu Infiniband drivers set the NodeDescription of the local Infiniband nodes
+# to the HCA type and manufacturer.
+# Replace with a string formed of the hostname, device name, HCA type and HCA firmware version.
+DEVICES=`ibstat -l`
+for DEVICE in ${DEVICES} ;
+do
+   DEVICE_DIR=/sys/class/infiniband/${DEVICE}
+   NEW_DESC="`hostname` ${DEVICE} `cat ${DEVICE_DIR}/hca_type` `cat ${DEVICE_DIR}/fw_ver`"
+   echo -n "${NEW_DESC}" > ${DEVICE_DIR}/node_desc
+done
+
 # Give the user permission to access the performance counters
 sudo chmod 666 /dev/infiniband/umad?
 
@@ -52,6 +63,7 @@ slpd
 
 # Report success
 exit 0
+
 
 On the slave PC running Ubuntu 14.04 /etc/rc.local is:
 #!/bin/sh -e
@@ -66,6 +78,17 @@ On the slave PC running Ubuntu 14.04 /etc/rc.local is:
 # bits.
 #
 # By default this script does nothing.
+
+# By default the Ubuntu Infiniband drivers set the NodeDescription of the local Infiniband nodes
+# to the HCA type and manufacturer.
+# Replace with a string formed of the hostname, device name, HCA type and HCA firmware version.
+DEVICES=`ibstat -l`
+for DEVICE in ${DEVICES} ;
+do
+   DEVICE_DIR=/sys/class/infiniband/${DEVICE}
+   NEW_DESC="`hostname` ${DEVICE} $(< ${DEVICE_DIR}/hca_type) $(< ${DEVICE_DIR}/fw_ver)"
+   echo -n "${NEW_DESC}" > ${DEVICE_DIR}/node_desc
+done
 
 # Give the user permission to access the performance counters
 sudo chmod 666 /dev/infiniband/umad?
