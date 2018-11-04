@@ -8,4 +8,4 @@ include_directories ("/usr/include/infiniband")
 
 add_executable (ibv_display_infiniband_counters "ibv_display_infiniband_counters_main.c")
 
-target_link_libraries (ibv_display_infiniband_counters ibverbs ibmad)
+target_link_libraries (ibv_display_infiniband_counters ibverbs ibmad ibnetdisc)
