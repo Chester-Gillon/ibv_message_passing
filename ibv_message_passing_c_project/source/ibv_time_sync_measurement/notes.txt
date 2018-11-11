@@ -3,14 +3,14 @@ The master was a dual CPU E5-2620 v3 @ 2.40GHz haswell system.
 The slave was a single i5-2310 CPU @ 2.90GHz.
 
 The PCs were connected with a 1G Ethernet connection to a switch.
-A dual QDR port Mellanox connectX-2 was in each PC, with direct connections between the PCs for measuring the
+A dual QDR port Mellanox connectX-2 was in each PC, connected via a Mellanox InfiniScale-IV switch, for measuring the
 synchronised time offset.
 
 
 time_not_synched.csv
 ====================
 
-Before PTP had been started on the master and slave. This shows a 34.79 second offset when time was not synchronised.
+Before PTP had been started on the master and slave. This shows a 49.95 second offset when time was not synchronised.
 
 
 time_sync_starts.csv
@@ -18,42 +18,8 @@ time_sync_starts.csv
 
 The PTP synchronisation was started on the master and slave during this test.
 
-Before the time had synchronised there was a 34.79 second offset.
-After the time had synchronised the time offset measured with a 2-3us round trip delay was 5347 to 7506 ns.
-
-The master is using CLOCK_REALTIME to measure the round-trip delay. On the measurement interval in which time synchronisation
-occurred the number of samples was 37 times the others. This suggests CLOCK_REALTIME on the master can jump at the point
-phc2sys is started.
-
-When the master and slave PCs had booted there was an approx one second difference, and the time on the master was manually
-changed to introduce an offset of around 35 seconds which presuambly adjusted CLOCK_REALTIME but not PTP time.
-On a normal boot not sure how much offset there is between CLOCK_REALTIME and PTP time, but shows the master should really be
-using CLOCK_MONOTONIC to measure the round-trip delay.
-
-On a repeat of the test, the offset between the master and slave was -7.15 seconds before PTP started, but at the point PTP
-was started the master still geot 37 times more samples when using CLOCK_REALTIME. The syslog entry from the master was:
-Sep 30 15:43:23 haswell-ubuntu ptp4l: [670.736] assuming the grand master role
-Sep 30 15:43:24 haswell-ubuntu phc2sys: [671.619] Waiting for ptp4l...
-Sep 30 15:43:25 haswell-ubuntu phc2sys: [672.619] phc offset 36000010101 s0 freq      +0 delay   2960
-Sep 30 15:42:50 haswell-ubuntu phc2sys: [673.619] phc offset 36000011093 s1 freq    +992 delay   2880
-Sep 30 15:42:50 haswell-ubuntu systemd[1471]: Time has been changed
-Sep 30 15:42:50 haswell-ubuntu systemd[1]: Time has been changed
-Sep 30 15:42:51 haswell-ubuntu phc2sys: [674.619] phc offset       -88 s2 freq    +904 delay   3000
-
-The the phc offset of 36 seconds causes the master CLOCK_REALTIME to go backwards.
-Where 36 seconds is the offset between TAI (PTP time) and UTC (CLOCK_REALTIME) :
-$ sudo pmc -u -b 0 'get TIME_PROPERTIES_DATA_SET'
-[sudo] password for mr_halfword: 
-sending: GET TIME_PROPERTIES_DATA_SET
-    ecb1d7.fffe.3e5ff1-0 seq 0 RESPONSE MANAGEMENT TIME_PROPERTIES_DATA_SET 
-        currentUtcOffset      36
-        leap61                0
-        leap59                0
-        currentUtcOffsetValid 0
-        ptpTimescale          1
-        timeTraceable         0
-        frequencyTraceable    0
-        timeSource            0xa0
+Before the time had synchronised there was a 49.94 second offset.
+After the time had synchronised the time offset measured with a 2-3us round trip delay was 4019 to 5730 ns.
 
 
 time_sync_started.csv
@@ -69,9 +35,9 @@ time_sync_started_blast_master_to_slave.csv
 
 Before this test was started:
 - The PTP synchronisation had already been started on the master and slave.
-- tcpBlaster sending 116750256 bytes/sec from master to slave.
+- tcpBlaster sending 116741696 bytes/sec from master to slave.
 
-The time offset measured with a 2-3us round trip delay was -6832 to -4869 ns.
+The time offset measured with a 2-3us round trip delay was -8850 to -6912 ns.
 
 
 time_sync_started_blast_master_bidir_slave.csv
@@ -79,25 +45,10 @@ time_sync_started_blast_master_bidir_slave.csv
 
 Before this test was started:
 - The PTP synchronisation had already been started on the master and slave.
-- tcpBlaster sending 93124595 bytes/sec from master to slave.
-- tcpBlaster sending 92123768 bytes/sec from slave to master.
+- tcpBlaster sending 91379684 bytes/sec from master to slave.
+- tcpBlaster sending 93923054 bytes/sec from slave to master.
 
-The time offset measured with a 2-3us round trip delay was -14058 to 13827 ns.
-
-
-time_sync_starts_zero_offset.csv
-================================
-
-This is a repeat of the time_sync_starts.csv test, but the addition of the phc2sys -O 0 option on the master and slave to use a
-zero TAI to UTC offset.
-
-The PTP synchronisation was started on the master and slave during this test.
-
-Before the time had synchronised there was a 35.82 second offset.
-Within 3 seconds after the time had synchronised the time offset measured with a 2-3us round trip delay was 4345 to 7573 ns.
-
-Using a zero offset for phc2sys has removed the issue where the CLOCK_REALTIME on the master went backwards by 36 seconds upon
-starting PTP.
+The time offset measured with a 2-3us round trip delay was -11527 to 15007 ns.
 
 
 time_sync_started_ib_port_1_load.csv
@@ -105,9 +56,9 @@ time_sync_started_ib_port_1_load.csv
 
 Before this test was started:
 - The PTP synchronisation had already been started on the master and slave.
-- ibv_message_bw sending 3189.7 Mbytes/second from master Infiniband port 1 to slave Infiniband port 1
+- ibv_message_bw sending 2736.8 Mbytes/second from master Infiniband port 1 to slave Infiniband port 1
 
-The round trip delay of 20 <= us < 21 had the most samples, and the time offset measured was 3424 to 15880 ns
+The round trip delay of 5 <= us < 6 had the most samples, and the time offset measured was 3472 to 7477 ns
 
 
 time_sync_started_ib_port_1-2_load.csv
@@ -115,7 +66,275 @@ time_sync_started_ib_port_1-2_load.csv
 
 Before this test was started:
 - The PTP synchronisation had already been started on the master and slave.
-- ibv_message_bw sending 3027.0 Mbytes/second from master Infiniband port 1 to slave Infiniband port 1
-- ibv_message_bw sending 2682.3 Mbytes/second from slave Infiniband port 2 to master Infiniband port 2
+- ibv_message_bw sending 2014.0 Mbytes/second from master Infiniband port 1 to slave Infiniband port 1
+- ibv_message_bw sending 2930.3 Mbytes/second from slave Infiniband port 2 to master Infiniband port 2
 
-The round trip delay of 18 <= us < 19 had the most samples, and the time offset measured was -1486 to 13426 ns
+The round trip delay of 21 <= us < 22 had the most samples, and the time offset measured was -5893 to 9031 ns
+
+
+
+Port counters
+=============
+
+The Infiniband port counters at the end of the test were:
+
+$ ibv_display_infiniband_counters/ibv_display_infiniband_counters 
+Counters for node "Haswell-Ubuntu mlx4_0 MT26428 2.9.1000" port 1 LID 1 ACTIVE (remote port 1 LID 5)
+  IB_PC_EXT_XMT_BYTES_F = 256336665463
+  IB_PC_EXT_RCV_BYTES_F = 2325018833
+  IB_PC_EXT_XMT_PKTS_F = 503880407
+  IB_PC_EXT_RCV_PKTS_F = 258513697
+  IB_PC_ERR_SYM_F = 0
+  IB_PC_LINK_RECOVERS_F = 0
+  IB_PC_LINK_DOWNED_F = 0
+  IB_PC_ERR_RCV_F = 1
+  IB_PC_ERR_PHYSRCV_F = 0
+  IB_PC_ERR_SWITCH_REL_F = 0
+  IB_PC_XMT_DISCARDS_F = 0
+  IB_PC_ERR_XMTCONSTR_F = 0
+  IB_PC_ERR_RCVCONSTR_F = 0
+  IB_PC_ERR_LOCALINTEG_F = 0
+  IB_PC_ERR_EXCESS_OVR_F = 0
+  IB_PC_VL15_DROPPED_F = 0
+  IB_PC_XMT_WAIT_F = 123721
+
+Counters for node "Haswell-Ubuntu mlx4_0 MT26428 2.9.1000" port 2 LID 3 ACTIVE (remote port 2 LID 5)
+  IB_PC_EXT_XMT_BYTES_F = 3203871962
+  IB_PC_EXT_RCV_BYTES_F = 124142860364
+  IB_PC_EXT_XMT_PKTS_F = 384363864
+  IB_PC_EXT_RCV_PKTS_F = 500652983
+  IB_PC_ERR_SYM_F = 0
+  IB_PC_LINK_RECOVERS_F = 0
+  IB_PC_LINK_DOWNED_F = 0
+  IB_PC_ERR_RCV_F = 0
+  IB_PC_ERR_PHYSRCV_F = 0
+  IB_PC_ERR_SWITCH_REL_F = 0
+  IB_PC_XMT_DISCARDS_F = 0
+  IB_PC_ERR_XMTCONSTR_F = 0
+  IB_PC_ERR_RCVCONSTR_F = 0
+  IB_PC_ERR_LOCALINTEG_F = 0
+  IB_PC_ERR_EXCESS_OVR_F = 0
+  IB_PC_VL15_DROPPED_F = 0
+  IB_PC_XMT_WAIT_F = 465
+
+Counters for node "Infiniscale-IV Mellanox Technologies" port 1 LID 5 ACTIVE (remote port 1 LID 1)
+  IB_PC_EXT_XMT_BYTES_F = 3846615640
+  IB_PC_EXT_RCV_BYTES_F = 258111792415
+  IB_PC_EXT_XMT_PKTS_F = 427548789
+  IB_PC_EXT_RCV_PKTS_F = 672915259
+  IB_PC_EXT_XMT_UPKTS_F = 427548398
+  IB_PC_EXT_RCV_UPKTS_F = 672915259
+  IB_PC_EXT_XMT_MPKTS_F = 391
+  IB_PC_EXT_RCV_MPKTS_F = 0
+  IB_PC_ERR_SYM_F = 0
+  IB_PC_LINK_RECOVERS_F = 0
+  IB_PC_LINK_DOWNED_F = 0
+  IB_PC_ERR_RCV_F = 0
+  IB_PC_ERR_PHYSRCV_F = 0
+  IB_PC_ERR_SWITCH_REL_F = 0
+  IB_PC_XMT_DISCARDS_F = 196
+  IB_PC_ERR_XMTCONSTR_F = 0
+  IB_PC_ERR_RCVCONSTR_F = 0
+  IB_PC_ERR_LOCALINTEG_F = 0
+  IB_PC_ERR_EXCESS_OVR_F = 0
+  IB_PC_VL15_DROPPED_F = 0
+  IB_PC_XMT_WAIT_F = 0
+
+Counters for node "Infiniscale-IV Mellanox Technologies" port 2 LID 5 ACTIVE (remote port 2 LID 3)
+  IB_PC_EXT_XMT_BYTES_F = 127101076360
+  IB_PC_EXT_RCV_BYTES_F = 5316919542
+  IB_PC_EXT_XMT_PKTS_F = 754201411
+  IB_PC_EXT_RCV_PKTS_F = 637912017
+  IB_PC_EXT_XMT_UPKTS_F = 754201020
+  IB_PC_EXT_RCV_UPKTS_F = 637912017
+  IB_PC_EXT_XMT_MPKTS_F = 391
+  IB_PC_EXT_RCV_MPKTS_F = 0
+  IB_PC_ERR_SYM_F = 0
+  IB_PC_LINK_RECOVERS_F = 0
+  IB_PC_LINK_DOWNED_F = 0
+  IB_PC_ERR_RCV_F = 0
+  IB_PC_ERR_PHYSRCV_F = 0
+  IB_PC_ERR_SWITCH_REL_F = 0
+  IB_PC_XMT_DISCARDS_F = 15
+  IB_PC_ERR_XMTCONSTR_F = 0
+  IB_PC_ERR_RCVCONSTR_F = 0
+  IB_PC_ERR_LOCALINTEG_F = 0
+  IB_PC_ERR_EXCESS_OVR_F = 0
+  IB_PC_VL15_DROPPED_F = 0
+  IB_PC_XMT_WAIT_F = 52097345
+
+Counters for node "Infiniscale-IV Mellanox Technologies" port 3 LID 5 DOWN
+  IB_PC_EXT_XMT_BYTES_F = 0
+  IB_PC_EXT_RCV_BYTES_F = 0
+  IB_PC_EXT_XMT_PKTS_F = 0
+  IB_PC_EXT_RCV_PKTS_F = 0
+  IB_PC_EXT_XMT_UPKTS_F = 0
+  IB_PC_EXT_RCV_UPKTS_F = 0
+  IB_PC_EXT_XMT_MPKTS_F = 0
+  IB_PC_EXT_RCV_MPKTS_F = 0
+  IB_PC_ERR_SYM_F = 0
+  IB_PC_LINK_RECOVERS_F = 0
+  IB_PC_LINK_DOWNED_F = 0
+  IB_PC_ERR_RCV_F = 0
+  IB_PC_ERR_PHYSRCV_F = 0
+  IB_PC_ERR_SWITCH_REL_F = 0
+  IB_PC_XMT_DISCARDS_F = 0
+  IB_PC_ERR_XMTCONSTR_F = 0
+  IB_PC_ERR_RCVCONSTR_F = 0
+  IB_PC_ERR_LOCALINTEG_F = 0
+  IB_PC_ERR_EXCESS_OVR_F = 0
+  IB_PC_VL15_DROPPED_F = 0
+  IB_PC_XMT_WAIT_F = 0
+
+Counters for node "Infiniscale-IV Mellanox Technologies" port 4 LID 5 DOWN
+  IB_PC_EXT_XMT_BYTES_F = 0
+  IB_PC_EXT_RCV_BYTES_F = 0
+  IB_PC_EXT_XMT_PKTS_F = 0
+  IB_PC_EXT_RCV_PKTS_F = 0
+  IB_PC_EXT_XMT_UPKTS_F = 0
+  IB_PC_EXT_RCV_UPKTS_F = 0
+  IB_PC_EXT_XMT_MPKTS_F = 0
+  IB_PC_EXT_RCV_MPKTS_F = 0
+  IB_PC_ERR_SYM_F = 0
+  IB_PC_LINK_RECOVERS_F = 0
+  IB_PC_LINK_DOWNED_F = 0
+  IB_PC_ERR_RCV_F = 0
+  IB_PC_ERR_PHYSRCV_F = 0
+  IB_PC_ERR_SWITCH_REL_F = 0
+  IB_PC_XMT_DISCARDS_F = 0
+  IB_PC_ERR_XMTCONSTR_F = 0
+  IB_PC_ERR_RCVCONSTR_F = 0
+  IB_PC_ERR_LOCALINTEG_F = 0
+  IB_PC_ERR_EXCESS_OVR_F = 0
+  IB_PC_VL15_DROPPED_F = 0
+  IB_PC_XMT_WAIT_F = 0
+
+Counters for node "Infiniscale-IV Mellanox Technologies" port 5 LID 5 DOWN
+  IB_PC_EXT_XMT_BYTES_F = 0
+  IB_PC_EXT_RCV_BYTES_F = 0
+  IB_PC_EXT_XMT_PKTS_F = 0
+  IB_PC_EXT_RCV_PKTS_F = 0
+  IB_PC_EXT_XMT_UPKTS_F = 0
+  IB_PC_EXT_RCV_UPKTS_F = 0
+  IB_PC_EXT_XMT_MPKTS_F = 0
+  IB_PC_EXT_RCV_MPKTS_F = 0
+  IB_PC_ERR_SYM_F = 0
+  IB_PC_LINK_RECOVERS_F = 0
+  IB_PC_LINK_DOWNED_F = 0
+  IB_PC_ERR_RCV_F = 0
+  IB_PC_ERR_PHYSRCV_F = 0
+  IB_PC_ERR_SWITCH_REL_F = 0
+  IB_PC_XMT_DISCARDS_F = 0
+  IB_PC_ERR_XMTCONSTR_F = 0
+  IB_PC_ERR_RCVCONSTR_F = 0
+  IB_PC_ERR_LOCALINTEG_F = 0
+  IB_PC_ERR_EXCESS_OVR_F = 0
+  IB_PC_VL15_DROPPED_F = 0
+  IB_PC_XMT_WAIT_F = 0
+
+Counters for node "Infiniscale-IV Mellanox Technologies" port 6 LID 5 DOWN
+  IB_PC_EXT_XMT_BYTES_F = 0
+  IB_PC_EXT_RCV_BYTES_F = 0
+  IB_PC_EXT_XMT_PKTS_F = 0
+  IB_PC_EXT_RCV_PKTS_F = 0
+  IB_PC_EXT_XMT_UPKTS_F = 0
+  IB_PC_EXT_RCV_UPKTS_F = 0
+  IB_PC_EXT_XMT_MPKTS_F = 0
+  IB_PC_EXT_RCV_MPKTS_F = 0
+  IB_PC_ERR_SYM_F = 0
+  IB_PC_LINK_RECOVERS_F = 0
+  IB_PC_LINK_DOWNED_F = 0
+  IB_PC_ERR_RCV_F = 0
+  IB_PC_ERR_PHYSRCV_F = 0
+  IB_PC_ERR_SWITCH_REL_F = 0
+  IB_PC_XMT_DISCARDS_F = 0
+  IB_PC_ERR_XMTCONSTR_F = 0
+  IB_PC_ERR_RCVCONSTR_F = 0
+  IB_PC_ERR_LOCALINTEG_F = 0
+  IB_PC_ERR_EXCESS_OVR_F = 0
+  IB_PC_VL15_DROPPED_F = 0
+  IB_PC_XMT_WAIT_F = 0
+
+Counters for node "Infiniscale-IV Mellanox Technologies" port 7 LID 5 ACTIVE (remote port 1 LID 2)
+  IB_PC_EXT_XMT_BYTES_F = 258111732244
+  IB_PC_EXT_RCV_BYTES_F = 3846531296
+  IB_PC_EXT_XMT_PKTS_F = 672914646
+  IB_PC_EXT_RCV_PKTS_F = 427547806
+  IB_PC_EXT_XMT_UPKTS_F = 672913901
+  IB_PC_EXT_RCV_UPKTS_F = 427547054
+  IB_PC_EXT_XMT_MPKTS_F = 745
+  IB_PC_EXT_RCV_MPKTS_F = 752
+  IB_PC_ERR_SYM_F = 0
+  IB_PC_LINK_RECOVERS_F = 0
+  IB_PC_LINK_DOWNED_F = 0
+  IB_PC_ERR_RCV_F = 0
+  IB_PC_ERR_PHYSRCV_F = 0
+  IB_PC_ERR_SWITCH_REL_F = 30
+  IB_PC_XMT_DISCARDS_F = 108
+  IB_PC_ERR_XMTCONSTR_F = 0
+  IB_PC_ERR_RCVCONSTR_F = 0
+  IB_PC_ERR_LOCALINTEG_F = 0
+  IB_PC_ERR_EXCESS_OVR_F = 0
+  IB_PC_VL15_DROPPED_F = 0
+  IB_PC_XMT_WAIT_F = 198804
+
+Counters for node "Infiniscale-IV Mellanox Technologies" port 8 LID 5 ACTIVE (remote port 2 LID 4)
+  IB_PC_EXT_XMT_BYTES_F = 5316854337
+  IB_PC_EXT_RCV_BYTES_F = 127100992471
+  IB_PC_EXT_XMT_PKTS_F = 637911323
+  IB_PC_EXT_RCV_PKTS_F = 754200443
+  IB_PC_EXT_XMT_UPKTS_F = 637910607
+  IB_PC_EXT_RCV_UPKTS_F = 754199673
+  IB_PC_EXT_XMT_MPKTS_F = 716
+  IB_PC_EXT_RCV_MPKTS_F = 770
+  IB_PC_ERR_SYM_F = 0
+  IB_PC_LINK_RECOVERS_F = 0
+  IB_PC_LINK_DOWNED_F = 0
+  IB_PC_ERR_RCV_F = 0
+  IB_PC_ERR_PHYSRCV_F = 0
+  IB_PC_ERR_SWITCH_REL_F = 23
+  IB_PC_XMT_DISCARDS_F = 23
+  IB_PC_ERR_XMTCONSTR_F = 0
+  IB_PC_ERR_RCVCONSTR_F = 0
+  IB_PC_ERR_LOCALINTEG_F = 0
+  IB_PC_ERR_EXCESS_OVR_F = 0
+  IB_PC_VL15_DROPPED_F = 0
+  IB_PC_XMT_WAIT_F = 0
+
+Counters for node "Sandy-Ubuntu mlx4_0 MT26428 2.9.1000" port 1 LID 2 ACTIVE (remote port 7 LID 5)
+  IB_PC_EXT_XMT_BYTES_F = 2325043375
+  IB_PC_EXT_RCV_BYTES_F = 256336699447
+  IB_PC_EXT_XMT_PKTS_F = 258514023
+  IB_PC_EXT_RCV_PKTS_F = 503880879
+  IB_PC_ERR_SYM_F = 0
+  IB_PC_LINK_RECOVERS_F = 0
+  IB_PC_LINK_DOWNED_F = 0
+  IB_PC_ERR_RCV_F = 0
+  IB_PC_ERR_PHYSRCV_F = 0
+  IB_PC_ERR_SWITCH_REL_F = 0
+  IB_PC_XMT_DISCARDS_F = 0
+  IB_PC_ERR_XMTCONSTR_F = 0
+  IB_PC_ERR_RCVCONSTR_F = 0
+  IB_PC_ERR_LOCALINTEG_F = 0
+  IB_PC_ERR_EXCESS_OVR_F = 0
+  IB_PC_VL15_DROPPED_F = 0
+  IB_PC_XMT_WAIT_F = 265
+
+Counters for node "Sandy-Ubuntu mlx4_0 MT26428 2.9.1000" port 2 LID 4 ACTIVE (remote port 8 LID 5)
+  IB_PC_EXT_XMT_BYTES_F = 124142827522
+  IB_PC_EXT_RCV_BYTES_F = 3203848922
+  IB_PC_EXT_XMT_PKTS_F = 500652512
+  IB_PC_EXT_RCV_PKTS_F = 384363544
+  IB_PC_ERR_SYM_F = 0
+  IB_PC_LINK_RECOVERS_F = 0
+  IB_PC_LINK_DOWNED_F = 0
+  IB_PC_ERR_RCV_F = 0
+  IB_PC_ERR_PHYSRCV_F = 0
+  IB_PC_ERR_SWITCH_REL_F = 0
+  IB_PC_XMT_DISCARDS_F = 0
+  IB_PC_ERR_XMTCONSTR_F = 0
+  IB_PC_ERR_RCVCONSTR_F = 0
+  IB_PC_ERR_LOCALINTEG_F = 0
+  IB_PC_ERR_EXCESS_OVR_F = 0
+  IB_PC_VL15_DROPPED_F = 0
+  IB_PC_XMT_WAIT_F = 25926519
