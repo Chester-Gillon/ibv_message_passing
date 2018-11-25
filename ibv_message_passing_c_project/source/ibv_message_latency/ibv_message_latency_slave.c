@@ -2,7 +2,7 @@
  * @file ibv_message_latency_slave.c
  * @date 18 Nov 2018
  * @author Chester Gillon
- * @brief The slave for the latency management tests
+ * @brief The slave for the latency measurement tests
  */
 
 #include <stdbool.h>
