@@ -367,7 +367,11 @@ rx_api_message_buffer *poll_rx_message (rx_message_context_handle context)
     bool message_available = false;
     const uint32_t sampled_sequence_number = __atomic_load_n (receive_sequence_number, __ATOMIC_ACQUIRE);
 
-    if (sampled_sequence_number == rx_buffer->message_available_sequence_number)
+    if (rx_buffer->owned_by_application)
+    {
+        /* All buffers are currently in use by the application */
+    }
+    else if (sampled_sequence_number == rx_buffer->message_available_sequence_number)
     {
         message_available = true;
     }
