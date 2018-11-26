@@ -17,6 +17,7 @@
 
 #include <infiniband/verbs.h>
 #include <infiniband/mad.h>
+#include <infiniband/iba/ib_types.h>
 
 #include "ibv_utils.h"
 
@@ -532,6 +533,18 @@ static void get_infiniband_performance_counters (const infiniband_statistics_han
     {
         memset (&portid, 0, sizeof (portid));
         portid.lid = handle->port_lids[port_index];
+
+        /* Determine which counters are available */
+        memset (mad_buf, 0, sizeof (mad_buf));
+        if (pma_query_via (mad_buf, &portid, handle->port_numbers[port_index], timeout,
+                           CLASS_PORT_INFO, handle->mad_port) == NULL)
+        {
+            fprintf (stderr, "pma_query_via failed for %s LID %u\n", handle->hca, portid.lid);
+            exit (EXIT_FAILURE);
+        }
+        mad_decode_field (mad_buf, IB_CPI_CAPMASK_F, &counters[port_index].cap_mask);
+        counters[port_index].cap_mask = CL_HTON16 (counters[port_index].cap_mask);
+
         memset (mad_buf, 0, sizeof (mad_buf));
         if (pma_query_via (mad_buf, &portid, handle->port_numbers[port_index], timeout,
                            IB_GSI_PORT_COUNTERS_EXT, handle->mad_port) == NULL)
@@ -548,6 +561,18 @@ static void get_infiniband_performance_counters (const infiniband_statistics_han
         mad_decode_field (mad_buf, IB_PC_EXT_RCV_UPKTS_F, &counters[port_index].unicast_rx_packets);
         mad_decode_field (mad_buf, IB_PC_EXT_XMT_MPKTS_F, &counters[port_index].multicast_tx_packets);
         mad_decode_field (mad_buf, IB_PC_EXT_RCV_MPKTS_F, &counters[port_index].multicast_rx_packets);
+
+
+        memset (mad_buf, 0, sizeof (mad_buf));
+        if (pma_query_via (mad_buf, &portid, handle->port_numbers[port_index], timeout,
+                           IB_GSI_PORT_COUNTERS, handle->mad_port) == NULL)
+        {
+            fprintf (stderr, "pma_query_via failed for %s LID %u\n", handle->hca, portid.lid);
+            exit (EXIT_FAILURE);
+        }
+
+        mad_decode_field (mad_buf, IB_PC_XMT_DISCARDS_F, &counters[port_index].xmit_discards);
+        mad_decode_field (mad_buf, IB_PC_XMT_WAIT_F, &counters[port_index].xmit_wait);
     }
 }
 
@@ -665,22 +690,36 @@ void display_infiniband_statistics (infiniband_statistics_handle *const handle,
         const infiniband_port_counters *const after = &stats->after.port_counters[port_index];
         const uint8_t port = handle->port_numbers[port_index];
 
-        printf ("  Port %u Tx Bytes = %lu (%lu -> %lu)\n", port,
-                after->tx_bytes - before->tx_bytes, before->tx_bytes, after->tx_bytes);
-        printf ("  Port %u Rx Bytes = %lu (%lu -> %lu)\n", port,
-                after->rx_bytes - before->rx_bytes, before->rx_bytes, after->rx_bytes);
-        printf ("  Port %u Tx Packets = %lu (%lu -> %lu)\n", port,
-                after->tx_packets - before->tx_packets, before->tx_packets, after->tx_packets);
-        printf ("  Port %u Rx Packets = %lu (%lu -> %lu)\n", port,
-                after->rx_packets - before->rx_packets, before->rx_packets, after->rx_packets);
-        printf ("  Port %u Tx Unicast Packets = %lu (%lu -> %lu)\n", port,
-                after->unicast_tx_packets - before->unicast_tx_packets, before->unicast_tx_packets, after->unicast_tx_packets);
-        printf ("  Port %u Rx Unicast Packets = %lu (%lu -> %lu)\n", port,
-                after->unicast_rx_packets - before->unicast_rx_packets, before->unicast_rx_packets, after->unicast_rx_packets);
-        printf ("  Port %u Tx Multicast Packets = %lu (%lu -> %lu)\n", port,
-                after->multicast_tx_packets - before->multicast_tx_packets, before->multicast_tx_packets, after->multicast_tx_packets);
-        printf ("  Port %u Rx Multicast Packets = %lu (%lu -> %lu)\n", port,
-                after->multicast_rx_packets - before->multicast_rx_packets, before->multicast_rx_packets, after->multicast_rx_packets);
+        if ((before->cap_mask & IB_PM_EXT_WIDTH_SUPPORTED) || (before->cap_mask & IB_PM_EXT_WIDTH_NOIETF_SUP))
+        {
+            printf ("  Port %u Tx Bytes = %lu (%lu -> %lu)\n", port,
+                    after->tx_bytes - before->tx_bytes, before->tx_bytes, after->tx_bytes);
+            printf ("  Port %u Rx Bytes = %lu (%lu -> %lu)\n", port,
+                    after->rx_bytes - before->rx_bytes, before->rx_bytes, after->rx_bytes);
+            printf ("  Port %u Tx Packets = %lu (%lu -> %lu)\n", port,
+                    after->tx_packets - before->tx_packets, before->tx_packets, after->tx_packets);
+            printf ("  Port %u Rx Packets = %lu (%lu -> %lu)\n", port,
+                    after->rx_packets - before->rx_packets, before->rx_packets, after->rx_packets);
+            if (before->cap_mask & IB_PM_EXT_WIDTH_SUPPORTED)
+            {
+                printf ("  Port %u Tx Unicast Packets = %lu (%lu -> %lu)\n", port,
+                        after->unicast_tx_packets - before->unicast_tx_packets, before->unicast_tx_packets, after->unicast_tx_packets);
+                printf ("  Port %u Rx Unicast Packets = %lu (%lu -> %lu)\n", port,
+                        after->unicast_rx_packets - before->unicast_rx_packets, before->unicast_rx_packets, after->unicast_rx_packets);
+                printf ("  Port %u Tx Multicast Packets = %lu (%lu -> %lu)\n", port,
+                        after->multicast_tx_packets - before->multicast_tx_packets, before->multicast_tx_packets, after->multicast_tx_packets);
+                printf ("  Port %u Rx Multicast Packets = %lu (%lu -> %lu)\n", port,
+                        after->multicast_rx_packets - before->multicast_rx_packets, before->multicast_rx_packets, after->multicast_rx_packets);
+            }
+        }
+
+        printf ("  Port %u Tx Discards = %u (%u -> %u)\n", port,
+                after->xmit_discards - before->xmit_discards, before->xmit_discards, after->xmit_discards);
+        if (before->cap_mask & IB_PM_PC_XMIT_WAIT_SUP)
+        {
+            printf ("  Port %u Tx Waits = %u (%u -> %u)\n", port,
+                    after->xmit_wait - before->xmit_wait, before->xmit_wait, after->xmit_wait);
+        }
     }
     printf ("\n");
 }

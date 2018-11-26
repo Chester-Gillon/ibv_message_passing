@@ -9,9 +9,10 @@
 #define IBV_UTILS_H_
 
 /** Contains the performance counters for one Infiniband port.
- *  These are read as extended 64-bit counts. */
+ *  These are read as extended 64-bit counts where possible. */
 typedef struct
 {
+    uint32_t cap_mask;
     uint64_t tx_bytes;
     uint64_t rx_bytes;
     uint64_t tx_packets;
@@ -20,6 +21,8 @@ typedef struct
     uint64_t unicast_rx_packets;
     uint64_t multicast_tx_packets;
     uint64_t multicast_rx_packets;
+    uint32_t xmit_discards;
+    uint32_t xmit_wait;
 } infiniband_port_counters;
 
 /** Contains one sample of Infiniband related statistics */
