@@ -39,6 +39,7 @@ add_subdirectory ("${PROJECT_SOURCE_DIR}/vector_test_load")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/ibv_time_sync_measurement")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/floor_it")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/ibv_message_latency")
+add_subdirectory ("${PROJECT_SOURCE_DIR}/log10f_test")
 
 # Location of the source code for the linuxptp package, to gain access to the phc.[ch]
 set (LINUXPTP_ROOT "$ENV{HOME}/linuxptp-1.6")
