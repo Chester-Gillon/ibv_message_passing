@@ -18,7 +18,12 @@
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <sys/resource.h>
-#include <phc.h>
+
+/* Build an include file name from a Macro, to test the CMake dependency generation */
+#define PTP_INCLUDE_STRINGIFY(FILE) #FILE
+#define PTP_INCLUDE(PTP_MAPPING) PTP_INCLUDE_STRINGIFY(PTP_MAPPING.h)
+#include PTP_INCLUDE(PTP_MAPPING)
+
 #include <linux/perf_event.h>
 
 

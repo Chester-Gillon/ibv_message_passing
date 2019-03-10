@@ -45,6 +45,22 @@ add_subdirectory ("${PROJECT_SOURCE_DIR}/log10f_test")
 set (LINUXPTP_ROOT "$ENV{HOME}/linuxptp-1.6")
 
 if (EXISTS ${LINUXPTP_ROOT})
+    # Generate a definition to re-direct the include of phc.h via a macro, to test the CMake IMPLICIT_DEPENDS_INCLUDE_TRANSFORM.
+    # Where IMPLICIT_DEPENDS_INCLUDE_TRANSFORM is set for this root directory and subdirectories.
+    # IMPLICIT_DEPENDS_INCLUDE_TRANSFORM has to include the complete filename in the replacement filename, rather than using
+    # the macro argument since CMake doesn't pre-process the macro argument.
+    #
+    # For the Eclipse indexer to resolve the PTP_INCLUDE macro in read_ptp.c the PTP_MAPPING symbol needs to set in the Eclipse
+    # "Paths and Symbols" in the .cproject file.
+    #
+    # CMake has followed the dependency correcly when the generated read_ptp/CMakeFiles/read_ptp.dir/build.make contains the
+    # following:
+    #   read_ptp/CMakeFiles/read_ptp.dir/read_ptp.c.o: /home/mr_halfword/linuxptp-1.6/missing.h
+    #   read_ptp/CMakeFiles/read_ptp.dir/read_ptp.c.o: /home/mr_halfword/linuxptp-1.6/phc.h
+    set (PTP_MAPPING phc)
+    add_definitions(-DPTP_MAPPING=${PTP_MAPPING})
+    set_property (DIRECTORY PROPERTY IMPLICIT_DEPENDS_INCLUDE_TRANSFORM "PTP_INCLUDE(%)=<${PTP_MAPPING}.h>")
+
     add_subdirectory ("${PROJECT_SOURCE_DIR}/read_ptp")
 endif()
 
