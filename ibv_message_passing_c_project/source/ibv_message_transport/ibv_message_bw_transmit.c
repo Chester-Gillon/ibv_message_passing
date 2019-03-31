@@ -83,8 +83,8 @@ typedef struct tx_message_context_s
     uint32_t next_transmit_buffer_index;
     /** Used to control only signalling message send completion on one in every path_def.num_message_buffers messages */
     uint32_t message_transmit_cq_pacing;
-    /** true when the message_transmit_cq was consumed while polling for Infiniband errors */
-    bool message_transmit_cq_consumed;
+    /** The number of outstanding completion queue entries which have not been consumed */
+    uint32_t num_outstanding_completions;
 } tx_message_context;
 
 /**
@@ -267,7 +267,7 @@ static void initialise_transmit_message_buffers (tx_message_context_handle conte
 
     context->next_transmit_buffer_index = 0;
     context->message_transmit_cq_pacing = 0;
-    context->message_transmit_cq_consumed = false;
+    context->num_outstanding_completions = 0;
 }
 
 /**
@@ -431,7 +431,7 @@ static bool is_buffer_free (tx_message_context_handle context, const uint32_t bu
                 {
                     if (wc.status == IBV_WC_SUCCESS)
                     {
-                        context->message_transmit_cq_consumed = true;
+                        context->num_outstanding_completions--;
                     }
                     else
                     {
@@ -549,17 +549,14 @@ void send_message (const tx_api_message_buffer *const api_buffer)
         struct ibv_wc wc;
         int num_completions;
 
-        if (api_buffer->context->message_transmit_cq_consumed)
-        {
-            api_buffer->context->message_transmit_cq_consumed = false;
-        }
-        else
+        if (api_buffer->context->num_outstanding_completions > 0)
         {
             do
             {
                 num_completions = ibv_poll_cq (api_buffer->context->message_transmit_cq, 1, &wc);
             } while (num_completions == 0);
             CHECK_ASSERT ((num_completions == 1) && (wc.status == IBV_WC_SUCCESS));
+            api_buffer->context->num_outstanding_completions--;
         }
         api_buffer->context->message_transmit_cq_pacing = 0;
     }
@@ -570,6 +567,7 @@ void send_message (const tx_api_message_buffer *const api_buffer)
     if (api_buffer->context->message_transmit_cq_pacing == 0)
     {
         tx_buffer->transmit_wrs[MESSAGE_HEADER_WQE_INDEX].send_flags |= IBV_SEND_SIGNALED;
+        api_buffer->context->num_outstanding_completions++;
     }
     else
     {
@@ -608,34 +606,39 @@ void send_message (const tx_api_message_buffer *const api_buffer)
 
 
 /**
- * @brief Wait for all queued DMA for a transmit path to wait.
- * @todo The queue pair automatically transitions from SQD back to RTS, regardless of there are some work-requests
- *       which has yet to complete.
+ * @brief Wait for all queued DMA for a transmit path to complete.
  * @param[in,out] context The transmit path to wait for the DMA to complete
  */
 void flush_transmit_dma (tx_message_context_handle context)
 {
     int rc;
-    struct ibv_qp_attr attr;
-    struct ibv_qp_init_attr init_attr;
+    struct ibv_wc wc;
+    int num_completions;
+    struct ibv_send_wr *bad_wr = NULL;
+    struct ibv_send_wr flush_wr;
 
-    memset (&attr, 0, sizeof (attr));
-    attr.qp_state = IBV_QPS_SQD;
-    rc = ibv_modify_qp (context->message_transmit_qp, &attr, IBV_QP_STATE);
+    /* Since completion queue pacing is used to only signal completion on one of num_message_buffers there may be
+     * queued transmit work-requests for which completion isn't signalled.
+     * Therefore, insert a zero-length work request with completion signalled, to be able to determine when any prior
+     * work requests with un-signalled completion have completed. */
+    memset (&flush_wr, 0, sizeof (flush_wr));
+    flush_wr.sg_list = NULL;
+    flush_wr.num_sge = 0;
+    flush_wr.next = NULL;
+    flush_wr.opcode = IBV_WR_RDMA_WRITE;
+    flush_wr.send_flags = IBV_SEND_SIGNALED;
+    rc = ibv_post_send (context->message_transmit_qp, &flush_wr, &bad_wr);
     CHECK_ASSERT (rc == 0);
+    context->num_outstanding_completions++;
 
-    do
+    /* Wait for outstanding work-queue completions. */
+    while (context->num_outstanding_completions > 0)
     {
-        memset (&attr, 0, sizeof (attr));
-        rc = ibv_query_qp (context->message_transmit_qp, &attr, IBV_QP_STATE, &init_attr);
-        CHECK_ASSERT (rc == 0);
-    } while ((attr.qp_state == IBV_QPS_SQD) && (attr.sq_draining));
-
-    if (attr.qp_state == IBV_QPS_SQD)
-    {
-        memset (&attr, 0, sizeof (attr));
-        attr.qp_state = IBV_QPS_RTS;
-        rc = ibv_modify_qp (context->message_transmit_qp, &attr, IBV_QP_STATE);
-        CHECK_ASSERT (rc == 0);
+        do
+        {
+            num_completions = ibv_poll_cq (context->message_transmit_cq, 1, &wc);
+        } while (num_completions == 0);
+        CHECK_ASSERT (num_completions == 1);
+        context->num_outstanding_completions--;
     }
 }
