@@ -1,0 +1,6 @@
+1) Test results when flush_transmit_dma() attempted to use a RTS -> SQD transition to flush the transmit DMA:
+$ ibv_time_dma_flush/ibv_time_dma_flush 
+dma_flush_time=0.000072 secs, followed by rx_time=0.913485
+rx_time=0.912698 secs, followed by dma_flush_time=0.000066
+
+This shows that the attempt to flush the transmit DMA was not working as expected.

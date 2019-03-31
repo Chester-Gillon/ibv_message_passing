@@ -234,6 +234,7 @@ void await_all_outstanding_messages_freed (tx_message_context_handle context);
 tx_api_message_buffer *get_send_buffer_no_wait (tx_message_context_handle context);
 tx_api_message_buffer *get_send_buffer (tx_message_context_handle context);
 void send_message (const tx_api_message_buffer *const api_buffer);
+void flush_transmit_dma (tx_message_context_handle context);
 
 rx_message_context_handle message_receive_create_local (const communication_path_definition *const path_def);
 void message_receive_attach_remote_pre_rtr (rx_message_context_handle context);

@@ -605,3 +605,37 @@ void send_message (const tx_api_message_buffer *const api_buffer)
     /* Advance to the next sequence number for this buffer */
     tx_buffer->next_transmit_sequence_number += api_buffer->context->path_def.num_message_buffers;
 }
+
+
+/**
+ * @brief Wait for all queued DMA for a transmit path to wait.
+ * @todo The queue pair automatically transitions from SQD back to RTS, regardless of there are some work-requests
+ *       which has yet to complete.
+ * @param[in,out] context The transmit path to wait for the DMA to complete
+ */
+void flush_transmit_dma (tx_message_context_handle context)
+{
+    int rc;
+    struct ibv_qp_attr attr;
+    struct ibv_qp_init_attr init_attr;
+
+    memset (&attr, 0, sizeof (attr));
+    attr.qp_state = IBV_QPS_SQD;
+    rc = ibv_modify_qp (context->message_transmit_qp, &attr, IBV_QP_STATE);
+    CHECK_ASSERT (rc == 0);
+
+    do
+    {
+        memset (&attr, 0, sizeof (attr));
+        rc = ibv_query_qp (context->message_transmit_qp, &attr, IBV_QP_STATE, &init_attr);
+        CHECK_ASSERT (rc == 0);
+    } while ((attr.qp_state == IBV_QPS_SQD) && (attr.sq_draining));
+
+    if (attr.qp_state == IBV_QPS_SQD)
+    {
+        memset (&attr, 0, sizeof (attr));
+        attr.qp_state = IBV_QPS_RTS;
+        rc = ibv_modify_qp (context->message_transmit_qp, &attr, IBV_QP_STATE);
+        CHECK_ASSERT (rc == 0);
+    }
+}
