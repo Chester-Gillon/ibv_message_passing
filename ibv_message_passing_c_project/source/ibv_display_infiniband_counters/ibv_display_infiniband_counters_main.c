@@ -218,7 +218,7 @@ static void find_unique_ports (discovered_fabric_t *const fabric)
     }
 
     fabric->num_unique_ports = 0;
-    fabric->unique_ports = calloc (max_ports, sizeof (unique_port_for_counters_t *));
+    fabric->unique_ports = calloc (max_ports, sizeof (unique_port_for_counters_t));
     for (local_port_index = 0; local_port_index < fabric->num_local_ports; local_port_index++)
     {
         fabric_from_local_port_t *const fabric_from_local_port = &fabric->fabric_from_local_ports[local_port_index];
