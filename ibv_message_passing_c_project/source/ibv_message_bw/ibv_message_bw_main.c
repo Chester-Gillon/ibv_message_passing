@@ -87,6 +87,10 @@ static bool arg_min_max_msg_sizes_present = false;
 static uint32_t arg_per_msg_size_duration_secs;
 static int arg_tx_all_msg_sizes = false;
 
+/** Command line argument which specifies if a non-default retry timeout is set */
+static uint8_t arg_retry_timeout;
+static bool arg_retry_timeout_present;
+
 /** The different message IDs used in the test */
 typedef enum
 {
@@ -233,6 +237,7 @@ static const struct option command_line_options[] =
     {"no-mb-size-check", no_argument, &arg_tx_checks_memory_buffer_size, false},
     {"msg-sizes", required_argument, NULL, 0},
     {"all-sizes", required_argument, NULL, 0},
+    {"retry-timeout", required_argument, NULL, 0},
     {NULL, 0, NULL, 0}
 };
 
@@ -279,6 +284,9 @@ static void display_usage (void)
     printf ("                           maximum message data size configured on the path.\n");
     printf ("  --all-sizes=<duration>  Test sending increasing data length, in powers of two.\n");
     printf ("                          Each data length is tested for <duration> seconds.\n");
+    printf ("  --retry-timeout=<timeout>  Set the retry timeout used on the QPs in units of\n");
+    printf ("                             4.096*2^timeout microseconds\n");
+
     exit (EXIT_FAILURE);
 }
 
@@ -615,6 +623,18 @@ static void parse_command_line_arguments (const int argc, char *argv[])
                     exit (EXIT_FAILURE);
                 }
                 arg_tx_all_msg_sizes = true;
+            }
+            else if (strcmp (optdef->name, "retry-timeout") == 0)
+            {
+                uint32_t timeout;
+
+                if ((sscanf (optarg, "%u%c", &timeout, &junk) != 1) || (timeout > 31))
+                {
+                    fprintf (stderr, "Invalid %s %s\n", optdef->name, optarg);
+                    exit (EXIT_FAILURE);
+                }
+                arg_retry_timeout = (uint8_t) timeout;
+                arg_retry_timeout_present = true;
             }
             else
             {
@@ -1072,6 +1092,8 @@ static void create_message_threads (void)
         {
             path_def.service_level = DEFAULT_SERVICE_LEVEL;
         }
+        path_def.set_non_default_retry_timeout = arg_retry_timeout_present;
+        path_def.retry_timeout = arg_retry_timeout;
 
         /* Set CPU affinity for the thread which sends or receives messages, if specified as a command line option */
         rc = pthread_attr_init (&thread_attr);

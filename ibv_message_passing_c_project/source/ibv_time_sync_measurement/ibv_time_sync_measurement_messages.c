@@ -34,6 +34,7 @@ void register_time_sync_measurement_messages (void)
     path_def.allocation_type = BUFFER_ALLOCATION_SHARED_MEMORY;
     path_def.tx_checks_memory_buffer_size = true;
     path_def.tx_polls_for_errors = false;
+    path_def.set_non_default_retry_timeout = false;
 
     /* Register the path from the master to slave */
     path_def.source_node = TIME_SYNC_MASTER_NODE_ID;

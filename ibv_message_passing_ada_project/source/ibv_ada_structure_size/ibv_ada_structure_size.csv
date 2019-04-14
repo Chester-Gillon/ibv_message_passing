@@ -13,6 +13,8 @@ communication_path_definition.num_message_buffers,32,40
 communication_path_definition.allocation_type,32,44
 communication_path_definition.tx_polls_for_errors,8,48
 communication_path_definition.tx_checks_memory_buffer_size,8,49
+communication_path_definition.set_non_default_retry_timeout,8,50
+communication_path_definition.retry_timeout,8,51
 ib_port_endpoint,2560
 ib_port_endpoint.num_devices,32,0
 ib_port_endpoint.device_list,64,8

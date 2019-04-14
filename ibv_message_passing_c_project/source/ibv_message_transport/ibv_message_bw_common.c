@@ -638,8 +638,10 @@ uint32_t get_max_inline_data (struct ibv_qp *const qp)
  * @param[in] expected_state The expected state of the Queue Pair
  * @param[in] qp The Queue Pair to check the state of
  * @param[in] qp_name String which identifies the Queue Pair in an error message
+ * @param[in] path_def If non-NULL then used to check if the requested non-default timeout has been set
  */
-void verify_qp_state (const enum ibv_qp_state expected_state, struct ibv_qp *const qp, const char *qp_name)
+void verify_qp_state (const enum ibv_qp_state expected_state, struct ibv_qp *const qp, const char *qp_name,
+                      const communication_path_definition *const path_def)
 {
     int rc;
     struct ibv_qp_attr attr;
@@ -659,5 +661,10 @@ void verify_qp_state (const enum ibv_qp_state expected_state, struct ibv_qp *con
         printf (" actual state=%d", attr.qp_state);
         printf ("\n");
         exit (EXIT_FAILURE);
+    }
+
+    if ((path_def != NULL) && (path_def->set_non_default_retry_timeout) && (attr.timeout != path_def->retry_timeout))
+    {
+        printf ("Info: Requested timeout=%u but actual timeout reported by driver is %u\n", path_def->retry_timeout, attr.timeout);
     }
 }

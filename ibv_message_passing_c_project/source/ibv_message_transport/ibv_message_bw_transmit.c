@@ -150,7 +150,7 @@ tx_message_context_handle message_transmit_create_local (const communication_pat
         perror ("ibv_create_qp message_transmit_qp failed");
         exit (EXIT_FAILURE);
     }
-    verify_qp_state (IBV_QPS_RESET, context->message_transmit_qp, "message_transmit_qp");
+    verify_qp_state (IBV_QPS_RESET, context->message_transmit_qp, "message_transmit_qp", NULL);
     context->message_transmit_psn = get_random_psn ();
     context->message_transmit_qp_max_inline_data = get_max_inline_data (context->message_transmit_qp);
 
@@ -170,7 +170,7 @@ tx_message_context_handle message_transmit_create_local (const communication_pat
         perror ("ibv_modify_qp message_transmit_qp failed");
         exit (EXIT_FAILURE);
     }
-    verify_qp_state (IBV_QPS_INIT, context->message_transmit_qp, "message_transmit_qp");
+    verify_qp_state (IBV_QPS_INIT, context->message_transmit_qp, "message_transmit_qp", NULL);
 
     /* Publish the transmit buffer using SLP */
     intialise_slp_connection (&context->slp_connection, is_tx_end, &context->path_def);
@@ -299,7 +299,7 @@ void message_transmit_attach_remote_pre_rtr (tx_message_context_handle context)
     qp_attr.dest_qp_num = context->slp_connection.remote_attributes.qp_num;
     qp_attr.rq_psn = context->slp_connection.remote_attributes.psn;
     qp_attr.max_dest_rd_atomic = 0;
-    qp_attr.min_rnr_timer = 12; /* 0.64 milliseconds delay */
+    qp_attr.min_rnr_timer = 0;
     qp_attr.ah_attr.is_global = false;
     qp_attr.ah_attr.dlid = context->slp_connection.remote_attributes.lid;
     qp_attr.ah_attr.sl = context->path_def.service_level;
@@ -318,7 +318,7 @@ void message_transmit_attach_remote_pre_rtr (tx_message_context_handle context)
         perror ("ibv_modify_qp message_send_qp failed");
         exit (EXIT_FAILURE);
     }
-    verify_qp_state (IBV_QPS_RTR, context->message_transmit_qp, "message_transmit_qp");
+    verify_qp_state (IBV_QPS_RTR, context->message_transmit_qp, "message_transmit_qp", NULL);
 
     /* Report that this endpoint is ready-to-receive */
     report_local_memory_buffer_rtr_with_slp (&context->slp_connection);
@@ -340,9 +340,10 @@ void message_transmit_attach_remote_post_rtr (tx_message_context_handle context)
     memset (&qp_attr, 0, sizeof (qp_attr));
     qp_attr.qp_state = IBV_QPS_RTS;
     qp_attr.sq_psn = context->message_transmit_psn;
-    qp_attr.timeout = 14;
-    qp_attr.retry_cnt = 7;
-    qp_attr.rnr_retry = 7; /* Infinite */
+    qp_attr.timeout = context->path_def.set_non_default_retry_timeout ?
+            context->path_def.retry_timeout : context->endpoint.device_attributes.local_ca_ack_delay;
+    qp_attr.retry_cnt = 7; /* Maximum */
+    qp_attr.rnr_retry = 0;
     qp_attr.max_rd_atomic = 0;
     rc = ibv_modify_qp (context->message_transmit_qp, &qp_attr,
                         IBV_QP_STATE              |
@@ -356,7 +357,7 @@ void message_transmit_attach_remote_post_rtr (tx_message_context_handle context)
         perror ("ibv_modify_qp message_send_qp failed");
         exit (EXIT_FAILURE);
     }
-    verify_qp_state (IBV_QPS_RTS, context->message_transmit_qp, "message_transmit_qp");
+    verify_qp_state (IBV_QPS_RTS, context->message_transmit_qp, "message_transmit_qp", &context->path_def);
 
     initialise_transmit_message_buffers (context);
 }

@@ -39,6 +39,7 @@ void register_controller_worker_messages (const bool controller_and_workers_on_s
     path_def.allocation_type = BUFFER_ALLOCATION_SHARED_MEMORY;
     path_def.tx_checks_memory_buffer_size = true;
     path_def.tx_polls_for_errors = false;
+    path_def.set_non_default_retry_timeout = false;
 
     /* Register the path from the controller to each worker */
     for (worker_node_id = FIRST_WORKER_NODE_ID; worker_node_id <= LAST_WORKER_NODE_ID; worker_node_id++)

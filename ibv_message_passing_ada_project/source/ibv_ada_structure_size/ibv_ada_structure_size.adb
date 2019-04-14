@@ -49,6 +49,8 @@ procedure Ibv_Ada_Structure_Size is
       print_struct_field (struct_name, "allocation_type", path_def.allocation_type'Size, path_def.allocation_type'Position);
       print_struct_field (struct_name, "tx_polls_for_errors", path_def.tx_polls_for_errors'Size, path_def.tx_polls_for_errors'Position);
       print_struct_field (struct_name, "tx_checks_memory_buffer_size", path_def.tx_checks_memory_buffer_size'Size, path_def.tx_checks_memory_buffer_size'Position);
+      print_struct_field (struct_name, "set_non_default_retry_timeout", path_def.set_non_default_retry_timeout'Size, path_def.set_non_default_retry_timeout'Position);
+      print_struct_field (struct_name, "retry_timeout", path_def.retry_timeout'Size, path_def.retry_timeout'Position);
    end report_communication_path_definition;
 
    procedure report_ib_port_endpoint is

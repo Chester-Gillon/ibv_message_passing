@@ -138,7 +138,7 @@ rx_message_context_handle message_receive_create_local (const communication_path
         perror ("ibv_create_qp freed_sequence_number_qp failed");
         exit (EXIT_FAILURE);
     }
-    verify_qp_state (IBV_QPS_RESET, context->freed_sequence_number_qp, "freed_sequence_number_qp");
+    verify_qp_state (IBV_QPS_RESET, context->freed_sequence_number_qp, "freed_sequence_number_qp", NULL);
     context->freed_sequence_number_psn = get_random_psn ();
     context->freed_sequence_number_qp_max_inline_data = get_max_inline_data (context->freed_sequence_number_qp);
 
@@ -158,7 +158,7 @@ rx_message_context_handle message_receive_create_local (const communication_path
         perror ("ibv_modify_qp freed_sequence_number_qp failed");
         exit (EXIT_FAILURE);
     }
-    verify_qp_state (IBV_QPS_INIT, context->freed_sequence_number_qp, "freed_sequence_number_qp");
+    verify_qp_state (IBV_QPS_INIT, context->freed_sequence_number_qp, "freed_sequence_number_qp", NULL);
 
     /* Publish the receive buffer using SLP */
     intialise_slp_connection (&context->slp_connection, is_tx_end, &context->path_def);
@@ -253,7 +253,7 @@ void message_receive_attach_remote_pre_rtr (rx_message_context_handle context)
     qp_attr.dest_qp_num = context->slp_connection.remote_attributes.qp_num;
     qp_attr.rq_psn = context->slp_connection.remote_attributes.psn;
     qp_attr.max_dest_rd_atomic = 0;
-    qp_attr.min_rnr_timer = 12; /* 0.64 milliseconds delay */
+    qp_attr.min_rnr_timer = 0;
     qp_attr.ah_attr.is_global = false;
     qp_attr.ah_attr.dlid = context->slp_connection.remote_attributes.lid;
     qp_attr.ah_attr.sl = context->path_def.service_level;
@@ -272,7 +272,7 @@ void message_receive_attach_remote_pre_rtr (rx_message_context_handle context)
         perror ("ibv_modify_qp freed_sequence_number_qp failed");
         exit (EXIT_FAILURE);
     }
-    verify_qp_state (IBV_QPS_RTR, context->freed_sequence_number_qp, "freed_sequence_number_qp");
+    verify_qp_state (IBV_QPS_RTR, context->freed_sequence_number_qp, "freed_sequence_number_qp", NULL);
 
     /* Report that this endpoint is ready-to-receive */
     report_local_memory_buffer_rtr_with_slp (&context->slp_connection);
@@ -294,9 +294,10 @@ void message_receive_attach_remote_post_rtr (rx_message_context_handle context)
     memset (&qp_attr, 0, sizeof (qp_attr));
     qp_attr.qp_state = IBV_QPS_RTS;
     qp_attr.sq_psn = context->freed_sequence_number_psn;
-    qp_attr.timeout = 14;
-    qp_attr.retry_cnt = 7;
-    qp_attr.rnr_retry = 7; /* Infinite */
+    qp_attr.timeout = context->path_def.set_non_default_retry_timeout ?
+            context->path_def.retry_timeout : context->endpoint.device_attributes.local_ca_ack_delay;
+    qp_attr.retry_cnt = 7; /* Maximum */
+    qp_attr.rnr_retry = 0;
     qp_attr.max_rd_atomic = 0;
     rc = ibv_modify_qp (context->freed_sequence_number_qp, &qp_attr,
                         IBV_QP_STATE              |
@@ -310,7 +311,7 @@ void message_receive_attach_remote_post_rtr (rx_message_context_handle context)
         perror ("ibv_modify_qp freed_sequence_number_qp failed");
         exit (EXIT_FAILURE);
     }
-    verify_qp_state (IBV_QPS_RTS, context->freed_sequence_number_qp, "freed_sequence_number_qp");
+    verify_qp_state (IBV_QPS_RTS, context->freed_sequence_number_qp, "freed_sequence_number_qp", &context->path_def);
 
     initialise_receive_message_buffers (context);
 }

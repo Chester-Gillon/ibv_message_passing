@@ -43,6 +43,7 @@ uint32_t register_message_latency_messages (const char *service_levels_arg,
     path_def.allocation_type = BUFFER_ALLOCATION_SHARED_MEMORY;
     path_def.tx_checks_memory_buffer_size = true;
     path_def.tx_polls_for_errors = false;
+    path_def.set_non_default_retry_timeout = false;
 
     /* Register each of the parallel paths for measuring latency, where the service levels are extracted from the command line
      * argument. */

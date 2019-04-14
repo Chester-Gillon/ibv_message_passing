@@ -121,6 +121,7 @@ int main (int argc, char *argv[])
         .allocation_type = BUFFER_ALLOCATION_SHARED_MEMORY,
         .tx_checks_memory_buffer_size = true,
         .tx_polls_for_errors = false,
+        .set_non_default_retry_timeout = false,
         .source_node = 0,
         .destination_node = 0,
         .instance = 0,

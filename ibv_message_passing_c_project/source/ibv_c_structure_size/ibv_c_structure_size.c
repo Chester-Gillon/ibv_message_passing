@@ -41,6 +41,8 @@ int main (int argc, char *argv[])
     PRINT_STRUCT_FIELD (communication_path_definition, allocation_type);
     PRINT_STRUCT_FIELD (communication_path_definition, tx_polls_for_errors);
     PRINT_STRUCT_FIELD (communication_path_definition, tx_checks_memory_buffer_size);
+    PRINT_STRUCT_FIELD (communication_path_definition, set_non_default_retry_timeout);
+    PRINT_STRUCT_FIELD (communication_path_definition, retry_timeout);
 
     PRINT_STRUCT_SIZE (ib_port_endpoint);
     PRINT_STRUCT_FIELD (ib_port_endpoint, num_devices);

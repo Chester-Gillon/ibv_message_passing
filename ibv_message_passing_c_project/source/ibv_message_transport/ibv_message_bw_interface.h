@@ -65,6 +65,11 @@ typedef struct
      *  When false the size of the memory buffer is not checked, and if the size is different the transmitter may get
      *  an Infiniband error if the memory buffer size on the transmitter is larger. */
     bool tx_checks_memory_buffer_size;
+    /** When true set the Infiniband transport retry timeout using the value of retry_timeout.
+     *  When false set to the local_ca_ack_delay for the device. */
+    bool set_non_default_retry_timeout;
+    /** The Infiniband transport retry timeout, in units of 4.096*2^timeout microseconds */
+    uint8_t retry_timeout;
 } communication_path_definition;
 
 /** Contains the Infiniband device and port on the local host which is used for transmitting or receiving messages from */
@@ -224,7 +229,8 @@ void create_memory_buffer (memory_buffer *const buffer, const bool is_tx_end,
 void release_memory_buffer (memory_buffer *const buffer);
 uint32_t get_random_psn (void);
 uint32_t get_max_inline_data (struct ibv_qp *const qp);
-void verify_qp_state (const enum ibv_qp_state expected_state, struct ibv_qp *const qp, const char *qp_name);
+void verify_qp_state (const enum ibv_qp_state expected_state, struct ibv_qp *const qp, const char *qp_name,
+                      const communication_path_definition *const path_def);
 
 tx_message_context_handle message_transmit_create_local (const communication_path_definition *const path_def);
 void message_transmit_attach_remote_pre_rtr (tx_message_context_handle context);
