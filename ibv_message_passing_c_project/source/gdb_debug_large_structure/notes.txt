@@ -1,0 +1,109 @@
+GDB 7.10 shows the failure:
+$ /opt/GNAT/2017/bin/gdb gdb_debug_large_structure/gdb_debug_large_structure 
+GNU gdb (GDB) 7.10 for GNAT GPL 2017 [rev=gdb-7.10-ref-199-g7cfc608]
+Copyright (C) 2015 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+See your support agreement for details of warranty and support.
+If you do not have a current support agreement, then there is absolutely
+no warranty for this version of GDB.  Type "show copying"
+and "show warranty" for details.
+This GDB was configured as "x86_64-pc-linux-gnu".
+Type "show configuration" for configuration details.For help, type "help".
+Type "apropos word" to search for commands related to "word"...
+Reading symbols from gdb_debug_large_structure/gdb_debug_large_structure...done.
+(gdb) b gdb_debug_large_structure.c:28
+Breakpoint 1 at 0x40075d: file /home/mr_halfword/ibv_message_passing/ibv_message_passing_c_project/source/gdb_debug_large_structure/gdb_debug_large_structure.c, line 28.
+(gdb) run
+Starting program: /home/mr_halfword/ibv_message_passing/ibv_message_passing_c_project/bin/Debug/gdb_debug_large_structure/gdb_debug_large_structure 
+data=0x7fffd57e3010
+&data->a=0x7fffd57e3010
+&data->b=0x7fffd59e3010
+&data->c=0x7ffff59e3010
+
+Breakpoint 1, main (argc=1, argv=0x7fffffffdeb8)
+    at /home/mr_halfword/ibv_message_passing/ibv_message_passing_c_project/source/gdb_debug_large_structure/gdb_debug_large_structure.c:28
+28      return 0;
+(gdb) p data
+$1 = (large_struct_t * const) 0x7fffd57e3010
+(gdb) p &data->a
+$2 = (char (*)[2097152]) 0x7fffd57e3010
+(gdb) p &data->b
+$3 = (char (*)[536870912]) 0x7fffd59e3010
+(gdb) p &data->c
+$4 = (char (*)[33554432]) 0x7fffd59e3010
+(gdb) 
+
+
+GDB 8.1 doesn't show the failure:
+$ /opt/GNAT/2018/bin/gdb gdb_debug_large_structure/gdb_debug_large_structure 
+GNU gdb (GDB) 8.1 for GNAT Community 2018 [rev=gdb-8.1-ref-73-g80fe2bb]
+Copyright (C) 2018 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+See your support agreement for details of warranty and support.
+If you do not have a current support agreement, then there is absolutely
+no warranty for this version of GDB.  Type "show copying"
+and "show warranty" for details.
+This GDB was configured as "x86_64-pc-linux-gnu".
+Type "show configuration" for configuration details.For help, type "help".
+Type "apropos word" to search for commands related to "word"...
+Reading symbols from gdb_debug_large_structure/gdb_debug_large_structure...done.
+(gdb) b gdb_debug_large_structure.c:28
+Breakpoint 1 at 0x40075d: file /home/mr_halfword/ibv_message_passing/ibv_message_passing_c_project/source/gdb_debug_large_structure/gdb_debug_large_structure.c, line 28.
+(gdb) run
+Starting program: /home/mr_halfword/ibv_message_passing/ibv_message_passing_c_project/bin/Debug/gdb_debug_large_structure/gdb_debug_large_structure 
+data=0x7fffd57e3010
+&data->a=0x7fffd57e3010
+&data->b=0x7fffd59e3010
+&data->c=0x7ffff59e3010
+
+Breakpoint 1, main (argc=1, argv=0x7fffffffdeb8)
+    at /home/mr_halfword/ibv_message_passing/ibv_message_passing_c_project/source/gdb_debug_large_structure/gdb_debug_large_structure.c:28
+28      return 0;
+(gdb) p data
+$1 = (large_struct_t * const) 0x7fffd57e3010
+(gdb) p &data->a
+$2 = (char (*)[2097152]) 0x7fffd57e3010
+(gdb) p &data->b
+$3 = (char (*)[536870912]) 0x7fffd59e3010
+(gdb) p &data->c
+$4 = (char (*)[33554432]) 0x7ffff59e3010
+(gdb) 
+
+
+GDB 8.3 doesn't show the failure:
+$ /opt/GNAT/2019/bin/gdb gdb_debug_large_structure/gdb_debug_large_structure 
+GNU gdb (GDB) 8.3 for GNAT Community 2019 [rev=gdb-8.3-ref-194-g3fc1095]
+Copyright (C) 2019 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+See your support agreement for details of warranty and support.
+If you do not have a current support agreement, then there is absolutely
+no warranty for this version of GDB.
+Type "show copying" and "show warranty" for details.
+This GDB was configured as "x86_64-pc-linux-gnu".
+Type "show configuration" for configuration details.
+For help, type "help".
+Type "apropos word" to search for commands related to "word"...
+Reading symbols from gdb_debug_large_structure/gdb_debug_large_structure...
+(gdb) b  gdb_debug_large_structure.c:28
+Breakpoint 1 at 0x40075d: file /home/mr_halfword/ibv_message_passing/ibv_message_passing_c_project/source/gdb_debug_large_structure/gdb_debug_large_structure.c, line 28.
+(gdb) run
+Starting program: /home/mr_halfword/ibv_message_passing/ibv_message_passing_c_project/bin/Debug/gdb_debug_large_structure/gdb_debug_large_structure 
+data=0x7fffd57e3010
+&data->a=0x7fffd57e3010
+&data->b=0x7fffd59e3010
+&data->c=0x7ffff59e3010
+
+Breakpoint 1, main (argc=1, argv=0x7fffffffdeb8)
+    at /home/mr_halfword/ibv_message_passing/ibv_message_passing_c_project/source/gdb_debug_large_structure/gdb_debug_large_structure.c:28
+28      return 0;
+(gdb) p data
+$1 = (large_struct_t * const) 0x7fffd57e3010
+(gdb) p &data->a
+$2 = (char (*)[2097152]) 0x7fffd57e3010
+(gdb) p &data->b
+$3 = (char (*)[536870912]) 0x7fffd59e3010
+(gdb) p &data->c
+$4 = (char (*)[33554432]) 0x7ffff59e3010

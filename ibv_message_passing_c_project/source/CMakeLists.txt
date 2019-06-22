@@ -44,6 +44,7 @@ add_subdirectory ("${PROJECT_SOURCE_DIR}/ibv_time_dma_flush")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/ibv_monitor_port_state")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/ibv_time_retry_timeout")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/ibv_generate_infiniband_test_load")
+add_subdirectory ("${PROJECT_SOURCE_DIR}/gdb_debug_large_structure")
 
 # Location of the source code for the linuxptp package, to gain access to the phc.[ch]
 set (LINUXPTP_ROOT "$ENV{HOME}/linuxptp-1.6")
