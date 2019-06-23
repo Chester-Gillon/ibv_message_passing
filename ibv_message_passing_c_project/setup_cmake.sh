@@ -6,7 +6,7 @@ SCRIPT=$(readlink -f $0)
 SCRIPT_PATH=`dirname ${SCRIPT}`
 WORKSPACE_PATH=$(readlink -f ${SCRIPT_PATH}/..)
 
-GCC_PATH=/opt/GNAT/2018/bin
+GCC_PATH=/opt/GNAT/2019/bin
 
 platforms="Debug Release Coverage"
 for platform in ${platforms}

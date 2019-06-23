@@ -22,6 +22,9 @@
 #include <signal.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <linux/mempolicy.h>
+#include <numa.h>
+#include <numaif.h>
 
 #include <infiniband/verbs.h>
 #include <slp.h>
@@ -149,6 +152,9 @@ typedef struct
     message_transmit_mode transmit_mode;
     /** The definition of the communication path for which this thread transmits messages on */
     communication_path_definition path_def;
+    /** When non-NULL the NUMA node mask used to set the memory policy to allocate from the NUMA node local to the core on
+     *  which the thread has its affinity set to. */
+    struct bitmask *numa_mask;
     /** Handle used for transmitting messages */
     tx_message_context_handle tx_handle;
     /** The results for this thread.
@@ -177,6 +183,9 @@ typedef struct
 {
     /** The definition of the communication path for which this thread receives messages on */
     communication_path_definition path_def;
+    /** When non-NULL the NUMA node mask used to set the memory policy to allocate from the NUMA node local to the core on
+     *  which the thread has its affinity set to. */
+    struct bitmask *numa_mask;
     /** Handle used for receiving messages */
     rx_message_context_handle rx_handle;
     /** The results for this thread */
@@ -264,7 +273,9 @@ static void display_usage (void)
     printf ("  --ib-dev=<dev>    Use IB device <dev>\n");
     printf ("  --ib-port=<port>  Use <port> of IB device\n");
     printf ("  --ib-sl=<sl>  Use <sl> as the IB service level\n");
-    printf ("  --core=<core>     Set the affinity of the tx / rx thread to the CPU <core>\n");
+    printf ("  --core=<core>     Set the affinity of the tx / rx thread to the CPU <core>.\n");
+    printf ("                    Also causes messages buffers to be allocated from the local\n");
+    printf ("                    NUMA node.\n");
     printf ("\n");
     printf ("Options which apply to all threads, having a single value:\n");
     printf ("  --max-msg-size=<size>  The maximum message data size configured on the path.\n"
@@ -716,6 +727,21 @@ static void transmit_message_warmup (message_transmit_thread_context *const thre
 }
 
 /**
+ * @brief Set the memory policy for a message transmit or receive thread
+ * @param[in] numa_mask If non-NULL defines which NUMA node to perform memory allocations from
+ */
+static void set_thread_memory_policy (const struct bitmask *const numa_mask)
+{
+    int rc;
+
+    if (numa_mask != NULL)
+    {
+        rc = set_mempolicy (MPOL_BIND | MPOL_F_STATIC_NODES, numa_mask->maskp, numa_mask->size);
+        check_assert (rc == 0, "set_mempolicy");
+    }
+}
+
+/**
  * @brief Initialise the test results for a message transmit or receive thread
  * @param[out] results The test results to initialise
  */
@@ -882,6 +908,7 @@ static void *message_transmit_thread (void *const arg)
     message_transmit_thread_context *const thread_context = (message_transmit_thread_context *) arg;
     int rc;
 
+    set_thread_memory_policy (thread_context->numa_mask);
     thread_context->test_pattern = thread_context->path_def.instance;
     thread_context->tx_handle = message_transmit_create_local (&thread_context->path_def);
     message_transmit_attach_remote_pre_rtr (thread_context->tx_handle);
@@ -990,6 +1017,7 @@ static void *message_receive_thread (void *const arg)
     message_receive_thread_context *const thread_context = (message_receive_thread_context *) arg;
     int rc;
 
+    set_thread_memory_policy (thread_context->numa_mask);
     thread_context->test_pattern = thread_context->path_def.instance;
     thread_context->rx_handle = message_receive_create_local (&thread_context->path_def);
     message_receive_attach_remote_pre_rtr (thread_context->rx_handle);
@@ -1069,6 +1097,8 @@ static void create_message_threads (void)
     pthread_attr_t thread_attr;
     int rc;
     uint32_t thread_index;
+    struct bitmask *numa_mask = NULL;
+    int numa_node;
 
     /* Create the threads */
     for (thread_index = 0; thread_index < num_threads; thread_index++)
@@ -1095,9 +1125,11 @@ static void create_message_threads (void)
         path_def.set_non_default_retry_timeout = arg_retry_timeout_present;
         path_def.retry_timeout = arg_retry_timeout;
 
-        /* Set CPU affinity for the thread which sends or receives messages, if specified as a command line option */
+        /* Set CPU affinity for the thread which sends or receives messages, if specified by a command line option.
+         * If the CPU affinity is set, also determine the local NUMA node mask to be used for allocations. */
         rc = pthread_attr_init (&thread_attr);
         check_assert (rc == 0, "pthread_attr_init");
+        numa_mask = NULL;
         if (num_cores > 0)
         {
             cpu_set_t cpuset;
@@ -1106,6 +1138,12 @@ static void create_message_threads (void)
             CPU_SET (arg_cores[thread_index], &cpuset);
             rc = pthread_attr_setaffinity_np (&thread_attr, sizeof (cpuset), &cpuset);
             check_assert (rc == 0, "pthread_attr_setaffinty_np");
+
+            numa_mask = numa_allocate_nodemask ();
+            check_assert (numa_mask != NULL, "numa_allocate_nodemask");
+            numa_node = numa_node_of_cpu (arg_cores[thread_index]);
+            check_assert (numa_node != -1, "numa_node_of_cpu");
+            numa_bitmask_setbit (numa_mask, (unsigned int) numa_node);
         }
 
         /* Create either transmit or receive thread */
@@ -1114,6 +1152,7 @@ static void create_message_threads (void)
             tx_or_rx->tx_thread_context = cache_line_aligned_calloc (1, sizeof (message_transmit_thread_context));
             tx_or_rx->rx_thread_context = NULL;
             tx_or_rx->thread_joined = false;
+            tx_or_rx->tx_thread_context->numa_mask = numa_mask;
             tx_or_rx->tx_thread_context->path_def = path_def;
             tx_or_rx->tx_thread_context->path_def.source_ib_device = arg_ib_devices[thread_index];
             tx_or_rx->tx_thread_context->path_def.source_port_num = (uint8_t) arg_ib_ports[thread_index];
@@ -1144,6 +1183,7 @@ static void create_message_threads (void)
             tx_or_rx->tx_thread_context = NULL;
             tx_or_rx->rx_thread_context = cache_line_aligned_calloc (1, sizeof (message_receive_thread_context));
             tx_or_rx->thread_joined = false;
+            tx_or_rx->rx_thread_context->numa_mask = numa_mask;
             tx_or_rx->rx_thread_context->path_def = path_def;
             tx_or_rx->rx_thread_context->path_def.destination_ib_device = arg_ib_devices[thread_index];
             tx_or_rx->rx_thread_context->path_def.destination_port_num = (uint8_t) arg_ib_ports[thread_index];
@@ -1418,8 +1458,12 @@ int main (int argc, char *argv[])
     uint32_t thread_index;
     SLPError slp_status;
     SLPHandle slp_main_thread_handle;
+    int rc;
 
     parse_command_line_arguments (argc, argv);
+
+    rc = numa_available ();
+    check_assert (rc != -1, "numa_available");
 
     /* To allow generation of random Packet Sequence numbers */
     srand48 (getpid() * time(NULL));
