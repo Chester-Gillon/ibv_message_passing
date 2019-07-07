@@ -1,0 +1,15 @@
+with "../../shared.gpr";
+project Get_Rdate is
+
+   for Source_Dirs use (".");
+   for Object_Dir use "../../obj/" & Shared.mode & "/get_rdate";
+   for Main use ("get_rdate.adb");
+
+   package Compiler renames Shared.Compiler;
+   package Builder renames Shared.Builder;
+   package Linker renames Shared.Linker;
+
+   package Ide is
+   end Ide;
+
+end Get_Rdate;
