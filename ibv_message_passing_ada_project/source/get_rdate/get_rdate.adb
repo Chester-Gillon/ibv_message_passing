@@ -10,10 +10,7 @@ with Ada.Text_IO;
 with Ada.Integer_Text_IO;
 with Ada.Command_Line;
 with Ada.Strings.Fixed;
-with Ada.Streams;
-with Ada.Unchecked_Conversion;
-with Interfaces;
-with System;
+with Interfaces; use Interfaces;
 with GNAT.Sockets;
 
 procedure Get_RDate is
@@ -22,22 +19,12 @@ procedure Get_RDate is
    Channel : GNAT.Sockets.Stream_Access;
    Rdate_Port : GNAT.Sockets.Port_Type := 37;
 
-   -- Define a big-endian (network order) structure to receive the rdate time as a 32-bit number of seconds
+   -- Define am array to receive the rdate time as a big-endian 32-bit number of seconds
    -- since the epoch of 00:00 (midnight) 1 January 1900 GMT
-   type Rdate_Time is record
-      Time : Interfaces.Unsigned_32;
-   end record;
-   for Rdate_Time use record
-      Time at 0 range 0 .. 31;
-   end record;
-   type Rdate_Time_Packet is new Rdate_Time;
-   for Rdate_Time_Packet'Bit_Order use System.High_Order_First;
-   for Rdate_Time_Packet'Scalar_Storage_Order use System.High_Order_First;
-
-   function From_Rdate_Packet is new Ada.Unchecked_Conversion (Rdate_Time_Packet, Rdate_Time);
-
+   type Rdate_Time_Packet is Array (0..3) of Interfaces.Unsigned_8;
    Raw_Time : Rdate_Time_Packet;
-   Host_Rdate_Time : Rdate_Time;
+
+   Host_Rdate_Time : Interfaces.Unsigned_32;
 
    -- From RFC 868
    Rdate_To_Linux_Epoch_Seconds : constant := 2208988800;
@@ -62,9 +49,14 @@ begin
       Rdate_Time_Packet'Read (Channel, Raw_Time);
       GNAT.Sockets.Close_Socket (Rdate_Client);
 
+      -- Convert the big-endian received rdate
+      Host_Rdate_Time := Interfaces.Shift_Left (Interfaces.Unsigned_32 (Raw_Time(0)), 24) +
+        Interfaces.Shift_Left (Interfaces.Unsigned_32 (Raw_Time(1)), 16) +
+        Interfaces.Shift_Left (Interfaces.Unsigned_32 (Raw_Time(2)), 8) +
+        Interfaces.Unsigned_32 (Raw_Time(3));
+
       -- Display the time as the number of seconds since the Linux epoch.
-      Host_Rdate_Time := From_Rdate_Packet (Raw_Time);
-      Time_Since_Linux_Epoch := Interfaces."-" (Host_Rdate_Time.Time, Rdate_To_Linux_Epoch_Seconds);
+      Time_Since_Linux_Epoch := Host_Rdate_Time - Rdate_To_Linux_Epoch_Seconds;
       declare
          Raw_Image : constant String := Interfaces.Unsigned_32'Image (Time_Since_Linux_Epoch);
       begin
