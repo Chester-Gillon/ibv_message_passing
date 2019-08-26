@@ -1,0 +1,507 @@
+Tests were run using:
+a. Connect-X2 HCAs which don't support the PortUnicastXmitPkts / PortUnicastRcvPkts / PortMulticastXmitPkts / PortMulticastRcvPkts
+   which don't support these counters. Hence these counters always displayed as invalid (blank) for the local ports.
+b. Infiniscale-IV switch which supports all counters for which statistics are collected.
+
+
+1. The following output shows what happend when the test was started with the Infiniband switch powered off, and
+the change when the switch was powered up and the remote ports identified the the local LIDs allocated.
+
+Statistics after 60 seconds
+                               Local      Local  Local  Local                 Remote  Remote  Remote              
+Counter name                   NUMA node  Port   LID    Counter value         Port    LID     Counter value       
+PortXmitData                           0      1                                                                   
+PortRcvData                            0      1                                                                   
+PortXmitPkts                           0      1                                                                   
+PortRcvPkts                            0      1                                                                   
+PortUnicastXmitPkts                    0      1                                                                   
+PortUnicastRcvPkts                     0      1                                                                   
+PortMulticastXmitPkts                  0      1                                                                   
+PortMulticastRcvPkts                   0      1                                                                   
+SymbolErrorCounter                     0      1                                                                   
+LinkErrorRecoveryCounter               0      1                                                                   
+LinkDownedCounter                      0      1                                                                   
+PortRcvErrors                          0      1                                                                   
+PortRcvRemotePhysicalErrors            0      1                                                                   
+PortRcvSwitchRelayErrors               0      1                                                                   
+PortXmitDiscards                       0      1                                                                   
+PortXmitConstraintErrors               0      1                                                                   
+PortRcvConstraintErrors                0      1                                                                   
+LocalLinkIntegrityErrors               0      1                                                                   
+ExcessiveBufferOverrunErrors           0      1                                                                   
+VL15Dropped                            0      1                                                                   
+PortXmitWait                           0      1                                                                   
+PortXmitData                           0      2                                                                   
+PortRcvData                            0      2                                                                   
+PortXmitPkts                           0      2                                                                   
+PortRcvPkts                            0      2                                                                   
+PortUnicastXmitPkts                    0      2                                                                   
+PortUnicastRcvPkts                     0      2                                                                   
+PortMulticastXmitPkts                  0      2                                                                   
+PortMulticastRcvPkts                   0      2                                                                   
+SymbolErrorCounter                     0      2                                                                   
+LinkErrorRecoveryCounter               0      2                                                                   
+LinkDownedCounter                      0      2                                                                   
+PortRcvErrors                          0      2                                                                   
+PortRcvRemotePhysicalErrors            0      2                                                                   
+PortRcvSwitchRelayErrors               0      2                                                                   
+PortXmitDiscards                       0      2                                                                   
+PortXmitConstraintErrors               0      2                                                                   
+PortRcvConstraintErrors                0      2                                                                   
+LocalLinkIntegrityErrors               0      2                                                                   
+ExcessiveBufferOverrunErrors           0      2                                                                   
+VL15Dropped                            0      2                                                                   
+PortXmitWait                           0      2                                                                   
+
+Statistics after 70 seconds
+                               Local      Local  Local  Local                 Remote  Remote  Remote              
+Counter name                   NUMA node  Port   LID    Counter value         Port    LID     Counter value       
+PortXmitData                           0      1      2                  6048       1       5                  6264
+PortRcvData                            0      1      2                  6192       1       5                  6192
+PortXmitPkts                           0      1      2                    84       1       5                    87
+PortRcvPkts                            0      1      2                    86       1       5                    86
+PortUnicastXmitPkts                    0      1      2                             1       5                    87
+PortUnicastRcvPkts                     0      1      2                             1       5                    86
+PortMulticastXmitPkts                  0      1      2                             1       5                     0
+PortMulticastRcvPkts                   0      1      2                             1       5                     0
+SymbolErrorCounter                     0      1      2                     0       1       5                     0
+LinkErrorRecoveryCounter               0      1      2                     0       1       5                     0
+LinkDownedCounter                      0      1      2                     0       1       5                     0
+PortRcvErrors                          0      1      2                     0       1       5                     0
+PortRcvRemotePhysicalErrors            0      1      2                     0       1       5                     0
+PortRcvSwitchRelayErrors               0      1      2                     0       1       5                     0
+PortXmitDiscards                       0      1      2                     0       1       5                     2
+PortXmitConstraintErrors               0      1      2                     0       1       5                     0
+PortRcvConstraintErrors                0      1      2                     0       1       5                     0
+LocalLinkIntegrityErrors               0      1      2                     0       1       5                     0
+ExcessiveBufferOverrunErrors           0      1      2                     0       1       5                     0
+VL15Dropped                            0      1      2                     0       1       5                     0
+PortXmitWait                           0      1      2                     0       1       5                     0
+PortXmitData                           0      2      3                  4824       2       5                  5040
+PortRcvData                            0      2      3                  4968       2       5                  4968
+PortXmitPkts                           0      2      3                    67       2       5                    70
+PortRcvPkts                            0      2      3                    69       2       5                    69
+PortUnicastXmitPkts                    0      2      3                             2       5                    70
+PortUnicastRcvPkts                     0      2      3                             2       5                    69
+PortMulticastXmitPkts                  0      2      3                             2       5                     0
+PortMulticastRcvPkts                   0      2      3                             2       5                     0
+SymbolErrorCounter                     0      2      3                     0       2       5                     0
+LinkErrorRecoveryCounter               0      2      3                     0       2       5                     0
+LinkDownedCounter                      0      2      3                     0       2       5                     0
+PortRcvErrors                          0      2      3                     0       2       5                     0
+PortRcvRemotePhysicalErrors            0      2      3                     0       2       5                     0
+PortRcvSwitchRelayErrors               0      2      3                     0       2       5                     0
+PortXmitDiscards                       0      2      3                     0       2       5                     1
+PortXmitConstraintErrors               0      2      3                     0       2       5                     0
+PortRcvConstraintErrors                0      2      3                     0       2       5                     0
+LocalLinkIntegrityErrors               0      2      3                     0       2       5                     0
+ExcessiveBufferOverrunErrors           0      2      3                     0       2       5                     0
+VL15Dropped                            0      2      3                     0       2       5                     0
+PortXmitWait                           0      2      3                     0       2       5                     0
+
+
+2. The following shows a long running ibv_message_bw program with a single transmitter on one PC and and single receiver
+on the PC on which the statistics program is running.
+
+The 32-bit PortXmitWait counter sticks at the maximum value, which is the defined behaviour of Infiniband counters.
+While the statistics collection could zero counters which reach the maximum, 
+
+Statistics after 920 seconds
+                               Local      Local  Local  Local                 Remote  Remote  Remote              
+Counter name                   NUMA node  Port   LID    Counter value         Port    LID     Counter value       
+PortXmitData                           0      1      1                117504       7       5                117504
+PortRcvData                            0      1      1                117432       7       5                117648
+PortXmitPkts                           0      1      1                  1632       7       5                  1632
+PortRcvPkts                            0      1      1                  1631       7       5                  1634
+PortUnicastXmitPkts                    0      1      1                             7       5                  1632
+PortUnicastRcvPkts                     0      1      1                             7       5                  1634
+PortMulticastXmitPkts                  0      1      1                             7       5                     0
+PortMulticastRcvPkts                   0      1      1                             7       5                     0
+SymbolErrorCounter                     0      1      1                     0       7       5                     0
+LinkErrorRecoveryCounter               0      1      1                     0       7       5                     0
+LinkDownedCounter                      0      1      1                     0       7       5                     0
+PortRcvErrors                          0      1      1                     0       7       5                     0
+PortRcvRemotePhysicalErrors            0      1      1                     0       7       5                     0
+PortRcvSwitchRelayErrors               0      1      1                     0       7       5                     0
+PortXmitDiscards                       0      1      1                     0       7       5                     2
+PortXmitConstraintErrors               0      1      1                     0       7       5                     0
+PortRcvConstraintErrors                0      1      1                     0       7       5                     0
+LocalLinkIntegrityErrors               0      1      1                     0       7       5                     0
+ExcessiveBufferOverrunErrors           0      1      1                     0       7       5                     0
+VL15Dropped                            0      1      1                     0       7       5                     0
+PortXmitWait                           0      1      1                     0       7       5                     0
+PortXmitData                           0      2      4              69011302       8       5          727306691451
+PortRcvData                            0      2      4          727306571945       8       5              69011471
+PortXmitPkts                           0      2      4               8274959       8       5             711572933
+PortRcvPkts                            0      2      4             711572814       8       5               8274964
+PortUnicastXmitPkts                    0      2      4                             8       5             711572934
+PortUnicastRcvPkts                     0      2      4                             8       5               8274964
+PortMulticastXmitPkts                  0      2      4                             8       5                     0
+PortMulticastRcvPkts                   0      2      4                             8       5                     0
+SymbolErrorCounter                     0      2      4                     0       8       5                     0
+LinkErrorRecoveryCounter               0      2      4                     0       8       5                     0
+LinkDownedCounter                      0      2      4                     0       8       5                     0
+PortRcvErrors                          0      2      4                     0       8       5                     0
+PortRcvRemotePhysicalErrors            0      2      4                     0       8       5                     0
+PortRcvSwitchRelayErrors               0      2      4                     0       8       5                     0
+PortXmitDiscards                       0      2      4                     0       8       5                     2
+PortXmitConstraintErrors               0      2      4                     0       8       5                     0
+PortRcvConstraintErrors                0      2      4                     0       8       5                     0
+LocalLinkIntegrityErrors               0      2      4                     0       8       5                     0
+ExcessiveBufferOverrunErrors           0      2      4                     0       8       5                     0
+VL15Dropped                            0      2      4                     0       8       5                     0
+PortXmitWait                           0      2      4                   174       8       5            4260980354
+
+Statistics after 930 seconds
+                               Local      Local  Local  Local                 Remote  Remote  Remote              
+Counter name                   NUMA node  Port   LID    Counter value         Port    LID     Counter value       
+PortXmitData                           0      1      1                118152       7       5                118152
+PortRcvData                            0      1      1                118080       7       5                118296
+PortXmitPkts                           0      1      1                  1641       7       5                  1641
+PortRcvPkts                            0      1      1                  1640       7       5                  1643
+PortUnicastXmitPkts                    0      1      1                             7       5                  1641
+PortUnicastRcvPkts                     0      1      1                             7       5                  1643
+PortMulticastXmitPkts                  0      1      1                             7       5                     0
+PortMulticastRcvPkts                   0      1      1                             7       5                     0
+SymbolErrorCounter                     0      1      1                     0       7       5                     0
+LinkErrorRecoveryCounter               0      1      1                     0       7       5                     0
+LinkDownedCounter                      0      1      1                     0       7       5                     0
+PortRcvErrors                          0      1      1                     0       7       5                     0
+PortRcvRemotePhysicalErrors            0      1      1                     0       7       5                     0
+PortRcvSwitchRelayErrors               0      1      1                     0       7       5                     0
+PortXmitDiscards                       0      1      1                     0       7       5                     2
+PortXmitConstraintErrors               0      1      1                     0       7       5                     0
+PortRcvConstraintErrors                0      1      1                     0       7       5                     0
+LocalLinkIntegrityErrors               0      1      1                     0       7       5                     0
+ExcessiveBufferOverrunErrors           0      1      1                     0       7       5                     0
+VL15Dropped                            0      1      1                     0       7       5                     0
+PortXmitWait                           0      1      1                     0       7       5                     0
+PortXmitData                           0      2      4              69773062       8       5          735338121161
+PortRcvData                            0      2      4          735337988194       8       5              69773231
+PortXmitPkts                           0      2      4               8366332       8       5             719430614
+PortRcvPkts                            0      2      4             719430483       8       5               8366337
+PortUnicastXmitPkts                    0      2      4                             8       5             719430615
+PortUnicastRcvPkts                     0      2      4                             8       5               8366337
+PortMulticastXmitPkts                  0      2      4                             8       5                     0
+PortMulticastRcvPkts                   0      2      4                             8       5                     0
+SymbolErrorCounter                     0      2      4                     0       8       5                     0
+LinkErrorRecoveryCounter               0      2      4                     0       8       5                     0
+LinkDownedCounter                      0      2      4                     0       8       5                     0
+PortRcvErrors                          0      2      4                     0       8       5                     0
+PortRcvRemotePhysicalErrors            0      2      4                     0       8       5                     0
+PortRcvSwitchRelayErrors               0      2      4                     0       8       5                     0
+PortXmitDiscards                       0      2      4                     0       8       5                     2
+PortXmitConstraintErrors               0      2      4                     0       8       5                     0
+PortRcvConstraintErrors                0      2      4                     0       8       5                     0
+LocalLinkIntegrityErrors               0      2      4                     0       8       5                     0
+ExcessiveBufferOverrunErrors           0      2      4                     0       8       5                     0
+VL15Dropped                            0      2      4                     0       8       5                     0
+PortXmitWait                           0      2      4                   177       8       5            4294967295
+
+
+
+3. The following shows a long running ibv_message_bw test where is transmitting on port 1 on the local host,
+and a physical error was inserted on one packet transmitted from the local host which then results in the
+*remote* PortRcvRemotePhysicalErrors incrementing by one.
+
+$ sudo mst start
+[sudo] password for mr_halfword: 
+Starting MST (Mellanox Software Tools) driver set
+Loading MST PCI module - Success
+Loading MST PCI configuration module - Success
+Create devices
+$ sudo pckt_drop -d /dev/mst/mt26428_pciconf0 -p 1
+Successfully configured port 1 to insert error on next transmitted data packet
+
+
+Statistics after 1970 seconds
+                               Local      Local  Local  Local                 Remote  Remote  Remote              
+Counter name                   NUMA node  Port   LID    Counter value         Port    LID     Counter value       
+PortXmitData                           0      1      2         1597197454784       1       5             151511018
+PortRcvData                            0      1      2             151510921       1       5         1597197616164
+PortXmitPkts                           0      1      2            1562645578       1       5              18164697
+PortRcvPkts                            0      1      2              18164693       1       5            1562645739
+PortUnicastXmitPkts                    0      1      2                             1       5              18164697
+PortUnicastRcvPkts                     0      1      2                             1       5            1562645739
+PortMulticastXmitPkts                  0      1      2                             1       5                     0
+PortMulticastRcvPkts                   0      1      2                             1       5                     0
+SymbolErrorCounter                     0      1      2                     0       1       5                     0
+LinkErrorRecoveryCounter               0      1      2                     0       1       5                     0
+LinkDownedCounter                      0      1      2                     0       1       5                     0
+PortRcvErrors                          0      1      2                     0       1       5                     0
+PortRcvRemotePhysicalErrors            0      1      2                     0       1       5                     0
+PortRcvSwitchRelayErrors               0      1      2                     0       1       5                     0
+PortXmitDiscards                       0      1      2                     0       1       5                     2
+PortXmitConstraintErrors               0      1      2                     0       1       5                     0
+PortRcvConstraintErrors                0      1      2                     0       1       5                     0
+LocalLinkIntegrityErrors               0      1      2                     0       1       5                     0
+ExcessiveBufferOverrunErrors           0      1      2                     0       1       5                     0
+VL15Dropped                            0      1      2                     0       1       5                     0
+PortXmitWait                           0      1      2            4294967295       1       5                     0
+PortXmitData                           0      2      3               2464914       2       5           25395430075
+PortRcvData                            0      2      3           25395430003       2       5               2465058
+PortXmitPkts                           0      2      3                282819       2       5              24847489
+PortRcvPkts                            0      2      3              24847488       2       5                282821
+PortUnicastXmitPkts                    0      2      3                             2       5              24847489
+PortUnicastRcvPkts                     0      2      3                             2       5                282821
+PortMulticastXmitPkts                  0      2      3                             2       5                     0
+PortMulticastRcvPkts                   0      2      3                             2       5                     0
+SymbolErrorCounter                     0      2      3                     0       2       5                     0
+LinkErrorRecoveryCounter               0      2      3                     0       2       5                     0
+LinkDownedCounter                      0      2      3                     0       2       5                     0
+PortRcvErrors                          0      2      3                     0       2       5                     0
+PortRcvRemotePhysicalErrors            0      2      3                     0       2       5                     0
+PortRcvSwitchRelayErrors               0      2      3                     0       2       5                     0
+PortXmitDiscards                       0      2      3                     0       2       5                     1
+PortXmitConstraintErrors               0      2      3                     0       2       5                     0
+PortRcvConstraintErrors                0      2      3                     0       2       5                     0
+LocalLinkIntegrityErrors               0      2      3                     0       2       5                     0
+ExcessiveBufferOverrunErrors           0      2      3                     0       2       5                     0
+VL15Dropped                            0      2      3                     0       2       5                     0
+PortXmitWait                           0      2      3                     0       2       5                  4632
+
+Statistics after 1980 seconds
+                               Local      Local  Local  Local                 Remote  Remote  Remote              
+Counter name                   NUMA node  Port   LID    Counter value         Port    LID     Counter value       
+PortXmitData                           0      1      2         1605205345808       1       5             152272045
+PortRcvData                            0      1      2             152271973       1       5         1605205537089
+PortXmitPkts                           0      1      2            1570480231       1       5              18256008
+PortRcvPkts                            0      1      2              18256007       1       5            1570480419
+PortUnicastXmitPkts                    0      1      2                             1       5              18256008
+PortUnicastRcvPkts                     0      1      2                             1       5            1570480419
+PortMulticastXmitPkts                  0      1      2                             1       5                     0
+PortMulticastRcvPkts                   0      1      2                             1       5                     0
+SymbolErrorCounter                     0      1      2                     0       1       5                     0
+LinkErrorRecoveryCounter               0      1      2                     0       1       5                     0
+LinkDownedCounter                      0      1      2                     0       1       5                     0
+PortRcvErrors                          0      1      2                     0       1       5                     0
+PortRcvRemotePhysicalErrors            0      1      2                     0       1       5                     1
+PortRcvSwitchRelayErrors               0      1      2                     0       1       5                     0
+PortXmitDiscards                       0      1      2                     0       1       5                     2
+PortXmitConstraintErrors               0      1      2                     0       1       5                     0
+PortRcvConstraintErrors                0      1      2                     0       1       5                     0
+LocalLinkIntegrityErrors               0      1      2                     0       1       5                     0
+ExcessiveBufferOverrunErrors           0      1      2                     0       1       5                     0
+VL15Dropped                            0      1      2                     0       1       5                     0
+PortXmitWait                           0      1      2            4294967295       1       5                     0
+PortXmitData                           0      2      3               2465274       2       5           25395430435
+PortRcvData                            0      2      3           25395430363       2       5               2465418
+PortXmitPkts                           0      2      3                282824       2       5              24847494
+PortRcvPkts                            0      2      3              24847493       2       5                282826
+PortUnicastXmitPkts                    0      2      3                             2       5              24847494
+PortUnicastRcvPkts                     0      2      3                             2       5                282826
+PortMulticastXmitPkts                  0      2      3                             2       5                     0
+PortMulticastRcvPkts                   0      2      3                             2       5                     0
+SymbolErrorCounter                     0      2      3                     0       2       5                     0
+LinkErrorRecoveryCounter               0      2      3                     0       2       5                     0
+LinkDownedCounter                      0      2      3                     0       2       5                     0
+PortRcvErrors                          0      2      3                     0       2       5                     0
+PortRcvRemotePhysicalErrors            0      2      3                     0       2       5                     0
+PortRcvSwitchRelayErrors               0      2      3                     0       2       5                     0
+PortXmitDiscards                       0      2      3                     0       2       5                     1
+PortXmitConstraintErrors               0      2      3                     0       2       5                     0
+PortRcvConstraintErrors                0      2      3                     0       2       5                     0
+LocalLinkIntegrityErrors               0      2      3                     0       2       5                     0
+ExcessiveBufferOverrunErrors           0      2      3                     0       2       5                     0
+VL15Dropped                            0      2      3                     0       2       5                     0
+PortXmitWait                           0      2      3                     0       2       5                  4632
+
+
+4. With ibv_message_bw running tranmitting on local port 1 reset port 1 using: 
+$ ibportstate --Ca mlx4_0 --Port 1 2 1 reset
+
+This caused a failure to collect the statistics for the remote port for a number of iterations, until the port became
+active again. The "ibwarn" are coming from the pma_query_via() library function.
+
+When the port became active again, PortRcvErrors on the *local* port had incremented.
+
+For this test the ibv_message_bw Infiniband transport timeouts were set such that the queue-pairs used for the throughput
+test had transferred to the error state by the time the link had become active again.
+
+Statistics after 70 seconds
+                               Local      Local  Local  Local                 Remote  Remote  Remote              
+Counter name                   NUMA node  Port   LID    Counter value         Port    LID     Counter value       
+PortXmitData                           0      1      2         2164154513602       1       5             205305647
+PortRcvData                            0      1      2             205305550       1       5         2164154684558
+PortXmitPkts                           0      1      2            2117337639       1       5              24615689
+PortRcvPkts                            0      1      2              24615685       1       5            2117337811
+PortUnicastXmitPkts                    0      1      2                             1       5              24615689
+PortUnicastRcvPkts                     0      1      2                             1       5            2117337811
+PortMulticastXmitPkts                  0      1      2                             1       5                     0
+PortMulticastRcvPkts                   0      1      2                             1       5                     0
+SymbolErrorCounter                     0      1      2                     0       1       5                     0
+LinkErrorRecoveryCounter               0      1      2                     0       1       5                     0
+LinkDownedCounter                      0      1      2                     0       1       5                     0
+PortRcvErrors                          0      1      2                     0       1       5                     1
+PortRcvRemotePhysicalErrors            0      1      2                     0       1       5                     1
+PortRcvSwitchRelayErrors               0      1      2                     0       1       5                     0
+PortXmitDiscards                       0      1      2                 14582       1       5                    22
+PortXmitConstraintErrors               0      1      2                     0       1       5                     0
+PortRcvConstraintErrors                0      1      2                     0       1       5                     0
+LocalLinkIntegrityErrors               0      1      2                     0       1       5                     0
+ExcessiveBufferOverrunErrors           0      1      2                     0       1       5                     0
+VL15Dropped                            0      1      2                     0       1       5                     0
+PortXmitWait                           0      1      2            4294967295       1       5                     0
+PortXmitData                           0      2      3               2516826       2       5           25395480187
+PortRcvData                            0      2      3           25395480115       2       5               2516970
+PortXmitPkts                           0      2      3                283540       2       5              24848185
+PortRcvPkts                            0      2      3              24848184       2       5                283542
+PortUnicastXmitPkts                    0      2      3                             2       5              24848185
+PortUnicastRcvPkts                     0      2      3                             2       5                283542
+PortMulticastXmitPkts                  0      2      3                             2       5                     0
+PortMulticastRcvPkts                   0      2      3                             2       5                     0
+SymbolErrorCounter                     0      2      3                     0       2       5                     0
+LinkErrorRecoveryCounter               0      2      3                     0       2       5                     0
+LinkDownedCounter                      0      2      3                     0       2       5                     0
+PortRcvErrors                          0      2      3                     0       2       5                     0
+PortRcvRemotePhysicalErrors            0      2      3                     0       2       5                     0
+PortRcvSwitchRelayErrors               0      2      3                     0       2       5                     7
+PortXmitDiscards                       0      2      3                    10       2       5                     1
+PortXmitConstraintErrors               0      2      3                     0       2       5                     0
+PortRcvConstraintErrors                0      2      3                     0       2       5                     0
+LocalLinkIntegrityErrors               0      2      3                     0       2       5                     0
+ExcessiveBufferOverrunErrors           0      2      3                     0       2       5                     0
+VL15Dropped                            0      2      3                     0       2       5                     0
+PortXmitWait                           0      2      3                     0       2       5                  4632
+ibwarn: [6875] _do_madrpc: recv failed: Connection timed out
+ibwarn: [6875] mad_rpc: _do_madrpc failed; dport (Lid 5)
+
+Statistics after 80 seconds
+                               Local      Local  Local  Local                 Remote  Remote  Remote              
+Counter name                   NUMA node  Port   LID    Counter value         Port    LID     Counter value       
+PortXmitData                           0      1      2         2171727201841       1       5                      
+PortRcvData                            0      1      2             206024051       1       5                      
+PortXmitPkts                           0      1      2            2124746507       1       5                      
+PortRcvPkts                            0      1      2              24701844       1       5                      
+PortUnicastXmitPkts                    0      1      2                             1       5                      
+PortUnicastRcvPkts                     0      1      2                             1       5                      
+PortMulticastXmitPkts                  0      1      2                             1       5                      
+PortMulticastRcvPkts                   0      1      2                             1       5                      
+SymbolErrorCounter                     0      1      2                     0       1       5                      
+LinkErrorRecoveryCounter               0      1      2                     0       1       5                      
+LinkDownedCounter                      0      1      2                     0       1       5                      
+PortRcvErrors                          0      1      2                     0       1       5                      
+PortRcvRemotePhysicalErrors            0      1      2                     0       1       5                      
+PortRcvSwitchRelayErrors               0      1      2                     0       1       5                      
+PortXmitDiscards                       0      1      2                 18892       1       5                      
+PortXmitConstraintErrors               0      1      2                     0       1       5                      
+PortRcvConstraintErrors                0      1      2                     0       1       5                      
+LocalLinkIntegrityErrors               0      1      2                     0       1       5                      
+ExcessiveBufferOverrunErrors           0      1      2                     0       1       5                      
+VL15Dropped                            0      1      2                     0       1       5                      
+PortXmitWait                           0      1      2            4294967295       1       5                      
+PortXmitData                           0      2      3               2517690       2       5           25395481051
+PortRcvData                            0      2      3           25395480979       2       5               2517834
+PortXmitPkts                           0      2      3                283552       2       5              24848197
+PortRcvPkts                            0      2      3              24848196       2       5                283554
+PortUnicastXmitPkts                    0      2      3                             2       5              24848197
+PortUnicastRcvPkts                     0      2      3                             2       5                283554
+PortMulticastXmitPkts                  0      2      3                             2       5                     0
+PortMulticastRcvPkts                   0      2      3                             2       5                     0
+SymbolErrorCounter                     0      2      3                     0       2       5                     0
+LinkErrorRecoveryCounter               0      2      3                     0       2       5                     0
+LinkDownedCounter                      0      2      3                     0       2       5                     0
+PortRcvErrors                          0      2      3                     0       2       5                     0
+PortRcvRemotePhysicalErrors            0      2      3                     0       2       5                     0
+PortRcvSwitchRelayErrors               0      2      3                     0       2       5                     7
+PortXmitDiscards                       0      2      3                    10       2       5                     1
+PortXmitConstraintErrors               0      2      3                     0       2       5                     0
+PortRcvConstraintErrors                0      2      3                     0       2       5                     0
+LocalLinkIntegrityErrors               0      2      3                     0       2       5                     0
+ExcessiveBufferOverrunErrors           0      2      3                     0       2       5                     0
+VL15Dropped                            0      2      3                     0       2       5                     0
+PortXmitWait                           0      2      3                     0       2       5                  4632
+ibwarn: [6875] _do_madrpc: recv failed: Connection timed out
+ibwarn: [6875] mad_rpc: _do_madrpc failed; dport (Lid 5)
+
+Statistics after 90 seconds
+                               Local      Local  Local  Local                 Remote  Remote  Remote              
+Counter name                   NUMA node  Port   LID    Counter value         Port    LID     Counter value       
+PortXmitData                           0      1      2         2171727201841       1       5                      
+PortRcvData                            0      1      2             206024051       1       5                      
+PortXmitPkts                           0      1      2            2124746507       1       5                      
+PortRcvPkts                            0      1      2              24701844       1       5                      
+PortUnicastXmitPkts                    0      1      2                             1       5                      
+PortUnicastRcvPkts                     0      1      2                             1       5                      
+PortMulticastXmitPkts                  0      1      2                             1       5                      
+PortMulticastRcvPkts                   0      1      2                             1       5                      
+SymbolErrorCounter                     0      1      2                     0       1       5                      
+LinkErrorRecoveryCounter               0      1      2                     0       1       5                      
+LinkDownedCounter                      0      1      2                     0       1       5                      
+PortRcvErrors                          0      1      2                     0       1       5                      
+PortRcvRemotePhysicalErrors            0      1      2                     0       1       5                      
+PortRcvSwitchRelayErrors               0      1      2                     0       1       5                      
+PortXmitDiscards                       0      1      2                 20433       1       5                      
+PortXmitConstraintErrors               0      1      2                     0       1       5                      
+PortRcvConstraintErrors                0      1      2                     0       1       5                      
+LocalLinkIntegrityErrors               0      1      2                     0       1       5                      
+ExcessiveBufferOverrunErrors           0      1      2                     0       1       5                      
+VL15Dropped                            0      1      2                     0       1       5                      
+PortXmitWait                           0      1      2            4294967295       1       5                      
+PortXmitData                           0      2      3               2518050       2       5           25395481411
+PortRcvData                            0      2      3           25395481339       2       5               2518194
+PortXmitPkts                           0      2      3                283557       2       5              24848202
+PortRcvPkts                            0      2      3              24848201       2       5                283559
+PortUnicastXmitPkts                    0      2      3                             2       5              24848202
+PortUnicastRcvPkts                     0      2      3                             2       5                283559
+PortMulticastXmitPkts                  0      2      3                             2       5                     0
+PortMulticastRcvPkts                   0      2      3                             2       5                     0
+SymbolErrorCounter                     0      2      3                     0       2       5                     0
+LinkErrorRecoveryCounter               0      2      3                     0       2       5                     0
+LinkDownedCounter                      0      2      3                     0       2       5                     0
+PortRcvErrors                          0      2      3                     0       2       5                     0
+PortRcvRemotePhysicalErrors            0      2      3                     0       2       5                     0
+PortRcvSwitchRelayErrors               0      2      3                     0       2       5                     7
+PortXmitDiscards                       0      2      3                    10       2       5                     1
+PortXmitConstraintErrors               0      2      3                     0       2       5                     0
+PortRcvConstraintErrors                0      2      3                     0       2       5                     0
+LocalLinkIntegrityErrors               0      2      3                     0       2       5                     0
+ExcessiveBufferOverrunErrors           0      2      3                     0       2       5                     0
+VL15Dropped                            0      2      3                     0       2       5                     0
+PortXmitWait                           0      2      3                     0       2       5                  4632
+
+Statistics after 100 seconds
+                               Local      Local  Local  Local                 Remote  Remote  Remote              
+Counter name                   NUMA node  Port   LID    Counter value         Port    LID     Counter value       
+PortXmitData                           0      1      2         2171727203065       1       5             206025419
+PortRcvData                            0      1      2             206025298       1       5         2171727202427
+PortXmitPkts                           0      1      2            2124746524       1       5              24701863
+PortRcvPkts                            0      1      2              24701862       1       5            2124746526
+PortUnicastXmitPkts                    0      1      2                             1       5              24701863
+PortUnicastRcvPkts                     0      1      2                             1       5            2124746526
+PortMulticastXmitPkts                  0      1      2                             1       5                     0
+PortMulticastRcvPkts                   0      1      2                             1       5                     0
+SymbolErrorCounter                     0      1      2                     0       1       5                     0
+LinkErrorRecoveryCounter               0      1      2                     0       1       5                     0
+LinkDownedCounter                      0      1      2                     0       1       5                     0
+PortRcvErrors                          0      1      2                     1       1       5                     2
+PortRcvRemotePhysicalErrors            0      1      2                     0       1       5                     1
+PortRcvSwitchRelayErrors               0      1      2                     0       1       5                     0
+PortXmitDiscards                       0      1      2                 20438       1       5                    22
+PortXmitConstraintErrors               0      1      2                     0       1       5                     0
+PortRcvConstraintErrors                0      1      2                     0       1       5                     0
+LocalLinkIntegrityErrors               0      1      2                     0       1       5                     0
+ExcessiveBufferOverrunErrors           0      1      2                     0       1       5                     0
+VL15Dropped                            0      1      2                     0       1       5                     0
+PortXmitWait                           0      1      2            4294967295       1       5                     0
+PortXmitData                           0      2      3               2518914       2       5           25395482275
+PortRcvData                            0      2      3           25395482203       2       5               2519058
+PortXmitPkts                           0      2      3                283569       2       5              24848214
+PortRcvPkts                            0      2      3              24848213       2       5                283571
+PortUnicastXmitPkts                    0      2      3                             2       5              24848214
+PortUnicastRcvPkts                     0      2      3                             2       5                283571
+PortMulticastXmitPkts                  0      2      3                             2       5                     0
+PortMulticastRcvPkts                   0      2      3                             2       5                     0
+SymbolErrorCounter                     0      2      3                     0       2       5                     0
+LinkErrorRecoveryCounter               0      2      3                     0       2       5                     0
+LinkDownedCounter                      0      2      3                     0       2       5                     0
+PortRcvErrors                          0      2      3                     0       2       5                     0
+PortRcvRemotePhysicalErrors            0      2      3                     0       2       5                     0
+PortRcvSwitchRelayErrors               0      2      3                     0       2       5                     7
+PortXmitDiscards                       0      2      3                    10       2       5                     1
+PortXmitConstraintErrors               0      2      3                     0       2       5                     0
+PortRcvConstraintErrors                0      2      3                     0       2       5                     0
+LocalLinkIntegrityErrors               0      2      3                     0       2       5                     0
+ExcessiveBufferOverrunErrors           0      2      3                     0       2       5                     0
+VL15Dropped                            0      2      3                     0       2       5                     0
+PortXmitWait                           0      2      3                     0       2       5                  4632
