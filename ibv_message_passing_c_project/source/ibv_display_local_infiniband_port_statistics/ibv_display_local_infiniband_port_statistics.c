@@ -372,6 +372,7 @@ static void find_local_ports (local_host_port_statistics_context_t *const contex
                 check_assert (context->num_local_ports < MAX_LOCAL_PORTS, "Too many local ports");
                 local_port->device_context = context->device_contexts[device_index];
                 local_port->local_hca = strdup (ibv_get_device_name (device));
+                local_port->statistics.local_numa_node = device_numa_node;
                 local_port->statistics.local.port_num = port_num;
                 local_port->mad_port =
                         mad_rpc_open_port (local_port->local_hca, local_port->statistics.local.port_num, mgmt_classes,
