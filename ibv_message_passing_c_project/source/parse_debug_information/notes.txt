@@ -1,0 +1,68 @@
+Looking at example enumerations produced by list_enumerations_in_exe for
+ibv_message_passing_ada_project/obj/Debug/ibv_controller_process/ibv_controller_process_main:
+
+1. buffer_allocation_type in which the typedef gets used as a field in other structure:
+typedef enum
+{ /* line 20 */
+    BUFFER_ALLOCATION_HEAP,
+    BUFFER_ALLOCATION_SHARED_MEMORY
+} buffer_allocation_type;
+
+Enumeration defined at /home/mr_halfword/ibv_message_passing/ibv_message_passing_c_project/source/ibv_message_transport/ibv_message_bw_interface.h line 20 column 1
+  type=unsigned int
+  DW_TAG_typedef name=buffer_allocation_type
+    DW_TAG_enumerator name="BUFFER_ALLOCATION_HEAP" value=0
+    DW_TAG_enumerator name="BUFFER_ALLOCATION_SHARED_MEMORY" value=1
+
+
+2. controller_worker_node_ids where the typedef is *not* referenced in the code, which is also an example of non-consecutive
+enumerations:
+typedef enum
+{ /* line 16 */
+    CONTROLLER_NODE_ID,
+    FIRST_WORKER_NODE_ID,
+    LAST_WORKER_NODE_ID = (FIRST_WORKER_NODE_ID + NUM_WORKERS - 1)
+} controller_worker_node_ids;
+
+Enumeration defined at /home/mr_halfword/ibv_message_passing/ibv_message_passing_c_project/source/ibv_message_transport/ibv_controller_worker_messages.h line 16 column 1
+  type=unsigned int
+    DW_TAG_enumerator name="CONTROLLER_NODE_ID" value=0
+    DW_TAG_enumerator name="FIRST_WORKER_NODE_ID" value=1
+    DW_TAG_enumerator name="LAST_WORKER_NODE_ID" value=3
+
+
+3. Example of buffer_allocation_type in an Ada generated spec, where in the debug information names are converted to lower case
+and qualified with the package name:
+   type buffer_allocation_type is /* line 25 */
+     (BUFFER_ALLOCATION_HEAP,
+      BUFFER_ALLOCATION_SHARED_MEMORY);
+   pragma Convention (C, buffer_allocation_type);
+
+Enumeration defined at /home/mr_halfword/ibv_message_passing/ibv_message_passing_ada_project/source/ibv_message_transport/ibv_message_bw_interface_h.ads line 25 column 9
+  enum name=ibv_message_bw_interface_h__buffer_allocation_type
+    DW_TAG_enumerator name="ibv_message_bw_interface_h__buffer_allocation_heap" value=0
+    DW_TAG_enumerator name="ibv_message_bw_interface_h__buffer_allocation_shared_memory" value=1
+
+
+4. Examplle of ibv_node_type from verbs.h which has one negative value and is therefore given a signed type of "int":
+enum ibv_node_type { /* line 78 */
+    IBV_NODE_UNKNOWN    = -1,
+    IBV_NODE_CA         = 1,
+    IBV_NODE_SWITCH,
+    IBV_NODE_ROUTER,
+    IBV_NODE_RNIC,
+    IBV_NODE_USNIC,
+    IBV_NODE_USNIC_UDP,
+};
+
+Enumeration defined at /usr/include/infiniband/verbs.h line 78 column 6
+  enum name=ibv_node_type
+  type=int
+    DW_TAG_enumerator name="IBV_NODE_UNKNOWN" value=-1
+    DW_TAG_enumerator name="IBV_NODE_CA" value=1
+    DW_TAG_enumerator name="IBV_NODE_SWITCH" value=2
+    DW_TAG_enumerator name="IBV_NODE_ROUTER" value=3
+    DW_TAG_enumerator name="IBV_NODE_RNIC" value=4
+    DW_TAG_enumerator name="IBV_NODE_USNIC" value=5
+    DW_TAG_enumerator name="IBV_NODE_USNIC_UDP" value=6
+    
