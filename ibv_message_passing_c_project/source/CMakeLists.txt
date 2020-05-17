@@ -17,7 +17,10 @@ else()
 endif()
 
 # Set conditional compilation flags 
-CHECK_STRUCT_HAS_MEMBER ("struct perf_event_mmap_page" cap_user_rdpmc linux/perf_event.h HAVE_PERF_CAP_USER_RDPMC)
+# @todo cap_user_rdpmc is a bit-field and CheckStructHasMember fails to find bit-fields since the C source
+#       used to check the field tries to take the sizeof the field which is illegal for a bit field.
+#       Therefore test for the capabilities field instead which is an integer.
+CHECK_STRUCT_HAS_MEMBER ("struct perf_event_mmap_page" capabilities linux/perf_event.h HAVE_PERF_CAP_USER_RDPMC)
 CHECK_STRUCT_HAS_MEMBER ("struct perf_event_mmap_page" pmc_width linux/perf_event.h HAVE_PERF_PMC_WIDTH)
 if (${HAVE_PERF_CAP_USER_RDPMC})
     add_definitions(-DHAVE_PERF_CAP_USER_RDPMC)
