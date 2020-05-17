@@ -7,4 +7,4 @@ cmake_minimum_required (VERSION 2.8)
 include_directories ("/usr/include/infiniband")
 
 add_executable (ibv_generate_infiniband_test_load "ibv_generate_infiniband_test_load.c")
-target_link_libraries (ibv_generate_infiniband_test_load numa ibverbs ibmad)
+target_link_libraries (ibv_generate_infiniband_test_load numa ibverbs ibmad rt)

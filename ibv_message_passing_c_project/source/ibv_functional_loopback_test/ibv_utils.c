@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include <unistd.h>
+#include <inttypes.h>
 #include <sys/resource.h>
 
 #include <infiniband/verbs.h>
@@ -284,7 +285,7 @@ void display_ibv_device_attributes (const struct ibv_context *const device, cons
 {
     printf ("Attributes of device %s:\n", ibv_get_device_name (device->device));
     printf (" num_comp_vectors=%d fw_ver=%s\n", device->num_comp_vectors, device_attr->fw_ver);
-    printf (" node_guid=0x%llx sys_image_guid=0x%llx\n", device_attr->node_guid, device_attr->sys_image_guid);
+    printf (" node_guid=0x%" PRIx64 " sys_image_guid=0x%" PRIx64 "\n", device_attr->node_guid, device_attr->sys_image_guid);
     printf (" max_mr_size=%lu page_size_cap=%lu vendor_id=0x%x vendor_part_id=0x%x hw_ver=%u\n",
             device_attr->max_mr_size, device_attr->page_size_cap, device_attr->vendor_id, device_attr->vendor_part_id, device_attr->hw_ver);
     printf (" max_qp=%d max_qp_wr=%d max_sge=%d max_sge_rd=%d\n",

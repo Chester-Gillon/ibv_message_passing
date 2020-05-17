@@ -192,11 +192,13 @@ static void initialise_core_frequency_measurement (test_thread_context *const co
         exit (EXIT_FAILURE);
     }
 
+#ifdef HAVE_PERF_CAP_USER_RDPMC
     if (!context->cycle_counter_mmap_page->cap_user_rdpmc)
     {
         fprintf (stderr, "No support for cap_user_rdpmc\n");
         exit (EXIT_FAILURE);
     }
+#endif
     if (context->cycle_counter_mmap_page->index == 0)
     {
         fprintf (stderr, "No performance counter index\n");
@@ -257,7 +259,15 @@ static void schedule_cpu_frequency_sample (test_thread_context *const context)
         {
             cpu_frequency_sample *const sample = &context->cpu_frequency_samples[context->num_cpu_frequency_samples];
             int64_t pmc;
+#ifdef HAVE_PERF_PMC_WIDTH
             const uint16_t pmc_sign_extend_shift = 64 - context->cycle_counter_mmap_page->pmc_width;
+#else
+            /* Have to assume standard Intel 48-bit PMC counters if the Kernel perf versiom doesn't report
+             * the actual width.
+             * Should be valid for Sandy Bridge and Haswell processors. */
+            const uint16_t assumed_pmc_width = 48;
+            const uint16_t pmc_sign_extend_shift = 64 - assumed_pmc_width;
+#endif
 
             rc = clock_gettime (CLOCK_MONOTONIC, &sample->monotonic_time);
             pmc = (int64_t) rdpmc (context->cycle_counter_mmap_page->index - 1u);

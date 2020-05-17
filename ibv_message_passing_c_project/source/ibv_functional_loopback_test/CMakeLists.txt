@@ -12,4 +12,4 @@ add_executable (ibv_functional_loopback_test "ibv_functional_loopback_test_main.
                                              "sender_rdma_write_with_imm_receiver_poll_cq.c"
                                              "sender_send_receiver_recv.c")
 
-target_link_libraries (ibv_functional_loopback_test pthread ibverbs ibmad)
+target_link_libraries (ibv_functional_loopback_test pthread ibverbs ibmad rt)

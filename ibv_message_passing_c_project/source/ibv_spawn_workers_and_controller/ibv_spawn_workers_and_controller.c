@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 #include <limits.h>
 #include <errno.h>
 #include <sys/types.h>

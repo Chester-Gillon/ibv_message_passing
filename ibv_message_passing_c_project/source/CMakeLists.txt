@@ -3,6 +3,8 @@
 project (ibv_message_passing C CXX)
 cmake_minimum_required (VERSION 2.8)
 
+include (CheckStructHasMember)
+
 # Set platform build flags
 if ("${PLATFORM_TYPE}" STREQUAL "Debug")
    set (PLATFORM_CFLAGS "-g")
@@ -12,6 +14,16 @@ elseif ("${PLATFORM_TYPE}" STREQUAL "Coverage")
    set (PLATFORM_CFLAGS "-g --coverage -fprofile-update=atomic --save-temps")
 else()
    message ("Unknown platform")
+endif()
+
+# Set conditional compilation flags 
+CHECK_STRUCT_HAS_MEMBER ("struct perf_event_mmap_page" cap_user_rdpmc linux/perf_event.h HAVE_PERF_CAP_USER_RDPMC)
+CHECK_STRUCT_HAS_MEMBER ("struct perf_event_mmap_page" pmc_width linux/perf_event.h HAVE_PERF_PMC_WIDTH)
+if (${HAVE_PERF_CAP_USER_RDPMC})
+    add_definitions(-DHAVE_PERF_CAP_USER_RDPMC)
+endif()
+if (${HAVE_PERF_PMC_WIDTH})
+    add_definitions(-DHAVE_PERF_PMC_WIDTH)
 endif()
 
 # -fmessage-length=0 is to allow Eclipse traceback for error messages

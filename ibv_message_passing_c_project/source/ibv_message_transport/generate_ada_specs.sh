@@ -15,7 +15,7 @@ WORKSPACE_PATH=$(readlink -f ${SCRIPT_PATH}/../../..)
 
 ADA_SPECS_DIR=${WORKSPACE_PATH}/ibv_message_passing_ada_project/source/ibv_message_transport
 
-GNAT_GPLUSPLUS=/opt/GNAT/2018/bin/g++
+GNAT_GPLUSPLUS=/opt/GNAT/2019/bin/g++
 
 [ -d ${ADA_SPECS_DIR} ] || mkdir ${ADA_SPECS_DIR}
 cd ${ADA_SPECS_DIR}
