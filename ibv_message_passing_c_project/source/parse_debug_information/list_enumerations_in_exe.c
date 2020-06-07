@@ -39,7 +39,8 @@ static void display_enumeration (Dwarf_Die *const cudie, Dwarf_Die *const enum_d
     (void) dwarf_decl_column (enum_die, &column);
     printf ("Enumeration defined at %s line %d column %d\n", dwarf_decl_file (enum_die), line, column);
 
-    /* Display the enum tag, if present. */
+    /* Display the enum tag, if present.
+     * Unlike the typedef, the enum tag is present in the debug information even if it isn't referenced in the code. */
     if (dwarf_attr (enum_die, DW_AT_name, &attr) != NULL)
     {
         printf ("  enum name=%s\n", dwarf_formstring (&attr));
