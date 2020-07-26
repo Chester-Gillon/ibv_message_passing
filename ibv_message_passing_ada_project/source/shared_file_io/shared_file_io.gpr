@@ -1,0 +1,15 @@
+with "../../shared.gpr";
+project Shared_File_Io is
+
+   for Source_Dirs use (".");
+   for Object_Dir use "../../obj/" & Shared.mode & "/shared_file_io";
+   for Main use ("shared_file_io.adb");
+
+   package Compiler renames Shared.Compiler;
+   package Builder renames Shared.Builder;
+   package Linker renames Shared.Linker;
+
+   package Ide is
+   end Ide;
+
+end Shared_File_Io;
