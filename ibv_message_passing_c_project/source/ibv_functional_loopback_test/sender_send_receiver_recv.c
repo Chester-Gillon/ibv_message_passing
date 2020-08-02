@@ -385,9 +385,6 @@ static void ssrr_sender_initialise_message_buffers (ssrr_sender_context *const s
         buffer->send_wr.next = NULL;
         buffer->send_wr.opcode = IBV_WR_SEND;
         buffer->send_wr.send_flags = 0;
-        buffer->send_wr.wr.rdma.rkey = receive_context->receive_mr->rkey;
-        buffer->send_wr.wr.rdma.remote_addr = (uintptr_t) receive_context->receive_mr->addr +
-                offsetof (ssrr_receiver_buffer, receive_messages[buffer_index].header);
 
         /* Set the scatter-gather entry to receive the freed sequence number */
         buffer->freed_buffer_sge.lkey = send_context->send_mr->lkey;
@@ -533,9 +530,6 @@ static void ssrr_receiver_initialise_message_buffers (ssrr_receiver_context *con
         {
             buffer->freed_buffer_wr.send_flags |= IBV_SEND_INLINE;
         }
-        buffer->freed_buffer_wr.wr.rdma.rkey = send_context->send_mr->rkey;
-        buffer->freed_buffer_wr.wr.rdma.remote_addr = (uintptr_t) send_context->send_mr->addr +
-                offsetof (ssrr_sender_buffer, freed_sequence_numbers[buffer_index].sequence_number);
 
         /* Initialise the sequence number management */
         buffer->message_available = false;
