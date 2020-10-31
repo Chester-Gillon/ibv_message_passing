@@ -3,8 +3,14 @@
 project (ibv_pingpong_measurements C)
 cmake_minimum_required (VERSION 2.8)
 
-include_directories ("/usr/include/glib-2.0"
-                     "/usr/lib/x86_64-linux-gnu/glib-2.0/include")
+if (AARCH64_SYSROOT)
+   include_directories("${AARCH64_SYSROOT}/glib-2.0/usr/include/glib-2.0"
+                       "${AARCH64_SYSROOT}/glib-2.0/usr/lib/glib-2.0/include")
+   link_directories("${AARCH64_SYSROOT}/glib-2.0/usr/lib")
+else()
+   include_directories ("/usr/include/glib-2.0"
+                        "/usr/lib/x86_64-linux-gnu/glib-2.0/include")
+endif()
 
 # Can't compile under CentOS 6 as the glib2 version doesn't support the Unix specific functions
 if (EXISTS /usr/include/glib-2.0/glib-unix.h)

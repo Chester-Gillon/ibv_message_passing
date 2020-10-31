@@ -12,8 +12,26 @@ elseif ("${PLATFORM_TYPE}" STREQUAL "release")
    set (PLATFORM_CFLAGS "-O3 -g -flto -fuse-linker-plugin")
 elseif ("${PLATFORM_TYPE}" STREQUAL "coverage")
    set (PLATFORM_CFLAGS "-g --coverage -fprofile-update=atomic --save-temps")
+elseif ("${PLATFORM_TYPE}" STREQUAL "aarch64_debug")
+   set (PLATFORM_CFLAGS "-Werror=poison-system-directories -g")
+elseif ("${PLATFORM_TYPE}" STREQUAL "aarch64_release")
+   set (PLATFORM_CFLAGS "-Werror=poison-system-directories -O3 -g -flto -fuse-linker-plugin")
 else()
    message ("Unknown platform")
+endif()
+
+if (AARCH64_SYSROOT)
+   # Add cross-compiled include and library paths for packages used directly by the source code
+   include_directories("${AARCH64_SYSROOT}/rdma-core/usr/include")
+   link_directories("${AARCH64_SYSROOT}/rdma-core/usr/lib")
+   include_directories("${AARCH64_SYSROOT}/openslp/usr/include")
+   link_directories("${AARCH64_SYSROOT}/openslp/usr/lib")
+   include_directories("${AARCH64_SYSROOT}/numactl/usr/include")
+   link_directories("${AARCH64_SYSROOT}/numactl/usr/lib")
+
+   # Add cross-compiled library paths for packages referenced by libraries above
+   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath-link=${AARCH64_SYSROOT}/libnl/usr/lib")
+   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath-link=${AARCH64_SYSROOT}/libpcre/usr/lib")
 endif()
 
 # Set conditional compilation flags 
