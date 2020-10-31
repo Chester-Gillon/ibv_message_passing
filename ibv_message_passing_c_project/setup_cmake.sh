@@ -8,7 +8,7 @@ WORKSPACE_PATH=$(readlink -f ${SCRIPT_PATH}/..)
 
 GCC_PATH=/opt/GNAT/2019/bin
 
-platforms="Debug Release Coverage"
+platforms="debug release coverage"
 for platform in ${platforms}
 do
    build_dir=${SCRIPT_PATH}/bin/${platform}

@@ -1,17 +1,17 @@
 abstract project Shared is
-   type Mode_Type is ("Debug", "Release", "Coverage");  -- all possible values
-   Mode : Mode_Type := external ("mode", "Debug");      -- a typed variable
+   type Mode_Type is ("debug", "release", "coverage");  -- all possible values
+   Mode : Mode_Type := external ("mode", "debug");      -- a typed variable
    for Source_Files use (); -- no sources
 
    package Compiler is
       case Mode is
-         when "Debug" =>
+         when "debug" =>
             for Switches ("Ada")
                 use ("-g");
-         when "Release" =>
+         when "release" =>
             for Switches ("Ada")
                 use ("-g", "-O2");
-         when "Coverage" =>
+         when "coverage" =>
             for Switches ("Ada")
                 use ("-g", "--coverage", "-fprofile-update=atomic", "-save-temps",
                      -- The following optimisation options are used to reduce the number of branches in the coverage data due to
@@ -29,13 +29,13 @@ abstract project Shared is
 
    package Builder is
       case Mode is
-         when "Debug" =>
+         when "debug" =>
             for Switches ("Ada")
                use ("-g");
-         when "Release" =>
+         when "release" =>
             for Switches ("Ada")
                use ("-g");
-         when "Coverage" =>
+         when "coverage" =>
             for Switches ("Ada")
                use ("-g", "--coverage");
       end case;
@@ -43,13 +43,13 @@ abstract project Shared is
 
    package Linker is
       case Mode is
-         when "Debug" =>
+         when "debug" =>
             for Leading_Switches ("Ada")
                use ();
-         when "Release" =>
+         when "release" =>
             for Leading_Switches ("Ada")
                use ();
-         when "Coverage" =>
+         when "coverage" =>
             for Leading_Switches ("Ada")
                use ("--coverage");
       end case;
