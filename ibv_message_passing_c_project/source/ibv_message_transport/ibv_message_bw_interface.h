@@ -87,6 +87,8 @@ typedef struct
     struct ibv_pd *device_pd;
     /** The attributes for selected_device */
     struct ibv_device_attr device_attributes;
+    /** The number of the selected port */
+    uint8_t port_num;
     /** The attributes for the port on selected_device which is used for transmitting or receiving messages from */
     struct ibv_port_attr port_attributes;
 } ib_port_endpoint;
@@ -108,6 +110,10 @@ typedef struct
     uint32_t qp_num;
     /** true once the Queue Pair is ready to receive */
     int qp_ready_to_receive;
+    /** The GID index to address the memory buffer when using RoCE. -1 means a global address isn't used */
+    int gid_index;
+    /** The GID used to address the memory buffer when using RoCE */
+    union ibv_gid gid;
 } memory_buffer_attributes;
 
 /** Contains the context to use SLP to publish the local Queue Pair information for a communication path, and then obtain

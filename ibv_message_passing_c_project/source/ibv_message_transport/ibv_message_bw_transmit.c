@@ -300,7 +300,13 @@ void message_transmit_attach_remote_pre_rtr (tx_message_context_handle context)
     qp_attr.rq_psn = context->slp_connection.remote_attributes.psn;
     qp_attr.max_dest_rd_atomic = 0;
     qp_attr.min_rnr_timer = 0;
-    qp_attr.ah_attr.is_global = false;
+    qp_attr.ah_attr.is_global = context->slp_connection.remote_attributes.gid_index >= 0;
+    if (qp_attr.ah_attr.is_global)
+    {
+        qp_attr.ah_attr.grh.hop_limit = 1;
+        qp_attr.ah_attr.grh.dgid = context->slp_connection.remote_attributes.gid;
+        qp_attr.ah_attr.grh.sgid_index = context->slp_connection.local_attributes.gid_index;
+    }
     qp_attr.ah_attr.dlid = context->slp_connection.remote_attributes.lid;
     qp_attr.ah_attr.sl = context->path_def.service_level;
     qp_attr.ah_attr.src_path_bits = 0;

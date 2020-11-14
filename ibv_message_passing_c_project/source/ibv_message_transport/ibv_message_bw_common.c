@@ -19,6 +19,7 @@
 
 #include <infiniband/verbs.h>
 #include <slp.h>
+#include <arpa/inet.h>
 
 #include "ibv_message_bw_interface.h"
 
@@ -119,9 +120,10 @@ void open_ib_port_endpoint (ib_port_endpoint *const endpoint, const communicatio
                             const bool is_tx_end)
 {
     const char *const ib_device = is_tx_end ? path_def->source_ib_device : path_def->destination_ib_device;
-    const uint8_t port_num = is_tx_end ? path_def->source_port_num : path_def->destination_port_num;
     int rc;
     int device_index;
+
+    endpoint->port_num = is_tx_end ? path_def->source_port_num : path_def->destination_port_num;
 
     /* Get the available Infiniband devices */
     endpoint->device_list = ibv_get_device_list (&endpoint->num_devices);
@@ -181,13 +183,13 @@ void open_ib_port_endpoint (ib_port_endpoint *const endpoint, const communicatio
     }
 
     /* Check the Infiniband port number is valid, and obtain the port attributes */
-    if ((port_num < 1) || (port_num > endpoint->device_attributes.phys_port_cnt))
+    if ((endpoint->port_num < 1) || (endpoint->port_num > endpoint->device_attributes.phys_port_cnt))
     {
         fprintf (stderr, "Infiniband port %u is out of range for device %s, valid ports are 1..%u\n",
-                 port_num, ib_device, endpoint->device_attributes.phys_port_cnt);
+                 endpoint->port_num, ib_device, endpoint->device_attributes.phys_port_cnt);
         exit (EXIT_FAILURE);
     }
-    rc = ibv_query_port (endpoint->device_context, port_num, &endpoint->port_attributes);
+    rc = ibv_query_port (endpoint->device_context, endpoint->port_num, &endpoint->port_attributes);
     if (rc != 0)
     {
         perror ("ibv_query_port failed");
@@ -263,13 +265,18 @@ static void slp_reg_callback (const SLPHandle handle, const SLPError error_code,
 static void publish_memory_buffer_with_slp (const communication_path_slp_connection *const slp_connection)
 {
     char attributes_text[SLP_ATTRIBUTES_MAX_LEN];
+    char gid[INET6_ADDRSTRLEN];
+    const char *gid_status;
     SLPError slp_status;
     SLPError registration_status;
 
-    sprintf (attributes_text, "(size=%lu,rkey=%u,addr=0x%lx,lid=%u,psn=%u,qp_num=%u,qp_rtr=%d)",
+    gid_status = inet_ntop (AF_INET6, &slp_connection->local_attributes.gid, gid, sizeof (gid));
+    check_assert (gid_status != NULL, "inet_ntop");
+    sprintf (attributes_text, "(size=%lu,rkey=%u,addr=0x%lx,lid=%u,psn=%u,qp_num=%u,qp_rtr=%d,gid_index=%d,gid=%s)",
              slp_connection->local_attributes.size, slp_connection->local_attributes.rkey, slp_connection->local_attributes.addr,
              slp_connection->local_attributes.lid, slp_connection->local_attributes.psn, slp_connection->local_attributes.qp_num,
-             slp_connection->local_attributes.qp_ready_to_receive);
+             slp_connection->local_attributes.qp_ready_to_receive,
+             slp_connection->local_attributes.gid_index, gid);
     slp_status = SLPReg (slp_connection->handle, slp_connection->local_service_url, SLP_LIFETIME_MAXIMUM, NULL, attributes_text,
             SLP_TRUE, slp_reg_callback, &registration_status);
     check_assert (slp_status == SLP_OK, "SLPReg");
@@ -279,7 +286,7 @@ static void publish_memory_buffer_with_slp (const communication_path_slp_connect
 /**
  * @brief Register a memory for transmitting or receiving message with SLP, with attributes which allow the remote end to attach
  * @param[in,out] slp_connection The SLP connection to use for the service URL registration
- * @param[in] endpoint The Infiniband port for the local endpoint, used to publish the LID
+ * @param[in] endpoint The Infiniband port for the local endpoint, used to publish the LID (and the GID for RoCE)
  * @param[in] psn The local initial packet sequence number to publish
  * @param[in] mr The local memory region to publish
  * @param[in] qp The local Queue Pair, to publish the Queue Pair Number
@@ -288,6 +295,32 @@ void register_memory_buffer_with_slp (communication_path_slp_connection *const s
                                       const ib_port_endpoint *const endpoint, const uint32_t psn,
                                       const struct ibv_mr *const mr, const struct ibv_qp *const qp)
 {
+    int rc;
+
+    if (endpoint->port_attributes.link_layer == IBV_LINK_LAYER_ETHERNET)
+    {
+        /* @todo When the link level is Ethernet assume GID index zero is for RoCEv1.
+         *       Support for RoCE was tested on Mellanox Connect-X2 VPI cards which only support RoCEv1.
+         *
+         *       Later versions of rdma-core have ibv_query_gid_type() which could be used to search for a specific RoCE version.
+         *
+         *       There is also /sys/class/infiniband/<device>/ports/<port_number>/gid_attrs/types/<gid_index> which has a string
+         *       for the RoCE version for the GID index on a given index of a port.
+         *       Older Kernels, e.g. 3.10.33-rt32.33.el6rt.x86_64, may not have the gid_attrs files in which only RoCEv1
+         *       is supported.
+         */
+        slp_connection->local_attributes.gid_index = 0;
+        rc = ibv_query_gid (endpoint->device_context, endpoint->port_num, slp_connection->local_attributes.gid_index,
+                &slp_connection->local_attributes.gid);
+        check_assert (rc == 0, "ibv_query_gid");
+    }
+    else
+    {
+        /* For Infiniband mark the GID as invalid, so only the LID is used */
+        slp_connection->local_attributes.gid_index = -1;
+        memset (&slp_connection->local_attributes.gid, 0, sizeof (slp_connection->local_attributes.gid));
+    }
+
     slp_connection->local_attributes.size = mr->length;
     slp_connection->local_attributes.rkey = mr->rkey;
     slp_connection->local_attributes.addr = (uintptr_t) mr->addr;
@@ -349,16 +382,24 @@ static SLPBoolean slp_service_attributes_callback (const SLPHandle handle, const
                                                    const SLPError error_code, void *const cookie)
 {
     communication_path_slp_connection *const slp_connection = (communication_path_slp_connection *) cookie;
+    char gid[INET6_ADDRSTRLEN];
+    int rc;
 
     if ((error_code == SLP_OK) && (!slp_connection->remote_attributes_obtained))
     {
-        const int num_items = sscanf (attributes, "(size=%lu,rkey=%u,addr=0x%lx,lid=%hu,psn=%u,qp_num=%u,qp_rtr=%d)",
+        const int num_items = sscanf (attributes, "(size=%lu,rkey=%u,addr=0x%lx,lid=%hu,psn=%u,qp_num=%u,qp_rtr=%d,gid_index=%d,gid=%[^,)])",
                 &slp_connection->remote_attributes.size, &slp_connection->remote_attributes.rkey,
                 &slp_connection->remote_attributes.addr, &slp_connection->remote_attributes.lid,
                 &slp_connection->remote_attributes.psn, &slp_connection->remote_attributes.qp_num,
-                &slp_connection->remote_attributes.qp_ready_to_receive);
+                &slp_connection->remote_attributes.qp_ready_to_receive,
+                &slp_connection->remote_attributes.gid_index, gid);
 
-        slp_connection->remote_attributes_obtained = num_items == 7;
+        slp_connection->remote_attributes_obtained = num_items == 9;
+        if (slp_connection->remote_attributes_obtained)
+        {
+            rc = inet_pton (AF_INET6, gid, &slp_connection->remote_attributes.gid);
+            slp_connection->remote_attributes_obtained = rc == 1;
+        }
     }
 
     /* Only request further data if haven't extracted the required attributes */
