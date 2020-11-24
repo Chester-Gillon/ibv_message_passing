@@ -106,6 +106,7 @@ procedure Ibv_Ada_Structure_Size is
       print_struct_field (struct_name, "device_attributes.max_pkeys", endpoint.device_attributes.max_pkeys'Size, offset + endpoint.device_attributes.max_pkeys'Position);
       print_struct_field (struct_name, "device_attributes.local_ca_ack_delay", endpoint.device_attributes.local_ca_ack_delay'Size, offset + endpoint.device_attributes.local_ca_ack_delay'Position);
       print_struct_field (struct_name, "device_attributes.phys_port_cnt", endpoint.device_attributes.phys_port_cnt'Size, offset + endpoint.device_attributes.phys_port_cnt'Position);
+      print_struct_field (struct_name, "port_num", endpoint.port_num'Size, endpoint.port_num'Position);
       print_struct_field (struct_name, "port_attributes", endpoint.port_attributes'Size, endpoint.port_attributes'Position);
       offset := endpoint.port_attributes'Position;
       print_struct_field (struct_name, "port_attributes.state", endpoint.port_attributes.state'Size, offset + endpoint.port_attributes.state'Position);
@@ -143,6 +144,8 @@ procedure Ibv_Ada_Structure_Size is
       print_struct_field (struct_name, "psn", buffer.psn'Size, buffer.psn'Position);
       print_struct_field (struct_name, "qp_num", buffer.qp_num'Size, buffer.qp_num'Position);
       print_struct_field (struct_name, "qp_ready_to_receive", buffer.qp_ready_to_receive'Size, buffer.qp_ready_to_receive'Position);
+      print_struct_field (struct_name, "gid_index", buffer.gid_index'Size, buffer.gid_index'Position);
+      print_struct_field (struct_name, "gid", buffer.gid'Size, buffer.gid'Position);
    end report_memory_buffer_attributes;
 
    procedure report_communication_path_slp_connection is
@@ -165,6 +168,8 @@ procedure Ibv_Ada_Structure_Size is
       print_struct_field (struct_name, "local_attributes.psn", slp_connection.local_attributes.psn'Size, offset + slp_connection.local_attributes.psn'Position);
       print_struct_field (struct_name, "local_attributes.qp_num", slp_connection.local_attributes.qp_num'Size, offset + slp_connection.local_attributes.qp_num'Position);
       print_struct_field (struct_name, "local_attributes.qp_ready_to_receive", slp_connection.local_attributes.qp_ready_to_receive'Size, offset + slp_connection.local_attributes.qp_ready_to_receive'Position);
+      print_struct_field (struct_name, "local_attributes.gid_index", slp_connection.local_attributes.gid_index'Size, offset + slp_connection.local_attributes.gid_index'Position);
+      print_struct_field (struct_name, "local_attributes.gid", slp_connection.local_attributes.gid'Size, offset + slp_connection.local_attributes.gid'Position);
       print_struct_field (struct_name, "remote_attributes", slp_connection.remote_attributes'Size, slp_connection.remote_attributes'Position);
       offset := slp_connection.remote_attributes'Position;
       print_struct_field (struct_name, "remote_attributes.size", slp_connection.remote_attributes.size'Size, offset + slp_connection.remote_attributes.size'Position);
@@ -174,6 +179,8 @@ procedure Ibv_Ada_Structure_Size is
       print_struct_field (struct_name, "remote_attributes.psn", slp_connection.remote_attributes.psn'Size, offset + slp_connection.remote_attributes.psn'Position);
       print_struct_field (struct_name, "remote_attributes.qp_num", slp_connection.remote_attributes.qp_num'Size, offset + slp_connection.remote_attributes.qp_num'Position);
       print_struct_field (struct_name, "remote_attributes.qp_ready_to_receive", slp_connection.remote_attributes.qp_ready_to_receive'Size, offset + slp_connection.remote_attributes.qp_ready_to_receive'Position);
+      print_struct_field (struct_name, "remote_attributes.gid_index", slp_connection.remote_attributes.gid_index'Size, offset + slp_connection.remote_attributes.gid_index'Position);
+      print_struct_field (struct_name, "remote_attributes.gid", slp_connection.remote_attributes.gid'Size, offset + slp_connection.remote_attributes.gid'Position);
    end report_communication_path_slp_connection;
 
    procedure report_memory_buffer is

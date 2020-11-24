@@ -91,6 +91,7 @@ int main (int argc, char *argv[])
     PRINT_STRUCT_FIELD (ib_port_endpoint, device_attributes.max_pkeys);
     PRINT_STRUCT_FIELD (ib_port_endpoint, device_attributes.local_ca_ack_delay);
     PRINT_STRUCT_FIELD (ib_port_endpoint, device_attributes.phys_port_cnt);
+    PRINT_STRUCT_FIELD (ib_port_endpoint, port_num);
     PRINT_STRUCT_FIELD (ib_port_endpoint, port_attributes);
     PRINT_STRUCT_FIELD (ib_port_endpoint, port_attributes.state);
     PRINT_STRUCT_FIELD (ib_port_endpoint, port_attributes.max_mtu);
@@ -122,6 +123,8 @@ int main (int argc, char *argv[])
     PRINT_STRUCT_FIELD (memory_buffer_attributes, psn);
     PRINT_STRUCT_FIELD (memory_buffer_attributes, qp_num);
     PRINT_STRUCT_FIELD (memory_buffer_attributes, qp_ready_to_receive);
+    PRINT_STRUCT_FIELD (memory_buffer_attributes, gid_index);
+    PRINT_STRUCT_FIELD (memory_buffer_attributes, gid);
 
     PRINT_STRUCT_SIZE (communication_path_slp_connection);
     PRINT_STRUCT_FIELD (communication_path_slp_connection, handle);
@@ -137,6 +140,8 @@ int main (int argc, char *argv[])
     PRINT_STRUCT_FIELD (communication_path_slp_connection, local_attributes.psn);
     PRINT_STRUCT_FIELD (communication_path_slp_connection, local_attributes.qp_num);
     PRINT_STRUCT_FIELD (communication_path_slp_connection, local_attributes.qp_ready_to_receive);
+    PRINT_STRUCT_FIELD (communication_path_slp_connection, local_attributes.gid_index);
+    PRINT_STRUCT_FIELD (communication_path_slp_connection, local_attributes.gid);
     PRINT_STRUCT_FIELD (communication_path_slp_connection, remote_attributes);
     PRINT_STRUCT_FIELD (communication_path_slp_connection, remote_attributes.size);
     PRINT_STRUCT_FIELD (communication_path_slp_connection, remote_attributes.addr);
@@ -145,6 +150,8 @@ int main (int argc, char *argv[])
     PRINT_STRUCT_FIELD (communication_path_slp_connection, remote_attributes.psn);
     PRINT_STRUCT_FIELD (communication_path_slp_connection, remote_attributes.qp_num);
     PRINT_STRUCT_FIELD (communication_path_slp_connection, remote_attributes.qp_ready_to_receive);
+    PRINT_STRUCT_FIELD (communication_path_slp_connection, remote_attributes.gid_index);
+    PRINT_STRUCT_FIELD (communication_path_slp_connection, remote_attributes.gid);
 
     PRINT_STRUCT_SIZE (memory_buffer);
     PRINT_STRUCT_FIELD (memory_buffer, allocation_type);
