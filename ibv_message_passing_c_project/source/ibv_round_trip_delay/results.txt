@@ -1,0 +1,624 @@
+== Tests over 1Gb motherboard Ethernet ==
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_server --cores=1
+TCP server 0 accepted connection from client 192.168.0.118:33884
+thread 0 59123 messages over last 10.0 seconds
+thread 0 59101 messages over last 10.0 seconds
+thread 0 59108 messages over last 10.0 seconds
+
+0 Total messages 189332 over 32.028355 seconds; 5911 messages/second
+0 minor page faults=0 (2 -> 2)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (2 -> 2)
+0 involuntary context switches=47242 (2 -> 47244)
+0 user time=2.745000 system time=29.153000
+
+mr_halfword@Haswell-Ubuntu:~/ibv_message_passing/ibv_message_passing_c_project/bin/release$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_client --cores=1 --tcp-server-ip=192.168.0.116
+TCP client 0 connected
+Press Ctrl-C to tell the 1 client thread(s) to stop the test
+thread 0 59123 messages over last 10.0 seconds
+thread 0 59100 messages over last 10.0 seconds
+thread 0 59107 messages over last 10.0 seconds
+^C
+0 Total messages 189332 over 32.028732 seconds; 5911 messages/second
+0 minor page faults=0 (33 -> 33)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (1 -> 1)
+0 involuntary context switches=11 (0 -> 11)
+0 user time=17.755439 system time=14.271621
+
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_server --cores=1,2
+TCP server 0 accepted connection from client 192.168.0.118:33888
+TCP server 1 accepted connection from client 192.168.0.118:49666
+thread 0 59156 messages over last 10.0 seconds
+thread 1 59155 messages over last 10.0 seconds
+thread 0 59213 messages over last 10.0 seconds
+thread 1 59213 messages over last 10.0 seconds
+
+0 Total messages 123106 over 20.800303 seconds; 5918 messages/second
+0 minor page faults=0 (2 -> 2)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (4 -> 4)
+0 involuntary context switches=43220 (2 -> 43222)
+0 user time=1.750000 system time=18.840000
+
+1 Total messages 123105 over 20.800300 seconds; 5918 messages/second
+1 minor page faults=0 (1 -> 1)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (8 -> 8)
+1 involuntary context switches=25268 (2 -> 25270)
+1 user time=1.792000 system time=18.950000
+
+mr_halfword@Haswell-Ubuntu:~/ibv_message_passing/ibv_message_passing_c_project/bin/release$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_client --cores=1,2 --tcp-server-ip=192.168.0.116
+TCP client 1 connected
+TCP client 0 connected
+Press Ctrl-C to tell the 2 client thread(s) to stop the test
+thread 0 59156 messages over last 10.0 seconds
+thread 1 59155 messages over last 10.0 seconds
+thread 0 59213 messages over last 10.0 seconds
+thread 1 59213 messages over last 10.0 seconds
+^C
+0 Total messages 123106 over 20.800534 seconds; 5918 messages/second
+0 minor page faults=0 (33 -> 33)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (2 -> 2)
+0 involuntary context switches=14 (0 -> 14)
+0 user time=11.578903 system time=9.219197
+
+1 Total messages 123105 over 20.800455 seconds; 5918 messages/second
+1 minor page faults=0 (33 -> 33)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (2 -> 2)
+1 involuntary context switches=13 (0 -> 13)
+1 user time=11.266148 system time=9.531328
+
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_server --cores=1,2
+TCP server 0 accepted connection from client 192.168.0.118:33888
+TCP server 1 accepted connection from client 192.168.0.118:49666
+thread 0 59156 messages over last 10.0 seconds
+thread 1 59155 messages over last 10.0 seconds
+thread 0 59213 messages over last 10.0 seconds
+thread 1 59213 messages over last 10.0 seconds
+
+0 Total messages 123106 over 20.800303 seconds; 5918 messages/second
+0 minor page faults=0 (2 -> 2)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (4 -> 4)
+0 involuntary context switches=43220 (2 -> 43222)
+0 user time=1.750000 system time=18.840000
+
+1 Total messages 123105 over 20.800300 seconds; 5918 messages/second
+1 minor page faults=0 (1 -> 1)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (8 -> 8)
+1 involuntary context switches=25268 (2 -> 25270)
+1 user time=1.792000 system time=18.950000
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_server --cores=1,2,3
+TCP server 0 accepted connection from client 192.168.0.118:33900
+TCP server 1 accepted connection from client 192.168.0.118:49678
+TCP server 2 accepted connection from client 192.168.0.118:48224
+thread 0 59198 messages over last 10.0 seconds
+thread 1 59198 messages over last 10.0 seconds
+thread 2 59199 messages over last 10.0 seconds
+thread 0 59176 messages over last 10.0 seconds
+thread 1 59176 messages over last 10.0 seconds
+thread 2 59175 messages over last 10.0 seconds
+thread 0 59140 messages over last 10.0 seconds
+thread 1 59140 messages over last 10.0 seconds
+thread 2 59140 messages over last 10.0 seconds
+
+0 Total messages 183400 over 30.994276 seconds; 5917 messages/second
+0 minor page faults=0 (2 -> 2)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (2 -> 2)
+0 involuntary context switches=230837 (9 -> 230846)
+0 user time=2.413000 system time=26.576000
+
+1 Total messages 183400 over 30.994269 seconds; 5917 messages/second
+1 minor page faults=0 (1 -> 1)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (2 -> 2)
+1 involuntary context switches=159369 (7 -> 159376)
+1 user time=2.466000 system time=27.233000
+
+2 Total messages 183400 over 30.994267 seconds; 5917 messages/second
+2 minor page faults=0 (1 -> 1)
+2 major page faults=0 (0 -> 0)
+2 voluntary context switches=0 (1 -> 1)
+2 involuntary context switches=62391 (9 -> 62400)
+2 user time=2.593000 system time=28.062000
+
+mr_halfword@Haswell-Ubuntu:~/ibv_message_passing/ibv_message_passing_c_project/bin/release$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_client --cores=1,2,3 --tcp-server-ip=192.168.0.116
+TCP client 0 connected
+TCP client 1 connected
+TCP client 2 connected
+Press Ctrl-C to tell the 3 client thread(s) to stop the test
+thread 0 59197 messages over last 10.0 seconds
+thread 1 59198 messages over last 10.0 seconds
+thread 2 59198 messages over last 10.0 seconds
+thread 0 59176 messages over last 10.0 seconds
+thread 1 59175 messages over last 10.0 seconds
+thread 2 59175 messages over last 10.0 seconds
+thread 0 59140 messages over last 10.0 seconds
+thread 1 59140 messages over last 10.0 seconds
+thread 2 59140 messages over last 10.0 seconds
+^C
+0 Total messages 183400 over 30.994600 seconds; 5917 messages/second
+0 minor page faults=0 (33 -> 33)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (2 -> 2)
+0 involuntary context switches=20 (0 -> 20)
+0 user time=16.944523 system time=14.046689
+
+1 Total messages 183400 over 30.994574 seconds; 5917 messages/second
+1 minor page faults=0 (33 -> 33)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (3 -> 3)
+1 involuntary context switches=27 (1 -> 28)
+1 user time=17.019000 system time=13.972189
+
+2 Total messages 183400 over 30.994606 seconds; 5917 messages/second
+2 minor page faults=0 (33 -> 33)
+2 major page faults=0 (0 -> 0)
+2 voluntary context switches=0 (2 -> 2)
+2 involuntary context switches=31 (0 -> 31)
+2 user time=17.350364 system time=13.641531
+
+
+== Tests over 10Gb MHQH29C-XTR Ethernet ==
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_server --cores=1
+TCP server 0 accepted connection from client 192.169.0.3:35600
+thread 0 463492 messages over last 10.0 seconds
+thread 0 467469 messages over last 10.0 seconds
+thread 0 471837 messages over last 10.0 seconds
+
+0 Total messages 1436952 over 30.732835 seconds; 46756 messages/second
+0 minor page faults=0 (2 -> 2)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=3 (2 -> 5)
+0 involuntary context switches=152657 (4 -> 152661)
+0 user time=2.130000 system time=28.184000
+
+mr_halfword@Haswell-Ubuntu:~/ibv_message_passing/ibv_message_passing_c_project/bin/release$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_client --cores=1 --tcp-server-ip=192.169.0.1
+TCP client 0 connected
+Press Ctrl-C to tell the 1 client thread(s) to stop the test
+thread 0 463492 messages over last 10.0 seconds
+thread 0 467464 messages over last 10.0 seconds
+thread 0 471832 messages over last 10.0 seconds
+^C
+0 Total messages 1436952 over 30.733156 seconds; 46756 messages/second
+0 minor page faults=0 (33 -> 33)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (1 -> 1)
+0 involuntary context switches=9 (0 -> 9)
+0 user time=13.767224 system time=16.963185
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_server --cores=1,2
+TCP server 0 accepted connection from client 192.169.0.3:35602
+TCP server 1 accepted connection from client 192.169.0.3:36798
+thread 0 438404 messages over last 10.0 seconds
+thread 1 419202 messages over last 10.0 seconds
+thread 0 440496 messages over last 10.0 seconds
+thread 1 440781 messages over last 10.0 seconds
+thread 0 440156 messages over last 10.0 seconds
+thread 1 442004 messages over last 10.0 seconds
+
+0 Total messages 1387603 over 31.583733 seconds; 43934 messages/second
+0 minor page faults=0 (2 -> 2)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=11 (2 -> 13)
+0 involuntary context switches=866123 (12 -> 866135)
+0 user time=1.863000 system time=25.368000
+
+1 Total messages 1369546 over 31.583730 seconds; 43362 messages/second
+1 minor page faults=0 (1 -> 1)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=18 (1 -> 19)
+1 involuntary context switches=668749 (2 -> 668751)
+1 user time=1.929000 system time=26.469000
+
+mr_halfword@Haswell-Ubuntu:~/ibv_message_passing/ibv_message_passing_c_project/bin/release$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_client --cores=1,2 --tcp-server-ip=192.169.0.1
+TCP client 0 connected
+TCP client 1 connected
+Press Ctrl-C to tell the 2 client thread(s) to stop the test
+thread 0 438405 messages over last 10.0 seconds
+thread 1 419203 messages over last 10.0 seconds
+thread 0 440490 messages over last 10.0 seconds
+thread 1 440776 messages over last 10.0 seconds
+thread 0 440153 messages over last 10.0 seconds
+thread 1 442000 messages over last 10.0 seconds
+^C
+0 Total messages 1387603 over 31.584002 seconds; 43934 messages/second
+0 minor page faults=0 (33 -> 33)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (2 -> 2)
+0 involuntary context switches=481 (0 -> 481)
+0 user time=14.203084 system time=17.356962
+
+1 Total messages 1369546 over 31.584025 seconds; 43362 messages/second
+1 minor page faults=0 (33 -> 33)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (2 -> 2)
+1 involuntary context switches=14 (0 -> 14)
+1 user time=13.914589 system time=17.666310
+
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_server --cores=1,2,3
+TCP server 0 accepted connection from client 192.169.0.3:35608
+TCP server 1 accepted connection from client 192.169.0.3:36804
+TCP server 2 accepted connection from client 192.169.0.3:46192
+thread 0 355709 messages over last 10.0 seconds
+thread 1 358694 messages over last 10.0 seconds
+thread 2 461842 messages over last 10.0 seconds
+thread 0 358688 messages over last 10.0 seconds
+thread 1 357458 messages over last 10.0 seconds
+thread 2 465488 messages over last 10.0 seconds
+thread 0 360664 messages over last 10.0 seconds
+thread 1 361492 messages over last 10.0 seconds
+thread 2 447022 messages over last 10.0 seconds
+
+0 Total messages 1132894 over 31.595805 seconds; 35856 messages/second
+0 minor page faults=0 (2 -> 2)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=73 (2 -> 75)
+0 involuntary context switches=1353222 (6 -> 1353228)
+0 user time=1.625000 system time=22.823000
+
+1 Total messages 1135163 over 31.595802 seconds; 35928 messages/second
+1 minor page faults=0 (1 -> 1)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=80 (4 -> 84)
+1 involuntary context switches=1150244 (2 -> 1150246)
+1 user time=1.723000 system time=23.233000
+
+2 Total messages 1445761 over 31.595804 seconds; 45758 messages/second
+2 minor page faults=0 (1 -> 1)
+2 major page faults=0 (0 -> 0)
+2 voluntary context switches=75 (4 -> 79)
+2 involuntary context switches=848289 (1 -> 848290)
+2 user time=1.795000 system time=25.012000
+
+mr_halfword@Haswell-Ubuntu:~/ibv_message_passing/ibv_message_passing_c_project/bin/release$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_client --cores=1,2,3 --tcp-server-ip=192.169.0.1
+TCP client 0 connected
+TCP client 1 connected
+TCP client 2 connected
+Press Ctrl-C to tell the 3 client thread(s) to stop the test
+thread 0 355707 messages over last 10.0 seconds
+thread 1 358689 messages over last 10.0 seconds
+thread 2 461836 messages over last 10.0 seconds
+thread 0 358684 messages over last 10.0 seconds
+thread 1 357456 messages over last 10.0 seconds
+thread 2 465488 messages over last 10.0 seconds
+thread 0 360662 messages over last 10.0 seconds
+thread 1 361489 messages over last 10.0 seconds
+thread 2 447015 messages over last 10.0 seconds
+^C
+0 Total messages 1132894 over 31.596117 seconds; 35855 messages/second
+0 minor page faults=0 (33 -> 33)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (2 -> 2)
+0 involuntary context switches=2510 (0 -> 2510)
+0 user time=13.291974 system time=18.197667
+
+1 Total messages 1135163 over 31.596114 seconds; 35927 messages/second
+1 minor page faults=0 (33 -> 33)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (2 -> 2)
+1 involuntary context switches=14 (0 -> 14)
+1 user time=13.826081 system time=17.766144
+
+2 Total messages 1445761 over 31.596131 seconds; 45758 messages/second
+2 minor page faults=0 (33 -> 33)
+2 major page faults=0 (0 -> 0)
+2 voluntary context switches=0 (2 -> 2)
+2 involuntary context switches=385 (0 -> 385)
+2 user time=14.465817 system time=17.125790
+
+
+== Tests over 10Gb MHQH29C-XTR RoCEv1 RDMA ==
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_server --cores=1 --ib-dev=mlx4_0 --ib-port=1
+RDMA server 0 connected
+thread 0 2602870 messages over last 10.0 seconds
+thread 0 2603824 messages over last 10.0 seconds
+thread 0 2609705 messages over last 10.0 seconds
+
+0 Total messages 8038091 over 30.852943 seconds; 260529 messages/second
+0 minor page faults=0 (238 -> 238)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (92 -> 92)
+0 involuntary context switches=31099 (9 -> 31108)
+0 user time=30.830000 system time=0.000000
+
+mr_halfword@Haswell-Ubuntu:~/ibv_message_passing/ibv_message_passing_c_project/bin/release$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_client --cores=1 --ib-dev=mlx4_0 --ib-port=1
+RDMA client 0 connected
+Press Ctrl-C to tell the 1 client thread(s) to stop the test
+thread 0 2602867 messages over last 10.0 seconds
+thread 0 2603795 messages over last 10.0 seconds
+thread 0 2609674 messages over last 10.0 seconds
+^C
+0 Total messages 8038091 over 30.853284 seconds; 260526 messages/second
+0 minor page faults=0 (124 -> 124)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (34 -> 34)
+0 involuntary context switches=2372 (17 -> 2389)
+0 user time=30.705768 system time=0.052009
+
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_server --cores=1,2 --ib-dev=mlx4_0 --ib-port=1
+RDMA server 0 connected
+RDMA server 1 connected
+thread 0 2584358 messages over last 10.0 seconds
+thread 1 2598246 messages over last 10.0 seconds
+thread 0 2587153 messages over last 10.0 seconds
+thread 1 2601983 messages over last 10.0 seconds
+thread 0 2596549 messages over last 10.0 seconds
+thread 1 2604295 messages over last 10.0 seconds
+
+0 Total messages 8200240 over 31.669714 seconds; 258930 messages/second
+0 minor page faults=0 (232 -> 232)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (69 -> 69)
+0 involuntary context switches=31982 (80 -> 32062)
+0 user time=31.647000 system time=0.000000
+
+1 Total messages 8239149 over 31.669716 seconds; 260159 messages/second
+1 minor page faults=0 (66 -> 66)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (89 -> 89)
+1 involuntary context switches=31743 (5 -> 31748)
+1 user time=31.646000 system time=0.000000
+
+mr_halfword@Haswell-Ubuntu:~/ibv_message_passing/ibv_message_passing_c_project/bin/release$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_client --cores=1,2 --ib-dev=mlx4_0 --ib-port=1
+RDMA client 0 connected
+RDMA client 1 connected
+Press Ctrl-C to tell the 2 client thread(s) to stop the test
+thread 0 2584353 messages over last 10.0 seconds
+thread 1 2598247 messages over last 10.0 seconds
+thread 0 2587125 messages over last 10.0 seconds
+thread 1 2601955 messages over last 10.0 seconds
+thread 0 2596519 messages over last 10.0 seconds
+thread 1 2604266 messages over last 10.0 seconds
+^C
+0 Total messages 8200240 over 31.670030 seconds; 258927 messages/second
+0 minor page faults=0 (78 -> 78)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (44 -> 44)
+0 involuntary context switches=2433 (0 -> 2433)
+0 user time=31.522230 system time=0.043971
+
+1 Total messages 8239149 over 31.670066 seconds; 260156 messages/second
+1 minor page faults=0 (124 -> 124)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (38 -> 38)
+1 involuntary context switches=10 (1 -> 11)
+1 user time=31.667926 system time=0.000042
+
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_server --cores=1,2,3 --ib-dev=mlx4_0 --ib-port=1
+RDMA server 1 connected
+RDMA server 2 connected
+RDMA server 0 connected
+thread 0 2379439 messages over last 10.0 seconds
+thread 1 2393206 messages over last 10.0 seconds
+thread 2 2394038 messages over last 10.0 seconds
+thread 0 2380271 messages over last 10.0 seconds
+thread 1 2394376 messages over last 10.0 seconds
+thread 2 2395176 messages over last 10.0 seconds
+thread 0 2386332 messages over last 10.0 seconds
+thread 1 2394369 messages over last 10.0 seconds
+thread 2 2395202 messages over last 10.0 seconds
+
+0 Total messages 7310849 over 30.691914 seconds; 238201 messages/second
+0 minor page faults=0 (237 -> 237)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (82 -> 82)
+0 involuntary context switches=31057 (29 -> 31086)
+0 user time=30.668000 system time=0.000000
+
+1 Total messages 7347683 over 30.691908 seconds; 239401 messages/second
+1 minor page faults=0 (61 -> 61)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (76 -> 76)
+1 involuntary context switches=30780 (52 -> 30832)
+1 user time=30.670000 system time=0.000000
+
+2 Total messages 7350217 over 30.691913 seconds; 239484 messages/second
+2 minor page faults=0 (60 -> 60)
+2 major page faults=0 (0 -> 0)
+2 voluntary context switches=0 (83 -> 83)
+2 involuntary context switches=30789 (49 -> 30838)
+2 user time=30.666000 system time=0.000000
+
+mr_halfword@Haswell-Ubuntu:~/ibv_message_passing/ibv_message_passing_c_project/bin/release$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_client --cores=1,2,3 --ib-dev=mlx4_0 --ib-port=1
+RDMA client 1 connected
+RDMA client 2 connected
+RDMA client 0 connected
+Press Ctrl-C to tell the 3 client thread(s) to stop the test
+thread 0 2379434 messages over last 10.0 seconds
+thread 1 2393207 messages over last 10.0 seconds
+thread 2 2394039 messages over last 10.0 seconds
+thread 0 2380245 messages over last 10.0 seconds
+thread 1 2394349 messages over last 10.0 seconds
+thread 2 2395150 messages over last 10.0 seconds
+thread 0 2386307 messages over last 10.0 seconds
+thread 1 2394344 messages over last 10.0 seconds
+thread 2 2395177 messages over last 10.0 seconds
+^C
+0 Total messages 7310849 over 30.692249 seconds; 238199 messages/second
+0 minor page faults=0 (126 -> 126)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (39 -> 39)
+0 involuntary context switches=2353 (1 -> 2354)
+0 user time=30.543384 system time=0.053595
+
+1 Total messages 7347683 over 30.692223 seconds; 239399 messages/second
+1 minor page faults=0 (78 -> 78)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (55 -> 55)
+1 involuntary context switches=11 (0 -> 11)
+1 user time=30.692184 system time=0.000000
+
+2 Total messages 7350217 over 30.692210 seconds; 239482 messages/second
+2 minor page faults=0 (78 -> 78)
+2 major page faults=0 (0 -> 0)
+2 voluntary context switches=0 (63 -> 63)
+2 involuntary context switches=10 (0 -> 10)
+2 user time=30.688310 system time=0.000000
+
+
+== Tests over 40Gb MHQH29C-XTR Infiniband RDMA ==
+
+[mr_halfword@sandy-centos ~]$ cd ibv_message_passing/ibv_message_passing_c_project/bin/release/
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_server --cores=1 --ib-dev=mlx4_0 --ib-port=1
+RDMA server 0 connected
+thread 0 2972649 messages over last 10.0 seconds
+thread 0 2973131 messages over last 10.0 seconds
+thread 0 2973973 messages over last 10.0 seconds
+
+0 Total messages 9525389 over 32.037788 seconds; 297317 messages/second
+0 minor page faults=0 (238 -> 238)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (65 -> 65)
+0 involuntary context switches=32086 (5 -> 32091)
+0 user time=32.015000 system time=0.000000
+
+mr_halfword@Haswell-Ubuntu:~/ibv_message_passing/ibv_message_passing_c_project/b
+in/release$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_client --cores=1 --ib-dev=mlx4_0 --ib-port=1
+RDMA client 0 connected
+Press Ctrl-C to tell the 1 client thread(s) to stop the test
+thread 0 2972643 messages over last 10.0 seconds
+thread 0 2973097 messages over last 10.0 seconds
+thread 0 2973938 messages over last 10.0 seconds
+^C
+0 Total messages 9525389 over 32.038151 seconds; 297314 messages/second
+0 minor page faults=0 (174 -> 174)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (96 -> 96)
+0 involuntary context switches=13 (0 -> 13)
+0 user time=32.035926 system time=0.000015
+
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_server --cores=1,2 --ib-dev=mlx4_0 --ib-port=1
+RDMA server 1 connected
+RDMA server 0 connected
+thread 0 2999693 messages over last 10.0 seconds
+thread 1 3000389 messages over last 10.0 seconds
+thread 0 3004388 messages over last 10.0 seconds
+thread 1 3005095 messages over last 10.0 seconds
+thread 0 3004363 messages over last 10.0 seconds
+thread 1 3005229 messages over last 10.0 seconds
+
+0 Total messages 9463182 over 31.516036 seconds; 300266 messages/second
+0 minor page faults=0 (237 -> 237)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (76 -> 76)
+0 involuntary context switches=31573 (1 -> 31574)
+0 user time=31.493000 system time=0.000000
+
+1 Total messages 9465582 over 31.516038 seconds; 300342 messages/second
+1 minor page faults=0 (61 -> 61)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (52 -> 52)
+1 involuntary context switches=31533 (50 -> 31583)
+1 user time=31.491000 system time=0.000000
+
+mr_halfword@Haswell-Ubuntu:~/ibv_message_passing/ibv_message_passing_c_project/bin/release$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_client --cores=1,2 --ib-dev=mlx4_0 --ib-port=1
+RDMA client 1 connected
+RDMA client 0 connected
+Press Ctrl-C to tell the 2 client thread(s) to stop the test
+thread 0 2999685 messages over last 10.0 seconds
+thread 1 3000388 messages over last 10.0 seconds
+thread 0 3004356 messages over last 10.0 seconds
+thread 1 3005061 messages over last 10.0 seconds
+thread 0 3004329 messages over last 10.0 seconds
+thread 1 3005194 messages over last 10.0 seconds
+^C
+0 Total messages 9463182 over 31.516382 seconds; 300262 messages/second
+0 minor page faults=0 (124 -> 124)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (48 -> 48)
+0 involuntary context switches=12 (0 -> 12)
+0 user time=31.515947 system time=0.000000
+
+1 Total messages 9465582 over 31.516351 seconds; 300339 messages/second
+1 minor page faults=0 (78 -> 78)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (56 -> 56)
+1 involuntary context switches=9 (0 -> 9)
+1 user time=31.513411 system time=0.000000
+
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_server --cores=1,2,3 --ib-dev=mlx4_0 --ib-port=1
+RDMA server 2 connected
+RDMA server 1 connected
+RDMA server 0 connected
+thread 0 2786789 messages over last 10.0 seconds
+thread 1 2786872 messages over last 10.0 seconds
+thread 2 2786947 messages over last 10.0 seconds
+thread 0 2788047 messages over last 10.0 seconds
+thread 1 2788482 messages over last 10.0 seconds
+thread 2 2788233 messages over last 10.0 seconds
+thread 0 2790298 messages over last 10.0 seconds
+thread 1 2790629 messages over last 10.0 seconds
+thread 2 2790479 messages over last 10.0 seconds
+
+0 Total messages 8571749 over 30.741748 seconds; 278831 messages/second
+0 minor page faults=0 (237 -> 237)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (85 -> 85)
+0 involuntary context switches=30826 (5 -> 30831)
+0 user time=30.718000 system time=0.000000
+
+1 Total messages 8572593 over 30.741743 seconds; 278858 messages/second
+1 minor page faults=0 (60 -> 60)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (86 -> 86)
+1 involuntary context switches=30837 (100 -> 30937)
+1 user time=30.717000 system time=0.000000
+
+2 Total messages 8572273 over 30.741747 seconds; 278848 messages/second
+2 minor page faults=0 (61 -> 61)
+2 major page faults=0 (0 -> 0)
+2 voluntary context switches=0 (92 -> 92)
+2 involuntary context switches=30780 (97 -> 30877)
+2 user time=30.718000 system time=0.000000
+
+mr_halfword@Haswell-Ubuntu:~/ibv_message_passing/ibv_message_passing_c_project/bin/release$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_client --cores=1,2,3 --ib-dev=mlx4_0 --ib-port=1
+RDMA client 1 connected
+RDMA client 2 connected
+RDMA client 0 connected
+Press Ctrl-C to tell the 3 client thread(s) to stop the test
+thread 0 2786784 messages over last 10.0 seconds
+thread 1 2786874 messages over last 10.0 seconds
+thread 2 2786949 messages over last 10.0 seconds
+thread 0 2788015 messages over last 10.0 seconds
+thread 1 2788447 messages over last 10.0 seconds
+thread 2 2788198 messages over last 10.0 seconds
+thread 0 2790265 messages over last 10.0 seconds
+thread 1 2790598 messages over last 10.0 seconds
+thread 2 2790448 messages over last 10.0 seconds
+^C
+0 Total messages 8571749 over 30.742089 seconds; 278828 messages/second
+0 minor page faults=0 (125 -> 125)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (52 -> 52)
+0 involuntary context switches=23 (1 -> 24)
+0 user time=30.739774 system time=0.000000
+
+1 Total messages 8572593 over 30.742055 seconds; 278856 messages/second
+1 minor page faults=0 (78 -> 78)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (66 -> 66)
+1 involuntary context switches=8 (0 -> 8)
+1 user time=30.736188 system time=0.002549
+
+2 Total messages 8572273 over 30.742049 seconds; 278845 messages/second
+2 minor page faults=0 (78 -> 78)
+2 major page faults=0 (0 -> 0)
+2 voluntary context switches=0 (69 -> 69)
+2 involuntary context switches=24 (0 -> 24)
+2 user time=30.738227 system time=0.000000
