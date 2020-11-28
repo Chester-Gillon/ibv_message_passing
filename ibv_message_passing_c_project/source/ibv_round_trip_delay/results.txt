@@ -622,3 +622,617 @@ thread 2 2790448 messages over last 10.0 seconds
 2 voluntary context switches=0 (69 -> 69)
 2 involuntary context switches=24 (0 -> 24)
 2 user time=30.738227 system time=0.000000
+
+
+== Tests over 1Gb motherboard Ethernet (with Zync as server) ==
+
+root@MYD_CZU4EV_RC:~# /mnt/sd-mmcblk1p2/root/ibv_round_trip_delay --role=tcp_server --cores=1
+TCP server 0 accepted connection from client 192.168.0.116:54737
+thread 0 81761 messages over last 10.0 seconds
+thread 0 81747 messages over last 10.0 seconds
+thread 0 79936 messages over last 10.0 seconds
+
+0 Total messages 275513 over 33.759426 seconds; 8161 messages/second
+0 minor page faults=0 (33 -> 33)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (1 -> 1)
+0 involuntary context switches=1319 (0 -> 1319)
+0 user time=5.750531 system time=28.000253
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_client --cores=1 --tcp-server=192.168.0.100
+TCP client 0 connected
+Press Ctrl-C to tell the 1 client thread(s) to stop the test
+thread 0 81761 messages over last 10.0 seconds
+thread 0 81746 messages over last 10.0 seconds
+thread 0 79936 messages over last 10.0 seconds
+^C
+0 Total messages 275513 over 33.759599 seconds; 8161 messages/second
+0 minor page faults=0 (2 -> 2)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (1 -> 1)
+0 involuntary context switches=69842 (4 -> 69846)
+0 user time=2.878000 system time=30.608000
+
+
+root@MYD_CZU4EV_RC:~# /mnt/sd-mmcblk1p2/root/ibv_round_trip_delay --role=tcp_server --cores=1,2
+TCP server 0 accepted connection from client 192.168.0.116:54738
+TCP server 1 accepted connection from client 192.168.0.116:53505
+thread 0 91132 messages over last 10.0 seconds
+thread 1 89396 messages over last 10.0 seconds
+thread 0 82865 messages over last 10.0 seconds
+thread 1 81149 messages over last 10.0 seconds
+thread 0 89315 messages over last 10.0 seconds
+thread 1 91086 messages over last 10.0 seconds
+
+0 Total messages 288802 over 32.926572 seconds; 8771 messages/second
+0 minor page faults=0 (33 -> 33)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (2 -> 2)
+0 involuntary context switches=397 (2 -> 399)
+0 user time=5.521989 system time=27.397242
+
+1 Total messages 287122 over 32.926629 seconds; 8720 messages/second
+1 minor page faults=0 (33 -> 33)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (1 -> 1)
+1 involuntary context switches=3264 (0 -> 3264)
+1 user time=5.173008 system time=27.726221
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_client --cores=1,2 --tcp-server=192.168.0.100
+TCP client 0 connected
+TCP client 1 connected
+Press Ctrl-C to tell the 2 client thread(s) to stop the test
+thread 0 91132 messages over last 10.0 seconds
+thread 1 89395 messages over last 10.0 seconds
+thread 0 82864 messages over last 10.0 seconds
+thread 1 81149 messages over last 10.0 seconds
+thread 0 89314 messages over last 10.0 seconds
+thread 1 91085 messages over last 10.0 seconds
+^C
+0 Total messages 288802 over 32.926734 seconds; 8771 messages/second
+0 minor page faults=0 (2 -> 2)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (7 -> 7)
+0 involuntary context switches=58903 (2 -> 58905)
+0 user time=2.609000 system time=30.057000
+
+1 Total messages 287122 over 32.926792 seconds; 8720 messages/second
+1 minor page faults=0 (1 -> 1)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (4 -> 4)
+1 involuntary context switches=43913 (3 -> 43916)
+1 user time=2.809000 system time=29.993000
+
+
+root@MYD_CZU4EV_RC:~# /mnt/sd-mmcblk1p2/root/ibv_round_trip_delay --role=tcp_server --cores=1,2,3
+TCP server 0 accepted connection from client 192.168.0.116:54740
+TCP server 1 accepted connection from client 192.168.0.116:53507
+TCP server 2 accepted connection from client 192.168.0.116:42359
+thread 0 87716 messages over last 10.0 seconds
+thread 1 89426 messages over last 10.0 seconds
+thread 2 89346 messages over last 10.0 seconds
+thread 0 87729 messages over last 10.0 seconds
+thread 1 89386 messages over last 10.0 seconds
+thread 2 84209 messages over last 10.0 seconds
+thread 0 76368 messages over last 10.0 seconds
+thread 1 82186 messages over last 10.0 seconds
+thread 2 83969 messages over last 10.0 seconds
+
+0 Total messages 274334 over 32.765775 seconds; 8373 messages/second
+0 minor page faults=0 (33 -> 33)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (2 -> 2)
+0 involuntary context switches=383 (0 -> 383)
+0 user time=5.866718 system time=26.893288
+
+1 Total messages 286516 over 32.765770 seconds; 8744 messages/second
+1 minor page faults=0 (33 -> 33)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (2 -> 2)
+1 involuntary context switches=350 (0 -> 350)
+1 user time=5.884551 system time=26.876819
+
+2 Total messages 283042 over 32.765750 seconds; 8638 messages/second
+2 minor page faults=0 (33 -> 33)
+2 major page faults=0 (0 -> 0)
+2 voluntary context switches=0 (1 -> 1)
+2 involuntary context switches=21356 (1 -> 21357)
+2 user time=5.845880 system time=26.765410
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_client --cores=1,2,3 --tcp-server=192.168.0.100
+TCP client 0 connected
+TCP client 1 connected
+TCP client 2 connected
+Press Ctrl-C to tell the 3 client thread(s) to stop the test
+thread 0 87715 messages over last 10.0 seconds
+thread 1 89425 messages over last 10.0 seconds
+thread 2 89346 messages over last 10.0 seconds
+thread 0 87729 messages over last 10.0 seconds
+thread 1 89386 messages over last 10.0 seconds
+thread 2 84208 messages over last 10.0 seconds
+thread 0 76369 messages over last 10.0 seconds
+thread 1 82185 messages over last 10.0 seconds
+thread 2 83969 messages over last 10.0 seconds
+^C
+0 Total messages 274334 over 32.765963 seconds; 8373 messages/second
+0 minor page faults=0 (2 -> 2)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (9 -> 9)
+0 involuntary context switches=300602 (1 -> 300603)
+0 user time=2.567000 system time=27.458000
+
+1 Total messages 286516 over 32.765933 seconds; 8744 messages/second
+1 minor page faults=0 (1 -> 1)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=1 (8 -> 9)
+1 involuntary context switches=166451 (2 -> 166453)
+1 user time=2.711000 system time=28.636000
+
+2 Total messages 283042 over 32.765945 seconds; 8638 messages/second
+2 minor page faults=0 (1 -> 1)
+2 major page faults=0 (0 -> 0)
+2 voluntary context switches=0 (3 -> 3)
+2 involuntary context switches=190212 (7 -> 190219)
+2 user time=2.652000 system time=28.492000
+
+
+== Tests over 40Gb MHQH29C-XTR Infiniband RDMA (with Zync as server) ==
+
+root@MYD_CZU4EV_RC:~# /mnt/sd-mmcblk1p2/root/ibv_round_trip_delay --role=rdma_server --cores=1 --ib-dev=mlx4_0 --ib-port=1
+RDMA server 0 connected
+thread 0 1365626 messages over last 10.0 seconds
+thread 0 1365265 messages over last 10.0 seconds
+thread 0 1365635 messages over last 10.0 seconds
+
+0 Total messages 4365572 over 31.970340 seconds; 136551 messages/second
+0 minor page faults=0 (134 -> 134)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (43 -> 43)
+0 involuntary context switches=361 (16 -> 377)
+0 user time=31.968968 system time=0.000000
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_client --cores=1 --ib-dev=mlx4_0 --ib-port=2
+RDMA client 0 connected
+Press Ctrl-C to tell the 1 client thread(s) to stop the test
+thread 0 1365617 messages over last 10.0 seconds
+thread 0 1365259 messages over last 10.0 seconds
+thread 0 1365628 messages over last 10.0 seconds
+^C
+0 Total messages 4365572 over 31.970506 seconds; 136550 messages/second
+0 minor page faults=0 (236 -> 236)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (47 -> 47)
+0 involuntary context switches=32136 (3 -> 32139)
+0 user time=31.946000 system time=0.000000
+
+
+root@MYD_CZU4EV_RC:~# /mnt/sd-mmcblk1p2/root/ibv_round_trip_delay --role=rdma_server --cores=1,2 --ib-dev=mlx4_0 --ib-port=1
+RDMA server 1 connected
+RDMA server 0 connected
+thread 0 1323450 messages over last 10.0 seconds
+thread 1 1324354 messages over last 10.0 seconds
+thread 0 1323269 messages over last 10.0 seconds
+thread 1 1324120 messages over last 10.0 seconds
+thread 0 1322534 messages over last 10.0 seconds
+thread 1 1323428 messages over last 10.0 seconds
+
+0 Total messages 4094538 over 30.947243 seconds; 132307 messages/second
+0 minor page faults=0 (134 -> 134)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (47 -> 47)
+0 involuntary context switches=341 (0 -> 341)
+0 user time=30.944375 system time=0.000880
+
+1 Total messages 4097279 over 30.947246 seconds; 132396 messages/second
+1 minor page faults=0 (82 -> 82)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (49 -> 49)
+1 involuntary context switches=312 (1 -> 313)
+1 user time=30.942941 system time=0.000000
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_client --cores=1,2 --ib-dev=mlx4_0 --ib-port=2
+RDMA client 1 connected
+RDMA client 0 connected
+Press Ctrl-C to tell the 2 client thread(s) to stop the test
+thread 0 1323442 messages over last 10.0 seconds
+thread 1 1324342 messages over last 10.0 seconds
+thread 0 1323263 messages over last 10.0 seconds
+thread 1 1324116 messages over last 10.0 seconds
+thread 0 1322528 messages over last 10.0 seconds
+thread 1 1323421 messages over last 10.0 seconds
+^C
+0 Total messages 4094538 over 30.947404 seconds; 132306 messages/second
+0 minor page faults=0 (235 -> 235)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (70 -> 70)
+0 involuntary context switches=31132 (5 -> 31137)
+0 user time=30.923000 system time=0.000000
+
+1 Total messages 4097279 over 30.947408 seconds; 132395 messages/second
+1 minor page faults=0 (66 -> 66)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (60 -> 60)
+1 involuntary context switches=30970 (1 -> 30971)
+1 user time=30.924000 system time=0.000000
+
+
+root@MYD_CZU4EV_RC:~# /mnt/sd-mmcblk1p2/root/ibv_round_trip_delay --role=rdma_server --cores=1,2,3 --ib-dev=mlx4_0 --ib-port=1
+RDMA server 0 connected
+RDMA server 1 connected
+RDMA server 2 connected
+thread 0 1277796 messages over last 10.0 seconds
+thread 1 1276844 messages over last 10.0 seconds
+thread 2 1277842 messages over last 10.0 seconds
+thread 0 1277704 messages over last 10.0 seconds
+thread 1 1276812 messages over last 10.0 seconds
+thread 2 1277856 messages over last 10.0 seconds
+thread 0 1277660 messages over last 10.0 seconds
+thread 1 1276732 messages over last 10.0 seconds
+thread 2 1277737 messages over last 10.0 seconds
+
+0 Total messages 4098427 over 32.076372 seconds; 127771 messages/second
+0 minor page faults=0 (134 -> 134)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (52 -> 52)
+0 involuntary context switches=360 (1 -> 361)
+0 user time=32.071717 system time=0.000128
+
+1 Total messages 4095480 over 32.076374 seconds; 127679 messages/second
+1 minor page faults=0 (82 -> 82)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (50 -> 50)
+1 involuntary context switches=325 (1 -> 326)
+1 user time=32.074281 system time=0.000000
+
+2 Total messages 4098718 over 32.076360 seconds; 127780 messages/second
+2 minor page faults=0 (82 -> 82)
+2 major page faults=0 (0 -> 0)
+2 voluntary context switches=0 (59 -> 59)
+2 involuntary context switches=353 (3 -> 356)
+2 user time=32.072369 system time=0.000000
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_client --cores=1,2,3 --ib-dev=mlx4_0 --ib-port=2
+RDMA client 0 connected
+RDMA client 2 connected
+RDMA client 1 connected
+Press Ctrl-C to tell the 3 client thread(s) to stop the test
+thread 0 1277793 messages over last 10.0 seconds
+thread 1 1276831 messages over last 10.0 seconds
+thread 2 1277836 messages over last 10.0 seconds
+thread 0 1277698 messages over last 10.0 seconds
+thread 1 1276807 messages over last 10.0 seconds
+thread 2 1277850 messages over last 10.0 seconds
+thread 0 1277655 messages over last 10.0 seconds
+thread 1 1276726 messages over last 10.0 seconds
+thread 2 1277731 messages over last 10.0 seconds
+^C
+0 Total messages 4098427 over 32.076540 seconds; 127770 messages/second
+0 minor page faults=0 (236 -> 236)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (81 -> 81)
+0 involuntary context switches=32330 (4 -> 32334)
+0 user time=32.052000 system time=0.000000
+
+1 Total messages 4095480 over 32.076542 seconds; 127678 messages/second
+1 minor page faults=0 (65 -> 65)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (87 -> 87)
+1 involuntary context switches=32130 (3 -> 32133)
+1 user time=32.051000 system time=0.000000
+
+2 Total messages 4098718 over 32.076544 seconds; 127779 messages/second
+2 minor page faults=0 (65 -> 65)
+2 major page faults=0 (0 -> 0)
+2 voluntary context switches=0 (79 -> 79)
+2 involuntary context switches=32119 (4 -> 32123)
+2 user time=32.051000 system time=0.002000
+
+
+== Tests over 10Gb MHQH29C-XTR Ethernet (with Zync as server) ==
+
+To switch the Zync ConnectX-2 from ib to eth manually:
+root@MYD_CZU4EV_RC:~# echo eth > /sys/module/mlx4_core/drivers/pci\:mlx4_core/00*/mlx4_port1
+root@MYD_CZU4EV_RC:~# echo eth > /sys/module/mlx4_core/drivers/pci\:mlx4_core/00*/mlx4_port2
+root@MYD_CZU4EV_RC:~# ifconfig eth1 up
+root@MYD_CZU4EV_RC:~# ifconfig eth1 192.170.0.6
+
+
+root@MYD_CZU4EV_RC:~# /mnt/sd-mmcblk1p2/root/ibv_round_trip_delay --role=tcp_server --cores=1
+TCP server 0 accepted connection from client 192.170.0.2:37820
+thread 0 243459 messages over last 10.0 seconds
+thread 0 243939 messages over last 10.0 seconds
+thread 0 243824 messages over last 10.0 seconds
+
+0 Total messages 851318 over 34.928943 seconds; 24373 messages/second
+0 minor page faults=0 (33 -> 33)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (1 -> 1)
+0 involuntary context switches=703 (1 -> 704)
+0 user time=4.467286 system time=30.453984
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_client --cores=1 --tcp-server=192.170.0.6
+TCP client 0 connected
+Press Ctrl-C to tell the 1 client thread(s) to stop the test
+thread 0 243456 messages over last 10.0 seconds
+thread 0 243937 messages over last 10.0 seconds
+thread 0 243823 messages over last 10.0 seconds
+^C
+0 Total messages 851318 over 34.929135 seconds; 24373 messages/second
+0 minor page faults=0 (2 -> 2)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (2 -> 2)
+0 involuntary context switches=43049 (5 -> 43054)
+0 user time=2.777000 system time=32.082000
+
+root@MYD_CZU4EV_RC:~# /mnt/sd-mmcblk1p2/root/ibv_round_trip_delay --role=tcp_server --cores=1,2
+TCP server 0 accepted connection from client 192.170.0.2:37821
+TCP server 1 accepted connection from client 192.170.0.2:59665
+thread 0 223761 messages over last 10.0 seconds
+thread 1 223800 messages over last 10.0 seconds
+thread 0 222595 messages over last 10.0 seconds
+thread 1 222640 messages over last 10.0 seconds
+thread 0 223235 messages over last 10.0 seconds
+thread 1 223268 messages over last 10.0 seconds
+
+0 Total messages 703875 over 31.542858 seconds; 22315 messages/second
+0 minor page faults=0 (33 -> 33)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (2 -> 2)
+0 involuntary context switches=662 (0 -> 662)
+0 user time=4.624593 system time=26.910336
+
+1 Total messages 704001 over 31.542856 seconds; 22319 messages/second
+1 minor page faults=0 (33 -> 33)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (1 -> 1)
+1 involuntary context switches=351 (0 -> 351)
+1 user time=4.462756 system time=27.076767
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_client --cores=1,2 --tcp-server=192.170.0.6
+TCP client 0 connected
+TCP client 1 connected
+Press Ctrl-C to tell the 2 client thread(s) to stop the test
+thread 0 223757 messages over last 10.0 seconds
+thread 1 223797 messages over last 10.0 seconds
+thread 0 222595 messages over last 10.0 seconds
+thread 1 222636 messages over last 10.0 seconds
+thread 0 223234 messages over last 10.0 seconds
+thread 1 223270 messages over last 10.0 seconds
+^C
+0 Total messages 703875 over 31.543039 seconds; 22315 messages/second
+0 minor page faults=0 (2 -> 2)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=1 (6 -> 7)
+0 involuntary context switches=721626 (7 -> 721633)
+0 user time=2.214000 system time=26.502000
+
+1 Total messages 704001 over 31.543029 seconds; 22319 messages/second
+1 minor page faults=0 (1 -> 1)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=3 (2 -> 5)
+1 involuntary context switches=549277 (3 -> 549280)
+1 user time=2.289000 system time=27.107000
+
+
+root@MYD_CZU4EV_RC:~# /mnt/sd-mmcblk1p2/root/ibv_round_trip_delay --role=tcp_server --cores=1,2,3
+TCP server 0 accepted connection from client 192.170.0.2:37823
+TCP server 1 accepted connection from client 192.170.0.2:59667
+TCP server 2 accepted connection from client 192.170.0.2:54706
+thread 0 194010 messages over last 10.0 seconds
+thread 1 194050 messages over last 10.0 seconds
+thread 2 194219 messages over last 10.0 seconds
+thread 0 193602 messages over last 10.0 seconds
+thread 1 193614 messages over last 10.0 seconds
+thread 2 193715 messages over last 10.0 seconds
+thread 0 194250 messages over last 10.0 seconds
+thread 1 194306 messages over last 10.0 seconds
+thread 2 194413 messages over last 10.0 seconds
+
+0 Total messages 603394 over 31.109178 seconds; 19396 messages/second
+0 minor page faults=0 (33 -> 33)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (2 -> 2)
+0 involuntary context switches=647 (0 -> 647)
+0 user time=4.926516 system time=26.171660
+
+1 Total messages 603509 over 31.109183 seconds; 19400 messages/second
+1 minor page faults=0 (33 -> 33)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (2 -> 2)
+1 involuntary context switches=344 (0 -> 344)
+1 user time=4.613241 system time=26.487409
+
+2 Total messages 603912 over 31.109182 seconds; 19413 messages/second
+2 minor page faults=0 (33 -> 33)
+2 major page faults=0 (0 -> 0)
+2 voluntary context switches=0 (1 -> 1)
+2 involuntary context switches=352 (2 -> 354)
+2 user time=4.731129 system time=26.371545
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=tcp_client --cores=1,2,3 --tcp-server=192.170.0.6
+TCP client 0 connected
+TCP client 1 connected
+TCP client 2 connected
+Press Ctrl-C to tell the 3 client thread(s) to stop the test
+thread 0 194007 messages over last 10.0 seconds
+thread 1 194047 messages over last 10.0 seconds
+thread 2 194216 messages over last 10.0 seconds
+thread 0 193600 messages over last 10.0 seconds
+thread 1 193613 messages over last 10.0 seconds
+thread 2 193714 messages over last 10.0 seconds
+thread 0 194249 messages over last 10.0 seconds
+thread 1 194304 messages over last 10.0 seconds
+thread 2 194413 messages over last 10.0 seconds
+^C
+0 Total messages 603394 over 31.109353 seconds; 19396 messages/second
+0 minor page faults=0 (2 -> 2)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=5 (10 -> 15)
+0 involuntary context switches=1052028 (6 -> 1052034)
+0 user time=2.057000 system time=24.657000
+
+1 Total messages 603509 over 31.109358 seconds; 19400 messages/second
+1 minor page faults=0 (1 -> 1)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=10 (8 -> 18)
+1 involuntary context switches=1019221 (5 -> 1019226)
+1 user time=2.081000 system time=24.766000
+
+2 Total messages 603912 over 31.109360 seconds; 19413 messages/second
+2 minor page faults=0 (1 -> 1)
+2 major page faults=0 (0 -> 0)
+2 voluntary context switches=11 (8 -> 19)
+2 involuntary context switches=734383 (3 -> 734386)
+2 user time=2.182000 system time=25.810000
+
+
+== Tests over 10Gb MHQH29C-XTR RoCEv1 RDMA (with Zync as server) ==
+
+root@MYD_CZU4EV_RC:~# /mnt/sd-mmcblk1p2/root/ibv_round_trip_delay --role=rdma_server --cores=1 --ib-dev=mlx4_0 --ib-port=1
+RDMA server 0 connected
+thread 0 1282996 messages over last 10.0 seconds
+thread 0 1283023 messages over last 10.0 seconds
+thread 0 1283057 messages over last 10.0 seconds
+
+0 Total messages 4001799 over 31.190479 seconds; 128302 messages/second
+0 minor page faults=0 (134 -> 134)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (28 -> 28)
+0 involuntary context switches=753 (27 -> 780)
+0 user time=31.181979 system time=0.000358
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_client --cores=1 --ib-dev=mlx4_0 --ib-port=2
+RDMA client 0 connected
+Press Ctrl-C to tell the 1 client thread(s) to stop the test
+thread 0 1282987 messages over last 10.0 seconds
+thread 0 1283016 messages over last 10.0 seconds
+thread 0 1283051 messages over last 10.0 seconds
+^C
+0 Total messages 4001799 over 31.190651 seconds; 128301 messages/second
+0 minor page faults=0 (236 -> 236)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (37 -> 37)
+0 involuntary context switches=31349 (8 -> 31357)
+0 user time=31.167000 system time=0.000000
+
+
+root@MYD_CZU4EV_RC:~# /mnt/sd-mmcblk1p2/root/ibv_round_trip_delay --role=rdma_server --cores=1,2 --ib-dev=mlx4_0 --ib-port=1
+RDMA server 1 connected
+RDMA server 0 connected
+thread 0 1249594 messages over last 10.0 seconds
+thread 1 1249050 messages over last 10.0 seconds
+thread 0 1249398 messages over last 10.0 seconds
+thread 1 1248928 messages over last 10.0 seconds
+thread 0 1249014 messages over last 10.0 seconds
+thread 1 1248523 messages over last 10.0 seconds
+
+0 Total messages 3944633 over 31.575859 seconds; 124926 messages/second
+0 minor page faults=0 (80 -> 80)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (38 -> 38)
+0 involuntary context switches=746 (34 -> 780)
+0 user time=31.569369 system time=0.000000
+
+1 Total messages 3943043 over 31.575860 seconds; 124875 messages/second
+1 minor page faults=0 (135 -> 135)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (42 -> 42)
+1 involuntary context switches=330 (18 -> 348)
+1 user time=31.571261 system time=0.000743
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_client --cores=1,2 --ib-dev=mlx4_0 --ib-port=2
+RDMA client 1 connected
+RDMA client 0 connected
+Press Ctrl-C to tell the 2 client thread(s) to stop the test
+thread 0 1249310 messages over last 10.0 seconds
+thread 1 1248760 messages over last 10.0 seconds
+thread 0 1249391 messages over last 10.0 seconds
+thread 1 1248926 messages over last 10.0 seconds
+thread 0 1249009 messages over last 10.0 seconds
+thread 1 1248519 messages over last 10.0 seconds
+^C
+0 Total messages 3944633 over 31.576034 seconds; 124925 messages/second
+0 minor page faults=0 (235 -> 235)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (57 -> 57)
+0 involuntary context switches=31721 (9 -> 31730)
+0 user time=31.552000 system time=0.000000
+
+1 Total messages 3943043 over 31.576036 seconds; 124875 messages/second
+1 minor page faults=0 (66 -> 66)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (58 -> 58)
+1 involuntary context switches=31602 (6 -> 31608)
+1 user time=31.552000 system time=0.000000
+
+
+root@MYD_CZU4EV_RC:~# /mnt/sd-mmcblk1p2/root/ibv_round_trip_delay --role=rdma_server --cores=1,2,3 --ib-dev=mlx4_0 --ib-port=1
+RDMA server 1 connected
+RDMA server 2 connected
+RDMA server 0 connected
+thread 0 1200138 messages over last 10.0 seconds
+thread 1 1199846 messages over last 10.0 seconds
+thread 2 1200360 messages over last 10.0 seconds
+thread 0 1200076 messages over last 10.0 seconds
+thread 1 1199732 messages over last 10.0 seconds
+thread 2 1200253 messages over last 10.0 seconds
+thread 0 1200155 messages over last 10.0 seconds
+thread 1 1199866 messages over last 10.0 seconds
+thread 2 1200369 messages over last 10.0 seconds
+
+0 Total messages 3767006 over 31.388281 seconds; 120013 messages/second
+0 minor page faults=0 (81 -> 81)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (39 -> 39)
+0 involuntary context switches=747 (25 -> 772)
+0 user time=31.382409 system time=0.000235
+
+1 Total messages 3766010 over 31.388284 seconds; 119981 messages/second
+1 minor page faults=0 (135 -> 135)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (36 -> 36)
+1 involuntary context switches=324 (0 -> 324)
+1 user time=31.385375 system time=0.000574
+
+2 Total messages 3767613 over 31.388277 seconds; 120032 messages/second
+2 minor page faults=0 (81 -> 81)
+2 major page faults=0 (0 -> 0)
+2 voluntary context switches=0 (46 -> 46)
+2 involuntary context switches=316 (1 -> 317)
+2 user time=31.385464 system time=0.000277
+
+[mr_halfword@sandy-centos release]$ ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_client --cores=1,2,3 --ib-dev=mlx4_0 --ib-port=2
+RDMA client 0 connected
+RDMA client 2 connected
+RDMA client 1 connected
+Press Ctrl-C to tell the 3 client thread(s) to stop the test
+thread 0 1200129 messages over last 10.0 seconds
+thread 1 1199816 messages over last 10.0 seconds
+thread 2 1200321 messages over last 10.0 seconds
+thread 0 1200070 messages over last 10.0 seconds
+thread 1 1199727 messages over last 10.0 seconds
+thread 2 1200253 messages over last 10.0 seconds
+thread 0 1200149 messages over last 10.0 seconds
+thread 1 1199857 messages over last 10.0 seconds
+thread 2 1200353 messages over last 10.0 seconds
+^C
+0 Total messages 3767006 over 31.388441 seconds; 120013 messages/second
+0 minor page faults=0 (236 -> 236)
+0 major page faults=0 (0 -> 0)
+0 voluntary context switches=0 (65 -> 65)
+0 involuntary context switches=31605 (12 -> 31617)
+0 user time=31.362000 system time=0.000000
+
+1 Total messages 3766010 over 31.388457 seconds; 119981 messages/second
+1 minor page faults=0 (65 -> 65)
+1 major page faults=0 (0 -> 0)
+1 voluntary context switches=0 (73 -> 73)
+1 involuntary context switches=31719 (10 -> 31729)
+1 user time=31.363000 system time=0.001000
+
+2 Total messages 3767613 over 31.388450 seconds; 120032 messages/second
+2 minor page faults=0 (65 -> 65)
+2 major page faults=0 (0 -> 0)
+2 voluntary context switches=0 (68 -> 68)
+2 involuntary context switches=31476 (9 -> 31485)
+2 user time=31.365000 system time=0.000000
