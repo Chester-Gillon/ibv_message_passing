@@ -28,10 +28,14 @@ if (AARCH64_SYSROOT)
    link_directories("${AARCH64_SYSROOT}/openslp/usr/lib")
    include_directories("${AARCH64_SYSROOT}/numactl/usr/include")
    link_directories("${AARCH64_SYSROOT}/numactl/usr/lib")
+   include_directories("${AARCH64_SYSROOT}/libftdi/usr/include/libftdi1")
+   link_directories("${AARCH64_SYSROOT}/libftdi/usr/lib")
 
    # Add cross-compiled library paths for packages referenced by libraries above
    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath-link=${AARCH64_SYSROOT}/libnl/usr/lib")
    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath-link=${AARCH64_SYSROOT}/libpcre/usr/lib")
+   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath-link=${AARCH64_SYSROOT}/libusb1/lib")
+   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath-link=${AARCH64_SYSROOT}/eudev/lib")
 endif()
 
 # Set conditional compilation flags 
