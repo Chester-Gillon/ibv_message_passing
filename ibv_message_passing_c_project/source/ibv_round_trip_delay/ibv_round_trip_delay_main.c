@@ -2,8 +2,8 @@
  * @file ibv_round_trip_delay_main.c
  * @date 15 Nov 2020
  * @author Chester Gillon
- * @brief Measure the round-trip delay of exchanging messages by either TCP sockets or RDMA.
- * @details Created to evaluate the per-message overhead of using either TCP sockets or RDMA.
+ * @brief Measure the round-trip delay of exchanging messages by either TCP sockets, SCTP sockets or RDMA.
+ * @details Created to evaluate the per-message overhead of using either TCP sockets, SCTP sockets or RDMA.
  *          By using the ibv_message_transport library the RDMA can be either over Infiniband, or RoCE over Ethernet.
  *
  *          The test is run as a client and server on two endpoints. It has one or more message threads, where each
@@ -27,7 +27,7 @@
  * @todo TCP was used as allow a connect operation. As the program exchanges short messages, using UDP sockets might have
  *       less per-message overheads.
  *
- *       However, since the ibv_message_transport library uses Reliable Connection (RC) Queue-Pairs for RDMA use of TCP
+ *       However, since the ibv_message_transport library uses Reliable Connection (RC) Queue-Pairs for RDMA use of TCP/SCTP
  *       is nominally equivalent.
  */
 
@@ -58,6 +58,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <signal.h>
+#include <netinet/sctp.h>
 
 #include <infiniband/verbs.h>
 #include <slp.h>
@@ -76,7 +77,9 @@ typedef enum
     TEST_ROLE_RDMA_SERVER,
     TEST_ROLE_RDMA_CLIENT,
     TEST_ROLE_TCP_SERVER,
-    TEST_ROLE_TCP_CLIENT
+    TEST_ROLE_TCP_CLIENT,
+    TEST_ROLE_SCTP_SERVER,
+    TEST_ROLE_SCTP_CLIENT
 } test_role_t;
 static test_role_t arg_test_role;
 
@@ -105,6 +108,12 @@ static uint32_t arg_tcp_base_port = 52000;
 
 /** Command line argument which specifies the TCP server address, to which the client connects */
 static struct in_addr arg_tcp_server_addr;
+
+/** Command line argument which specifies the base server port for SCTP transport, incremented for each thread */
+static uint32_t arg_sctp_base_port = 52000;
+
+/** Command line argument which specifies the SCTP server address, to which the client connects */
+static struct in_addr arg_sctp_server_addr;
 
 /** Command line argument which specifies the data size in bytes of the message exchanged */
 static uint32_t arg_message_size = 120;
@@ -139,6 +148,19 @@ typedef struct
     uint32_t *rx_buffer;
 } message_thread_tcp_context;
 
+/** Contains the context for one message thread when using SCTP transport */
+typedef struct
+{
+    /** The bi-directional data socket used to exchange messages with the remote end */
+    int data_socket;
+    /** The number of bytes exchanged in each message. A header plus arg_message_size for the data */
+    size_t buffer_size_bytes;
+    /** Buffer of buffer_size_bytes used to transmit messages */
+    uint32_t *tx_buffer;
+    /** Buffer of buffer_size_bytes used to receive messages */
+    uint32_t *rx_buffer;
+} message_thread_sctp_context;
+
 /** Used to build the test results for a message thread */
 typedef struct
 {
@@ -172,6 +194,8 @@ typedef struct
     message_thread_rdma_context rdma;
     /** Context used for TCP transport */
     message_thread_tcp_context tcp;
+    /** Context used for SCTP transport */
+    message_thread_sctp_context sctp;
     /** Set once an EXIT_MSG_ID has been exchanged to indicate the test is complete, and the thread exits */
     bool test_complete;
     /** The results for this thread */
@@ -199,6 +223,8 @@ static const struct option command_line_options[] =
     {"ib-port", required_argument, NULL, 0},
     {"tcp-base-port", required_argument, NULL, 0},
     {"tcp-server-ip", required_argument, NULL, 0},
+    {"sctp-base-port", required_argument, NULL, 0},
+    {"sctp-server-ip", required_argument, NULL, 0},
     {"msg-size", required_argument, NULL, 0},
     {NULL, 0, NULL, 0}
 };
@@ -223,7 +249,7 @@ static void display_usage (void)
     printf ("  ibv_round_trip_delay <options>  Test round-trip delay for TCP .vs. RDMA\n");
     printf ("\n");
     printf ("Options:\n");
-    printf ("  --role=rdma_server|rdma_client|tcp_server|tcp_client\n");
+    printf ("  --role=rdma_server|rdma_client|tcp_server|tcp_client|sctp_server|sctp_client\n");
     printf ("    Specifies the role performed by the program, in terms of the transport\n");
     printf ("    and which endpoint.\n");
     printf ("  --cores=<cores>  Specifies the comma separated list of cores to run message\n");
@@ -234,6 +260,10 @@ static void display_usage (void)
     printf ("                          transport, incremented for each thread.\n");
     printf ("  --tcp-server-ip=<addr>  Specifies the IP address of the TCP server,\n");
     printf ("                          to which the tcp_client connects.\n");
+    printf ("  --sctp-base-port=<port>  Specifies the base SCTP port number used for SCTP\n");
+    printf ("                           transport, incremented for each thread.\n");
+    printf ("  --sctp-server-ip=<addr>  Specifies the IP address of the SCTP server,\n");
+    printf ("                           to which the tcp_client connects.\n");
     printf ("  --msg-size=<size>  The data size in bytes of the message exchanged.\n");
 
     exit (EXIT_FAILURE);
@@ -290,6 +320,7 @@ static void parse_command_line_arguments (const int argc, char *argv[])
     bool test_role_set = false;
     bool ib_port_set = false;
     bool tcp_server_addr_set = false;
+    bool sctp_server_addr_set = false;
 
     do
     {
@@ -325,6 +356,14 @@ static void parse_command_line_arguments (const int argc, char *argv[])
                 else if (strcmp (optarg, "tcp_client") == 0)
                 {
                     arg_test_role = TEST_ROLE_TCP_CLIENT;
+                }
+                else if (strcmp (optarg, "sctp_server") == 0)
+                {
+                    arg_test_role = TEST_ROLE_SCTP_SERVER;
+                }
+                else if (strcmp (optarg, "sctp_client") == 0)
+                {
+                    arg_test_role = TEST_ROLE_SCTP_CLIENT;
                 }
                 else
                 {
@@ -367,6 +406,24 @@ static void parse_command_line_arguments (const int argc, char *argv[])
                     exit (EXIT_FAILURE);
                 }
                 tcp_server_addr_set = true;
+            }
+            else if (strcmp (optdef->name, "sctp-base-port") == 0)
+            {
+                if ((sscanf (optarg, "%u%c", &arg_sctp_base_port, &junk) != 1) || (arg_sctp_base_port > 65535))
+                {
+                    fprintf (stderr, "Invalid %s %s\n", optdef->name, optarg);
+                    exit (EXIT_FAILURE);
+                }
+            }
+            else if (strcmp (optdef->name, "sctp-server-ip") == 0)
+            {
+                rc = inet_pton (AF_INET, optarg, &arg_sctp_server_addr);
+                if (rc != 1)
+                {
+                    fprintf (stderr, "Invalid %s %s\n", optdef->name, optarg);
+                    exit (EXIT_FAILURE);
+                }
+                sctp_server_addr_set = true;
             }
             else if (strcmp (optdef->name, "msg-size") == 0)
             {
@@ -423,6 +480,18 @@ static void parse_command_line_arguments (const int argc, char *argv[])
         break;
 
     case TEST_ROLE_TCP_SERVER:
+        /* No required options */
+        break;
+
+    case TEST_ROLE_SCTP_CLIENT:
+        if (!sctp_server_addr_set)
+        {
+            fprintf (stderr, "sctp-server-ip must be specified for sctp_client\n");
+            exit (EXIT_FAILURE);
+        }
+        break;
+
+    case TEST_ROLE_SCTP_SERVER:
         /* No required options */
         break;
     }
@@ -539,6 +608,90 @@ static void round_trip_message_thread_tcp_initialise (message_thread_context *co
 
 
 /**
+ * @brief Initialise the SCTP transport for one message thread.
+ * @details Returns once has connected to the remote thread.
+ * @param[in,out] context The message thread context being initialised.
+ */
+static void round_trip_message_thread_sctp_initialise (message_thread_context *const context)
+{
+    int rc;
+
+    if (arg_test_role == TEST_ROLE_SCTP_SERVER)
+    {
+        /* Create a listening server socket, and wait for the client to connect.
+         * The listening socket can be closed after the client has connected since there is a separate server port for each
+         * part of client and server message threads. */
+        int listening_socket;
+
+        listening_socket = socket (PF_INET, SOCK_STREAM, IPPROTO_SCTP);
+        check_assert (listening_socket >= 0, "socket");
+
+        int reuse_addr = 1;
+        rc = setsockopt (listening_socket, SOL_SOCKET, SO_REUSEADDR, &reuse_addr, sizeof (reuse_addr));
+        check_assert (rc == 0, "setsockopt");
+
+        struct sockaddr_in server_addr =
+        {
+            .sin_family = AF_INET,
+            .sin_port = htons (arg_sctp_base_port + context->thread_index)
+        };
+        rc = bind (listening_socket, &server_addr, sizeof (server_addr));
+        check_assert (rc == 0, "bind");
+
+        const int max_backlog = 1;
+        rc = listen (listening_socket, max_backlog);
+        check_assert (rc == 0, "listen");
+
+        struct sockaddr_in client_addr;
+        socklen_t client_addr_len = sizeof (client_addr);
+        context->sctp.data_socket = accept (listening_socket, &client_addr, &client_addr_len);
+        check_assert (context->sctp.data_socket >= 0, "accept");
+
+        rc = close (listening_socket);
+        check_assert (rc == 0, "close");
+
+        char client_addr_str[INET_ADDRSTRLEN];
+        inet_ntop (AF_INET, &client_addr.sin_addr, client_addr_str, sizeof (client_addr_str));
+        printf ("SCTP server %d accepted connection from client %s:%u\n",
+                context->thread_index, client_addr_str, ntohs (client_addr.sin_port));
+    }
+    else
+    {
+        /* Connect to the server */
+        context->sctp.data_socket = socket (PF_INET, SOCK_STREAM, IPPROTO_SCTP);
+        check_assert (context->sctp.data_socket >= 0, "socket");
+
+        struct sockaddr_in server_addr =
+        {
+            .sin_family = AF_INET,
+            .sin_port = htons (arg_sctp_base_port + context->thread_index),
+            .sin_addr = arg_sctp_server_addr
+        };
+
+        rc = connect (context->sctp.data_socket, &server_addr, sizeof (server_addr));
+        check_assert (rc == 0, strerror (errno));
+        printf ("SCTP client %d connected\n", context->thread_index);
+    }
+
+    /* Disable Nagle, as are exchanging short messages as quickly as possible */
+    int nodelay = 1;
+    rc = setsockopt (context->sctp.data_socket, IPPROTO_SCTP, SCTP_NODELAY, &nodelay, sizeof (nodelay));
+    check_assert (rc == 0, "setsockopt");
+
+    /* Set non-blocking socket as should only be one short outstanding message */
+    rc = fcntl (context->sctp.data_socket, F_SETFL, O_NONBLOCK);
+    check_assert (rc == 0, "fnctl");
+
+    /* Allocate message buffers */
+    context->sctp.buffer_size_bytes = sizeof (uint32_t) /* header for message ID */ + arg_message_size;
+    context->sctp.tx_buffer = malloc (context->sctp.buffer_size_bytes);
+    CHECK_ASSERT (context->sctp.tx_buffer != NULL);
+    context->sctp.rx_buffer = malloc (context->sctp.buffer_size_bytes);
+    CHECK_ASSERT (context->sctp.rx_buffer != NULL);
+}
+
+
+/**
  * @brief Wait for a TCP message to be received.
  * @details This is done by using ioctl() to poll for the number of bytes to be that of the fixed size message used by the test,
  *          and then performing a non-blocking read() when there are sufficient available bytes for one message.
@@ -570,6 +723,40 @@ static void await_tcp_message (message_thread_tcp_context *const context)
 static void send_tcp_message (const message_thread_tcp_context *const context)
 {
     const ssize_t bytes_written = write (context->data_socket, context->tx_buffer, context->buffer_size_bytes);
+    CHECK_ASSERT (bytes_written == (ssize_t) context->buffer_size_bytes);
+}
+
+
+/**
+ * @brief Wait for a SCTP message to be received.
+ * @details This is done by using ioctl() to poll for the number of bytes to be that of the fixed size message used by the test,
+ *          and then performing a non-blocking read() when there are sufficient available bytes for one message.
+ *          Performing a busy-poll read is done for comparing against the RDMA transport which is also busy-polling.
+ * @param[in/out] context The TCP transport context to read the message from.
+ */
+static void await_sctp_message (message_thread_sctp_context *const context)
+{
+    int available_bytes;
+    int rc;
+
+    do
+    {
+        rc = ioctl (context->data_socket, FIONREAD, &available_bytes);
+        check_assert (rc == 0, "ioctl FIONREAD");
+    } while (available_bytes < context->buffer_size_bytes);
+
+    const ssize_t bytes_read = read (context->data_socket, context->rx_buffer, context->buffer_size_bytes);
+    CHECK_ASSERT (bytes_read == (ssize_t) context->buffer_size_bytes);
+}
+
+
+/**
+ * @brief Send a SCTP message
+ * @param[in] context The SCTP transport message to transmit the message from.
+ */
+static void send_sctp_message (const message_thread_sctp_context *const context)
+{
+    const ssize_t bytes_written = send (context->data_socket, context->tx_buffer, context->buffer_size_bytes, 0);
     CHECK_ASSERT (bytes_written == (ssize_t) context->buffer_size_bytes);
 }
 
@@ -631,6 +818,24 @@ static void round_trip_message_iteration (message_thread_context *const context)
         await_tcp_message (&context->tcp);
         context->test_complete = context->tcp.rx_buffer[0] == EXIT_MSG_ID;
         break;
+
+    case TEST_ROLE_SCTP_SERVER:
+        /* Echo received messages back to the client */
+        await_sctp_message (&context->sctp);
+        context->test_complete = context->sctp.rx_buffer[0] == EXIT_MSG_ID;
+
+        memcpy (context->sctp.tx_buffer, context->sctp.rx_buffer, context->sctp.buffer_size_bytes);
+        send_sctp_message (&context->sctp);
+        break;
+
+    case TEST_ROLE_SCTP_CLIENT:
+        /* Send a message to server and wait for it to be echoed back */
+        context->sctp.tx_buffer[0] = stop_transmission ? EXIT_MSG_ID : ECHO_MSG_ID;
+        send_sctp_message (&context->sctp);
+
+        await_sctp_message (&context->sctp);
+        context->test_complete = context->sctp.rx_buffer[0] == EXIT_MSG_ID;
+        break;
     }
 
     context->results.total_messages++;
@@ -664,6 +869,11 @@ static void *round_trip_message_thread (void *const arg)
     case TEST_ROLE_TCP_SERVER:
     case TEST_ROLE_TCP_CLIENT:
         round_trip_message_thread_tcp_initialise (context);
+        break;
+
+    case TEST_ROLE_SCTP_SERVER:
+    case TEST_ROLE_SCTP_CLIENT:
+        round_trip_message_thread_sctp_initialise (context);
         break;
     }
 
@@ -701,6 +911,12 @@ static void *round_trip_message_thread (void *const arg)
     case TEST_ROLE_TCP_SERVER:
     case TEST_ROLE_TCP_CLIENT:
         rc = close (context->tcp.data_socket);
+        check_assert (rc == 0, "close");
+        break;
+
+    case TEST_ROLE_SCTP_SERVER:
+    case TEST_ROLE_SCTP_CLIENT:
+        rc = close (context->sctp.data_socket);
         check_assert (rc == 0, "close");
         break;
     }
@@ -857,7 +1073,7 @@ static void wait_for_message_threads_to_exit (void)
         clock_gettime (CLOCK_MONOTONIC, &thread_contexts[thread_index].current_results_time);
     }
 
-    if ((arg_test_role == TEST_ROLE_RDMA_CLIENT) || (arg_test_role == TEST_ROLE_TCP_CLIENT))
+    if ((arg_test_role == TEST_ROLE_RDMA_CLIENT) || (arg_test_role == TEST_ROLE_TCP_CLIENT) || (arg_test_role == TEST_ROLE_SCTP_CLIENT))
     {
         /* Install a signal handler to allow a request to stop transmission */
         struct sigaction action;
