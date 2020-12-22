@@ -59,6 +59,7 @@
 #include <sys/resource.h>
 #include <signal.h>
 #include <netinet/sctp.h>
+#include <poll.h>
 
 #include <infiniband/verbs.h>
 #include <slp.h>
@@ -92,8 +93,8 @@ static test_role_t arg_test_role;
  *  - ECHO_MSG_ID sent from client to server, with data size of arg_message_size, which server echos back to client.
  *  - EXIT_MSG_ID sent from client to server to cause the server to exit at the end of the test.
  */
-#define ECHO_MSG_ID 0
-#define EXIT_MSG_ID 1
+#define ECHO_MSG_ID 1
+#define EXIT_MSG_ID 2
 
 /** Command line argument which specify which cores the message threads run on */
 static int arg_cores[MAX_THREADS];
@@ -153,12 +154,21 @@ typedef struct
 {
     /** The bi-directional data socket used to exchange messages with the remote end */
     int data_socket;
-    /** The number of bytes exchanged in each message. A header plus arg_message_size for the data */
-    size_t buffer_size_bytes;
-    /** Buffer of buffer_size_bytes used to transmit messages */
+    /** The number of bytes data bytes sent in each message; arg_message_size*/
+    size_t tx_buffer_size_bytes;
+    /** Buffer of tx_buffer_size_bytes used to transmit messages */
     uint32_t *tx_buffer;
-    /** Buffer of buffer_size_bytes used to receive messages */
+    /** The number of bytes in the receive buffer, set to more than tx_buffer_size_bytes to check that message boundaries
+     *  are preserved. */
+    size_t rx_buffer_size_bytes;
+    /** Buffer of rx_buffer_size_bytes used to receive messages */
     uint32_t *rx_buffer;
+    /** Used to populate the transmit ancillary information, where sinfo_ppid is the message ID */
+    struct sctp_sndrcvinfo tx_info;
+    /** Used to obtain the receive ancillary information, where sinfo_ppid is the message ID */
+    struct sctp_sndrcvinfo rx_info;
+    /** The flags for the received message */
+    int rx_flags;
 } message_thread_sctp_context;
 
 /** Used to build the test results for a message thread */
@@ -682,11 +692,22 @@ static void round_trip_message_thread_sctp_initialise (message_thread_context *c
     rc = fcntl (context->sctp.data_socket, F_SETFL, O_NONBLOCK);
     check_assert (rc == 0, "fnctl");
 
+    /* Subscribe to the event to allow sctp_recvmsg() to obtain the ppid which is used for the message ID */
+    struct sctp_event_subscribe events =
+    {
+        .sctp_data_io_event = 1,
+    };
+    rc = setsockopt (context->sctp.data_socket, IPPROTO_SCTP, SCTP_EVENTS, &events, sizeof (events));
+    check_assert (rc == 0, "setsockopt");
+
     /* Allocate message buffers */
-    context->sctp.buffer_size_bytes = sizeof (uint32_t) /* header for message ID */ + arg_message_size;
-    context->sctp.tx_buffer = malloc (context->sctp.buffer_size_bytes);
+    context->sctp.tx_buffer_size_bytes = arg_message_size;
+    context->sctp.tx_buffer = malloc (context->sctp.tx_buffer_size_bytes);
     CHECK_ASSERT (context->sctp.tx_buffer != NULL);
-    context->sctp.rx_buffer = malloc (context->sctp.buffer_size_bytes);
+    memset (&context->sctp.tx_info, 0, sizeof (context->sctp.tx_info));
+
+    context->sctp.rx_buffer_size_bytes = arg_message_size + 1024;
+    context->sctp.rx_buffer = malloc (context->sctp.rx_buffer_size_bytes);
     CHECK_ASSERT (context->sctp.rx_buffer != NULL);
 }
 
@@ -729,24 +750,31 @@ static void send_tcp_message (const message_thread_tcp_context *const context)
 
 /**
  * @brief Wait for a SCTP message to be received.
- * @details This is done by using ioctl() to poll for the number of bytes to be that of the fixed size message used by the test,
- *          and then performing a non-blocking read() when there are sufficient available bytes for one message.
+ * @details This is done by using poll() to poll for a message to be available.
  *          Performing a busy-poll read is done for comparing against the RDMA transport which is also busy-polling.
  * @param[in/out] context The TCP transport context to read the message from.
  */
 static void await_sctp_message (message_thread_sctp_context *const context)
 {
-    int available_bytes;
     int rc;
+    struct pollfd fds =
+    {
+        .fd = context->data_socket,
+        .events = POLLIN
+    };
 
     do
     {
-        rc = ioctl (context->data_socket, FIONREAD, &available_bytes);
-        check_assert (rc == 0, "ioctl FIONREAD");
-    } while (available_bytes < context->buffer_size_bytes);
+        rc = poll (&fds, 1, 0);
+        check_assert (rc >= 0, "ioctl FIONREAD");
+    } while ((fds.revents & POLLIN) == 0);
 
-    const ssize_t bytes_read = read (context->data_socket, context->rx_buffer, context->buffer_size_bytes);
-    CHECK_ASSERT (bytes_read == (ssize_t) context->buffer_size_bytes);
+    /* Test receiving a message where the buffer (rx_buffer_size_bytes) is larger than the expected message size
+     * (tx_buffer_size_bytes). */
+    const ssize_t bytes_read = sctp_recvmsg (context->data_socket, context->rx_buffer, context->rx_buffer_size_bytes,
+            NULL, NULL, &context->rx_info, &context->rx_flags);
+    CHECK_ASSERT (bytes_read == (ssize_t) context->tx_buffer_size_bytes);
+    CHECK_ASSERT ((context->rx_flags & MSG_EOR) == MSG_EOR);
 }
 
 
@@ -756,8 +784,10 @@ static void await_sctp_message (message_thread_sctp_context *const context)
  */
 static void send_sctp_message (const message_thread_sctp_context *const context)
 {
-    const ssize_t bytes_written = send (context->data_socket, context->tx_buffer, context->buffer_size_bytes, 0);
-    CHECK_ASSERT (bytes_written == (ssize_t) context->buffer_size_bytes);
+    const int flags = 0;
+    const ssize_t bytes_written = sctp_send (context->data_socket, context->tx_buffer, context->tx_buffer_size_bytes,
+            &context->tx_info, flags);
+    CHECK_ASSERT (bytes_written == (ssize_t) context->tx_buffer_size_bytes);
 }
 
 
@@ -822,19 +852,20 @@ static void round_trip_message_iteration (message_thread_context *const context)
     case TEST_ROLE_SCTP_SERVER:
         /* Echo received messages back to the client */
         await_sctp_message (&context->sctp);
-        context->test_complete = context->sctp.rx_buffer[0] == EXIT_MSG_ID;
+        context->test_complete = context->sctp.rx_info.sinfo_ppid == EXIT_MSG_ID;
 
-        memcpy (context->sctp.tx_buffer, context->sctp.rx_buffer, context->sctp.buffer_size_bytes);
+        context->sctp.tx_info.sinfo_ppid = context->sctp.rx_info.sinfo_ppid;
+        memcpy (context->sctp.tx_buffer, context->sctp.rx_buffer, context->sctp.tx_buffer_size_bytes);
         send_sctp_message (&context->sctp);
         break;
 
     case TEST_ROLE_SCTP_CLIENT:
         /* Send a message to server and wait for it to be echoed back */
-        context->sctp.tx_buffer[0] = stop_transmission ? EXIT_MSG_ID : ECHO_MSG_ID;
+        context->sctp.tx_info.sinfo_ppid = stop_transmission ? EXIT_MSG_ID : ECHO_MSG_ID;
         send_sctp_message (&context->sctp);
 
         await_sctp_message (&context->sctp);
-        context->test_complete = context->sctp.rx_buffer[0] == EXIT_MSG_ID;
+        context->test_complete = context->sctp.rx_info.sinfo_ppid == EXIT_MSG_ID;
         break;
     }
 

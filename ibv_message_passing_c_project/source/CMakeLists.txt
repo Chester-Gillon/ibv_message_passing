@@ -30,6 +30,8 @@ if (AARCH64_SYSROOT)
    link_directories("${AARCH64_SYSROOT}/numactl/usr/lib")
    include_directories("${AARCH64_SYSROOT}/libftdi/usr/include/libftdi1")
    link_directories("${AARCH64_SYSROOT}/libftdi/usr/lib")
+   include_directories("${AARCH64_SYSROOT}/lksctp-tools/usr/include")
+   link_directories("${AARCH64_SYSROOT}/lksctp-tools/usr/lib")
 
    # Add cross-compiled library paths for packages referenced by libraries above
    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath-link=${AARCH64_SYSROOT}/libnl/usr/lib")
