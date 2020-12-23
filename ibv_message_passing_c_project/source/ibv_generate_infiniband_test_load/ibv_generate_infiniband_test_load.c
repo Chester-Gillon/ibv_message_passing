@@ -59,8 +59,6 @@
 #include <numaif.h>
 
 #include <infiniband/verbs.h>
-#include <infiniband/mad.h>
-#include <infiniband/iba/ib_types.h>
 
 
 /* Defines the size and number of buffers used to transmit test data on each port.
@@ -159,8 +157,6 @@ typedef struct
     struct ibv_mr *buffers_mr;
     /* Used to generate a full duplex test load of the ports on the Infiniband device */
     test_load_port_context_t ports[EXPECTED_PORTS_PER_DEVICE];
-    /** The ibmad port used to collect the port statistics */
-    struct ibmad_port *mad_port;
 } test_load_device_context_t;
 
 
@@ -427,10 +423,6 @@ static void initialise_test_transfers (test_load_device_context_t *const device,
                         IBV_QP_MAX_QP_RD_ATOMIC);
     CHECK_ASSERT (rc == 0);
 
-    /* Open MAD port to obtain port counters */
-    int mgmt_class = IB_PERFORMANCE_CLASS;
-    device->mad_port = mad_rpc_open_port (strdup (device->device->device->name), source_port, &mgmt_class, 1);
-
     /* Initialise the test transfers */
     for (buffer_index = 0; buffer_index < NUM_TEST_BUFFERS_PER_PORT; buffer_index++)
     {
@@ -541,9 +533,9 @@ static void read_all_port_counters (test_load_context_t *const context, const bo
 {
     uint32_t device_index;
     uint32_t port_index;
-    ib_portid_t portid;
-    uint8_t mad_buf[1024];
-    const int timeout = 0;
+    uint32_t counter_index;
+    char port_counter_pathname[PATH_MAX];
+    FILE *counter_file;
 
     for (device_index = 0; device_index < context->num_devices; device_index++)
     {
@@ -555,13 +547,32 @@ static void read_all_port_counters (test_load_context_t *const context, const bo
             infiniband_port_counters *const counters = test_start ?
                     &port->source_port_counters_start : &port->source_port_counters_end;
 
-            memset (&portid, 0, sizeof (portid));
-            portid.lid = port->tx_port_attributes.lid;
-            memset (mad_buf, 0, sizeof (mad_buf));
-            CHECK_ASSERT (pma_query_via (mad_buf, &portid, port->source_port, timeout,
-                    IB_GSI_PORT_COUNTERS_EXT, device->mad_port) != NULL);
-            mad_decode_field (mad_buf, IB_PC_EXT_XMT_BYTES_F, &counters->tx_words);
-            mad_decode_field (mad_buf, IB_PC_EXT_RCV_BYTES_F, &counters->rx_words);
+            const struct
+            {
+                const char *const name;
+                uint64_t *const value;
+            } counter_defs[] =
+            {
+                {
+                    .name = "port_xmit_data",
+                    .value = &counters->tx_words
+                },
+                {
+                    .name = "port_rcv_data",
+                    .value = &counters->rx_words
+                }
+            };
+
+            for (counter_index = 0; counter_index < (sizeof(counter_defs) / sizeof(counter_defs[0])); counter_index++)
+            {
+                snprintf (port_counter_pathname, sizeof (port_counter_pathname), "%s/ports/%" PRIu32 "/counters/%s",
+                        device->device->device->ibdev_path, port_index + 1, counter_defs[counter_index].name);
+                counter_file = fopen (port_counter_pathname, "r");
+                CHECK_ASSERT (counter_file != NULL);
+                const int num_read = fscanf (counter_file, "%" SCNu64, counter_defs[counter_index].value);
+                CHECK_ASSERT (num_read == 1);
+                fclose (counter_file);
+            }
         }
     }
 }
