@@ -1,0 +1,62 @@
+== Tests on a ConnectX-2 with loop back between the ports ==
+
+== QDR Infiniband with 4096 MTU ==
+
+$ ibv_generate_infiniband_test_load/ibv_generate_infiniband_test_load 0
+PRBS32 pattern period is 4294967295
+Press Ctrl-C to stop the Infiniband test load
+^C
+mlx4_0 rx_buffer compare : PASS
+mlx4_0 port 1 -> 2 RDMA write transmitted 1218428534784 bytes in 728.260808 seconds, 1673.1 Mbytes/sec
+mlx4_0 port 1 transmitted 1225600488532 bytes in 728.260808 seconds, 1682.9 Mbytes/sec
+mlx4_0 port 1 received 1225600488504 bytes in 728.260808 seconds, 1682.9 Mbytes/sec
+mlx4_0 port 2 -> 1 RDMA write transmitted 1218428534784 bytes in 728.260832 seconds, 1673.1 Mbytes/sec
+mlx4_0 port 2 transmitted 1225600488504 bytes in 728.260832 seconds, 1682.9 Mbytes/sec
+mlx4_0 port 2 received 1225600488532 bytes in 728.260832 seconds, 1682.9 Mbytes/sec
+
+Port bytes are 0.59% more than application bytes.
+
+ibv_devinfo reports active MTU is 4096
+
+== 10Gb RoCE with 1024 MTU ==
+
+$ ibv_generate_infiniband_test_load/ibv_generate_infiniband_test_load 0
+PRBS32 pattern period is 4294967295
+Press Ctrl-C to stop the Infiniband test load
+^C
+mlx4_0 rx_buffer compare : PASS
+mlx4_0 port 1 -> 2 RDMA write transmitted 71940702208 bytes in 62.984176 seconds, 1142.2 Mbytes/sec
+mlx4_0 port 1 transmitted 77160992248 bytes in 62.984176 seconds, 1225.1 Mbytes/sec
+mlx4_0 port 1 received 77160992480 bytes in 62.984176 seconds, 1225.1 Mbytes/sec
+mlx4_0 port 2 -> 1 RDMA write transmitted 71940702208 bytes in 62.984168 seconds, 1142.2 Mbytes/sec
+mlx4_0 port 2 transmitted 77160992480 bytes in 62.984168 seconds, 1225.1 Mbytes/sec
+mlx4_0 port 2 received 77160992248 bytes in 62.984168 seconds, 1225.1 Mbytes/sec
+
+Port bytes are 7.26% more than application bytes
+
+ifconfig reports Ethernet MTU is the default 1500, and ibv_devinfo reports active MTU is 1024
+
+== 10Gb RoCE with 4096 MTU ==
+
+$ ibv_generate_infiniband_test_load/ibv_generate_infiniband_test_load 0
+PRBS32 pattern period is 4294967295
+Press Ctrl-C to stop the Infiniband test load
+^C
+mlx4_0 rx_buffer compare : PASS
+mlx4_0 port 1 -> 2 RDMA write transmitted 154081951744 bytes in 126.187924 seconds, 1221.1 Mbytes/sec
+mlx4_0 port 1 transmitted 156877150368 bytes in 126.187924 seconds, 1243.2 Mbytes/sec
+mlx4_0 port 1 received 156877150444 bytes in 126.187924 seconds, 1243.2 Mbytes/sec
+mlx4_0 port 2 -> 1 RDMA write transmitted 154081951744 bytes in 126.188344 seconds, 1221.0 Mbytes/sec
+mlx4_0 port 2 transmitted 156877150444 bytes in 126.188344 seconds, 1243.2 Mbytes/sec
+mlx4_0 port 2 received 156877150368 bytes in 126.188344 seconds, 1243.2 Mbytes/sec
+
+Port bytes are 1.82% more than application bytes.
+
+Used ifconfig to set the maximum Ethernet MTU for the ConnectX-2:
+$ sudo ifconfig ens5d1 mtu 9600
+$ sudo ifconfig ens5 mtu 9600
+
+Where the maximum MTU of 9600 was found by increasing the requested MTU before "SIOCSIFMTU: Invalid argument" was reported
+
+ibv_devinfo reports active MTU is 4096
+

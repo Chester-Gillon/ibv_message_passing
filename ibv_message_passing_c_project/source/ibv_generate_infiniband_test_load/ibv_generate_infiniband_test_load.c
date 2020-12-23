@@ -3,8 +3,8 @@
  * @date 2 Jun 2019
  * @author Chester Gillon
  * @details
- *   Program to generate an Infiniband test load, for the purpose of generating maximum transfer rate across all
- *   Infiniband ports on a host with minimum CPU load.
+ *   Program to generate an RDMA test load, for the purpose of generating maximum transfer rate across all
+ *   Infiniband (or RoCE) ports on a host with minimum CPU load.
  *
  *   To minimise the CPU load the test queues RDMA write transfers of 256MB size, and blocks waiting for a transfer to
  *   complete before queueing another transfer. Each pair of Infiniband ports tests can have two transfers queued, so while
@@ -353,7 +353,30 @@ static void initialise_test_transfers (test_load_device_context_t *const device,
     qp_attr.rq_psn = rx_psn;
     qp_attr.max_dest_rd_atomic = 0;
     qp_attr.min_rnr_timer = 0;
-    qp_attr.ah_attr.is_global = false;
+    if (port->rx_port_attributes.link_layer == IBV_LINK_LAYER_ETHERNET)
+    {
+        /* @todo When the link level is Ethernet assume GID index zero is for RoCEv1.
+         *       Support for RoCE was tested on Mellanox Connect-X2 VPI cards which only support RoCEv1.
+         *
+         *       Later versions of rdma-core have ibv_query_gid_type() which could be used to search for a specific RoCE version.
+         *
+         *       There is also /sys/class/infiniband/<device>/ports/<port_number>/gid_attrs/types/<gid_index> which has a string
+         *       for the RoCE version for the GID index on a given index of a port.
+         *       Older Kernels, e.g. 3.10.33-rt32.33.el6rt.x86_64, may not have the gid_attrs files in which only RoCEv1
+         *       is supported.
+         */
+        qp_attr.ah_attr.is_global = true;
+        qp_attr.ah_attr.grh.sgid_index = 0;
+        rc = ibv_query_gid (device->device, destination_port, qp_attr.ah_attr.grh.sgid_index,
+                &qp_attr.ah_attr.grh.dgid);
+        CHECK_ASSERT (rc == 0);
+        qp_attr.ah_attr.grh.hop_limit = 1;
+    }
+    else
+    {
+        /* For Infiniband use LID addressing */
+        qp_attr.ah_attr.is_global = false;
+    }
     qp_attr.ah_attr.dlid = port->rx_port_attributes.lid;
     qp_attr.ah_attr.sl = 0;
     qp_attr.ah_attr.src_path_bits = 0;
@@ -375,7 +398,30 @@ static void initialise_test_transfers (test_load_device_context_t *const device,
     qp_attr.rq_psn = tx_psn;
     qp_attr.max_dest_rd_atomic = 0;
     qp_attr.min_rnr_timer = 0;
-    qp_attr.ah_attr.is_global = false;
+    if (port->tx_port_attributes.link_layer == IBV_LINK_LAYER_ETHERNET)
+    {
+        /* @todo When the link level is Ethernet assume GID index zero is for RoCEv1.
+         *       Support for RoCE was tested on Mellanox Connect-X2 VPI cards which only support RoCEv1.
+         *
+         *       Later versions of rdma-core have ibv_query_gid_type() which could be used to search for a specific RoCE version.
+         *
+         *       There is also /sys/class/infiniband/<device>/ports/<port_number>/gid_attrs/types/<gid_index> which has a string
+         *       for the RoCE version for the GID index on a given index of a port.
+         *       Older Kernels, e.g. 3.10.33-rt32.33.el6rt.x86_64, may not have the gid_attrs files in which only RoCEv1
+         *       is supported.
+         */
+        qp_attr.ah_attr.is_global = true;
+        qp_attr.ah_attr.grh.sgid_index = 0;
+        rc = ibv_query_gid (device->device, source_port, qp_attr.ah_attr.grh.sgid_index,
+                &qp_attr.ah_attr.grh.dgid);
+        CHECK_ASSERT (rc == 0);
+        qp_attr.ah_attr.grh.hop_limit = 1;
+    }
+    else
+    {
+        /* For Infiniband use LID addressing */
+        qp_attr.ah_attr.is_global = false;
+    }
     qp_attr.ah_attr.dlid = port->tx_port_attributes.lid;
     qp_attr.ah_attr.sl = 0;
     qp_attr.ah_attr.src_path_bits = 0;
