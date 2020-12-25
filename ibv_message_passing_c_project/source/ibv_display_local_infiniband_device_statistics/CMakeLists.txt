@@ -5,4 +5,4 @@ cmake_minimum_required (VERSION 2.8)
 
 add_executable (ibv_display_local_infiniband_device_statistics "ibv_display_local_infiniband_device_statistics.c")
 
-target_link_libraries (ibv_display_local_infiniband_device_statistics ibverbs)
+target_link_libraries (ibv_display_local_infiniband_device_statistics ibverbs rt)
