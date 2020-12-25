@@ -1,0 +1,456 @@
+== Tests on ConnectX-2 with loopback cable between ports 1 and 2 with QDR Infiniband link-layer ==
+
+While running ibv_generate_infiniband_test_load generate one corrupt packet on port 1 using:
+$ sudo pckt_drop -d /dev/mst/mt26428_pciconf0 -p 1
+Successfully configured port 1 to insert error on next transmitted data packet
+
+
+Statistics after 80 seconds
+Counter name                     Device  Port  Counter value(delta)
+port_xmit_data                   mlx4_0     1  16614976221(+4205280921)
+port_xmit_wait                   mlx4_0     1  45936(+5136)
+port_rcv_packets                 mlx4_0     1  16194184(+4098655)
+port_rcv_data                    mlx4_0     1  16615225488(+4205278688)
+port_xmit_packets                mlx4_0     1  16194401(+4098651)
+port_xmit_data                   mlx4_0     2  16615443848(+4205272681)
+port_xmit_wait                   mlx4_0     2  49578(+11954)
+port_rcv_packets                 mlx4_0     2  16194652(+4098643)
+port_rcv_data                    mlx4_0     2  16615703415(+4205266501)
+port_xmit_packets                mlx4_0     2  16194863(+4098637)
+
+Statistics after 90 seconds
+Counter name                     Device  Port  Counter value(delta)
+rq_num_oos                       mlx4_0        1(+1)
+sq_num_oos                       mlx4_0        1(+1)
+port_xmit_data                   mlx4_0     1  20733968696(+4118992475)
+port_xmit_wait                   mlx4_0     1  5040994(+4995058)
+port_rcv_packets                 mlx4_0     1  20249552(+4055368)
+port_rcv_data                    mlx4_0     1  20775031709(+4159806221)
+port_xmit_packets                mlx4_0     1  20209116(+4014715)
+port_xmit_data                   mlx4_0     2  20775252224(+4159808376)
+port_xmit_wait                   mlx4_0     2  5643493(+5593915)
+port_rcv_remote_physical_errors  mlx4_0     2  1(+1)
+port_rcv_packets                 mlx4_0     2  20209372(+4014720)
+port_rcv_data                    mlx4_0     2  20734711110(+4119007695)
+port_xmit_packets                mlx4_0     2  20250241(+4055378)
+
+Statistics after 100 seconds
+Counter name                     Device  Port  Counter value(delta)
+rq_num_oos                       mlx4_0        1
+sq_num_oos                       mlx4_0        1
+port_xmit_data                   mlx4_0     1  24939810988(+4205842292)
+port_xmit_wait                   mlx4_0     1  5284158(+243164)
+port_rcv_packets                 mlx4_0     1  24348756(+4099204)
+port_rcv_data                    mlx4_0     1  24980875126(+4205843417)
+port_xmit_packets                mlx4_0     1  24308312(+4099196)
+port_xmit_data                   mlx4_0     2  24981094516(+4205842292)
+port_xmit_wait                   mlx4_0     2  5664328(+20835)
+port_rcv_remote_physical_errors  mlx4_0     2  1
+port_rcv_packets                 mlx4_0     2  24308559(+4099187)
+port_rcv_data                    mlx4_0     2  24940535099(+4205823989)
+port_xmit_packets                mlx4_0     2  24349432(+4099191)
+
+This shows than one corrupt packet was inserted on port 1 transmit:
+a. port_rcv_remote_physical_errors on port 2 receive incremented by one.
+b. per-device rq_num_oos (Responder - number of out of dequence requests received) and
+   sq_num_oos (Requester - number of Out of Sequence NAKs received) incremented by one.
+
+   https://support.mellanox.com/s/article/mlnx-ofed-connectx-3-rdma-diagnostic-counters describes these per-device counters
+
+
+== Tests on ConnectX-2 with loopback cable between ports 1 and 2 with 10Gb Ethernet link-layer ==
+
+While running ibv_generate_infiniband_test_load generate one corrupt packet on port 2 using:
+$ sudo pckt_drop -d /dev/mst/mt26428_pciconf0 -p 2
+Successfully configured port 2 to insert error on next transmitted data packet
+
+Statistics after 90 seconds
+Counter name                     Device  Port  Counter value(delta)
+rq_num_wrfe                      mlx4_0        768
+port_xmit_data                   mlx4_0     1  14465467795(+3062803140)
+port_rcv_packets                 mlx4_0     1  52890421(+11198377)
+port_rcv_data                    mlx4_0     1  14465963953(+3062821257)
+port_xmit_packets                mlx4_0     1  52891790(+11198336)
+port_xmit_data                   mlx4_0     2  14466352194(+3062836904)
+port_rcv_packets                 mlx4_0     2  52893553(+11198337)
+port_rcv_data                    mlx4_0     2  14466821176(+3062813022)
+port_xmit_packets                mlx4_0     2  52894919(+11198439)
+
+Statistics after 100 seconds
+Counter name                     Device  Port  Counter value(delta)
+rq_num_wrfe                      mlx4_0        768
+rq_num_oos                       mlx4_0        1(+1)
+sq_num_oos                       mlx4_0        1(+1)
+port_xmit_data                   mlx4_0     1  17004942948(+2539475153)
+port_rcv_packets                 mlx4_0     1  61888417(+8997996)
+port_rcv_data                    mlx4_0     1  16926684720(+2460720767)
+port_xmit_packets                mlx4_0     1  62179655(+9287865)
+port_xmit_data                   mlx4_0     2  16981451416(+2515099222)
+port_rcv_packets                 mlx4_0     2  62181397(+9287844)
+port_rcv_data                    mlx4_0     2  17006302917(+2539481741)
+port_xmit_packets                mlx4_0     2  62090979(+9196060)
+
+Statistics after 110 seconds
+Counter name                     Device  Port  Counter value(delta)
+rq_num_wrfe                      mlx4_0        768
+rq_num_oos                       mlx4_0        1
+sq_num_oos                       mlx4_0        1
+port_xmit_data                   mlx4_0     1  20067872671(+3062929723)
+port_rcv_packets                 mlx4_0     1  73087659(+11199242)
+port_rcv_data                    mlx4_0     1  19989749792(+3063065072)
+port_xmit_packets                mlx4_0     1  73378761(+11199106)
+port_xmit_data                   mlx4_0     2  20044513194(+3063061778)
+port_rcv_packets                 mlx4_0     2  73380489(+11199092)
+port_rcv_data                    mlx4_0     2  20069320225(+3063017308)
+port_xmit_packets                mlx4_0     2  73290218(+11199239)
+
+
+This shows than one corrupt packet was inserted on port 2 transmit:
+a. per-device rq_num_oos (Responder - number of out of dequence requests received) and
+   sq_num_oos (Requester - number of Out of Sequence NAKs received) incremented by one.
+
+   https://support.mellanox.com/s/article/mlnx-ofed-connectx-3-rdma-diagnostic-counters describes these per-device counters
+b. No physical errors recorded.
+c. The non-nero rq_num_wrfe (Responder - number of CQEs with error. Incremented each time a CQE with error is generated)
+   was from before ibv_generate_infiniband_test_load was started. Could have occurred when the ports where changed in turn
+   from Infiniband to Ethernet link-layer.
+
+After the test, ethtool did show one rx_error on the device for port 1:
+$ ethtool -S ens5
+NIC statistics:
+     rx_packets: 21
+     tx_packets: 45
+     rx_bytes: 1818
+     tx_bytes: 6930
+     rx_errors: 1  <--- error
+     tx_errors: 0
+     rx_dropped: 0
+     tx_dropped: 0
+     multicast: 45
+     collisions: 0
+     rx_length_errors: 0
+     rx_over_errors: 0
+     rx_crc_errors: 0
+     rx_frame_errors: 0
+     rx_fifo_errors: 0
+     rx_missed_errors: 0
+     tx_aborted_errors: 0
+     tx_carrier_errors: 0
+     tx_fifo_errors: 0
+     tx_heartbeat_errors: 0
+     tx_window_errors: 0
+     tso_packets: 0
+     xmit_more: 0
+     queue_stopped: 0
+     wake_queue: 0
+     tx_timeout: 0
+     rx_alloc_pages: 8193
+     rx_csum_good: 21
+     rx_csum_none: 0
+     rx_csum_complete: 0
+     tx_chksum_offload: 45
+     rx_multicast_packets: 45
+     rx_broadcast_packets: 0
+     rx_jabbers: 0
+     rx_in_range_length_error: 0
+     rx_out_range_length_error: 0
+     tx_multicast_packets: 45
+     tx_broadcast_packets: 0
+     rx_prio_0_packets: 0
+     rx_prio_0_bytes: 0
+     rx_prio_1_packets: 0
+     rx_prio_1_bytes: 0
+     rx_prio_2_packets: 0
+     rx_prio_2_bytes: 0
+     rx_prio_3_packets: 0
+     rx_prio_3_bytes: 0
+     rx_prio_4_packets: 0
+     rx_prio_4_bytes: 0
+     rx_prio_5_packets: 0
+     rx_prio_5_bytes: 0
+     rx_prio_6_packets: 0
+     rx_prio_6_bytes: 0
+     rx_prio_7_packets: 0
+     rx_prio_7_bytes: 0
+     rx_novlan_packets: 80203264
+     rx_novlan_bytes: 87743981312
+     tx_prio_0_packets: 0
+     tx_prio_0_bytes: 0
+     tx_prio_1_packets: 0
+     tx_prio_1_bytes: 0
+     tx_prio_2_packets: 0
+     tx_prio_2_bytes: 0
+     tx_prio_3_packets: 0
+     tx_prio_3_bytes: 0
+     tx_prio_4_packets: 0
+     tx_prio_4_bytes: 0
+     tx_prio_5_packets: 0
+     tx_prio_5_bytes: 0
+     tx_prio_6_packets: 0
+     tx_prio_6_bytes: 0
+     tx_prio_7_packets: 0
+     tx_prio_7_bytes: 0
+     tx_novlan_packets: 80270111
+     tx_novlan_bytes: 87814075538
+     rx_xdp_drop: 0
+     rx_xdp_tx: 0
+     rx_xdp_tx_full: 0
+     tx0_packets: 2
+     tx0_bytes: 169
+     tx1_packets: 4
+     tx1_bytes: 384
+     tx2_packets: 4
+     tx2_bytes: 474
+     tx3_packets: 1
+     tx3_bytes: 213
+     tx4_packets: 2
+     tx4_bytes: 300
+     tx5_packets: 7
+     tx5_bytes: 715
+     tx6_packets: 2
+     tx6_bytes: 295
+     tx7_packets: 5
+     tx7_bytes: 1065
+     tx8_packets: 4
+     tx8_bytes: 852
+     tx9_packets: 5
+     tx9_bytes: 808
+     tx10_packets: 7
+     tx10_bytes: 1360
+     tx11_packets: 2
+     tx11_bytes: 295
+     rx0_packets: 0
+     rx0_bytes: 0
+     rx0_dropped: 0
+     rx0_xdp_drop: 0
+     rx0_xdp_tx: 0
+     rx0_xdp_tx_full: 0
+     rx1_packets: 0
+     rx1_bytes: 0
+     rx1_dropped: 0
+     rx1_xdp_drop: 0
+     rx1_xdp_tx: 0
+     rx1_xdp_tx_full: 0
+     rx2_packets: 0
+     rx2_bytes: 0
+     rx2_dropped: 0
+     rx2_xdp_drop: 0
+     rx2_xdp_tx: 0
+     rx2_xdp_tx_full: 0
+     rx3_packets: 21
+     rx3_bytes: 1818
+     rx3_dropped: 0
+     rx3_xdp_drop: 0
+     rx3_xdp_tx: 0
+     rx3_xdp_tx_full: 0
+     rx4_packets: 0
+     rx4_bytes: 0
+     rx4_dropped: 0
+     rx4_xdp_drop: 0
+     rx4_xdp_tx: 0
+     rx4_xdp_tx_full: 0
+     rx5_packets: 0
+     rx5_bytes: 0
+     rx5_dropped: 0
+     rx5_xdp_drop: 0
+     rx5_xdp_tx: 0
+     rx5_xdp_tx_full: 0
+     rx6_packets: 0
+     rx6_bytes: 0
+     rx6_dropped: 0
+     rx6_xdp_drop: 0
+     rx6_xdp_tx: 0
+     rx6_xdp_tx_full: 0
+     rx7_packets: 0
+     rx7_bytes: 0
+     rx7_dropped: 0
+     rx7_xdp_drop: 0
+     rx7_xdp_tx: 0
+     rx7_xdp_tx_full: 0
+
+$ ethtool -S ens5d1
+NIC statistics:
+     rx_packets: 21
+     tx_packets: 45
+     rx_bytes: 1818
+     tx_bytes: 6930
+     rx_errors: 0
+     tx_errors: 0
+     rx_dropped: 0
+     tx_dropped: 0
+     multicast: 45
+     collisions: 0
+     rx_length_errors: 0
+     rx_over_errors: 0
+     rx_crc_errors: 0
+     rx_frame_errors: 0
+     rx_fifo_errors: 0
+     rx_missed_errors: 0
+     tx_aborted_errors: 0
+     tx_carrier_errors: 0
+     tx_fifo_errors: 0
+     tx_heartbeat_errors: 0
+     tx_window_errors: 0
+     tso_packets: 0
+     xmit_more: 0
+     queue_stopped: 0
+     wake_queue: 0
+     tx_timeout: 0
+     rx_alloc_pages: 8204
+     rx_csum_good: 21
+     rx_csum_none: 0
+     rx_csum_complete: 0
+     tx_chksum_offload: 45
+     rx_multicast_packets: 45
+     rx_broadcast_packets: 0
+     rx_jabbers: 0
+     rx_in_range_length_error: 0
+     rx_out_range_length_error: 0
+     tx_multicast_packets: 45
+     tx_broadcast_packets: 0
+     rx_prio_0_packets: 0
+     rx_prio_0_bytes: 0
+     rx_prio_1_packets: 0
+     rx_prio_1_bytes: 0
+     rx_prio_2_packets: 0
+     rx_prio_2_bytes: 0
+     rx_prio_3_packets: 0
+     rx_prio_3_bytes: 0
+     rx_prio_4_packets: 0
+     rx_prio_4_bytes: 0
+     rx_prio_5_packets: 0
+     rx_prio_5_bytes: 0
+     rx_prio_6_packets: 0
+     rx_prio_6_bytes: 0
+     rx_prio_7_packets: 0
+     rx_prio_7_bytes: 0
+     rx_novlan_packets: 80270111
+     rx_novlan_bytes: 87814075538
+     tx_prio_0_packets: 0
+     tx_prio_0_bytes: 0
+     tx_prio_1_packets: 0
+     tx_prio_1_bytes: 0
+     tx_prio_2_packets: 0
+     tx_prio_2_bytes: 0
+     tx_prio_3_packets: 0
+     tx_prio_3_bytes: 0
+     tx_prio_4_packets: 0
+     tx_prio_4_bytes: 0
+     tx_prio_5_packets: 0
+     tx_prio_5_bytes: 0
+     tx_prio_6_packets: 0
+     tx_prio_6_bytes: 0
+     tx_prio_7_packets: 0
+     tx_prio_7_bytes: 0
+     tx_novlan_packets: 80203265
+     tx_novlan_bytes: 87743982410
+     rx_xdp_drop: 0
+     rx_xdp_tx: 0
+     rx_xdp_tx_full: 0
+     tx0_packets: 2
+     tx0_bytes: 169
+     tx1_packets: 4
+     tx1_bytes: 384
+     tx2_packets: 4
+     tx2_bytes: 474
+     tx3_packets: 1
+     tx3_bytes: 213
+     tx4_packets: 2
+     tx4_bytes: 300
+     tx5_packets: 7
+     tx5_bytes: 715
+     tx6_packets: 2
+     tx6_bytes: 295
+     tx7_packets: 5
+     tx7_bytes: 1065
+     tx8_packets: 4
+     tx8_bytes: 852
+     tx9_packets: 5
+     tx9_bytes: 808
+     tx10_packets: 7
+     tx10_bytes: 1360
+     tx11_packets: 2
+     tx11_bytes: 295
+     rx0_packets: 0
+     rx0_bytes: 0
+     rx0_dropped: 0
+     rx0_xdp_drop: 0
+     rx0_xdp_tx: 0
+     rx0_xdp_tx_full: 0
+     rx1_packets: 0
+     rx1_bytes: 0
+     rx1_dropped: 0
+     rx1_xdp_drop: 0
+     rx1_xdp_tx: 0
+     rx1_xdp_tx_full: 0
+     rx2_packets: 0
+     rx2_bytes: 0
+     rx2_dropped: 0
+     rx2_xdp_drop: 0
+     rx2_xdp_tx: 0
+     rx2_xdp_tx_full: 0
+     rx3_packets: 0
+     rx3_bytes: 0
+     rx3_dropped: 0
+     rx3_xdp_drop: 0
+     rx3_xdp_tx: 0
+     rx3_xdp_tx_full: 0
+     rx4_packets: 0
+     rx4_bytes: 0
+     rx4_dropped: 0
+     rx4_xdp_drop: 0
+     rx4_xdp_tx: 0
+     rx4_xdp_tx_full: 0
+     rx5_packets: 0
+     rx5_bytes: 0
+     rx5_dropped: 0
+     rx5_xdp_drop: 0
+     rx5_xdp_tx: 0
+     rx5_xdp_tx_full: 0
+     rx6_packets: 21
+     rx6_bytes: 1818
+     rx6_dropped: 0
+     rx6_xdp_drop: 0
+     rx6_xdp_tx: 0
+     rx6_xdp_tx_full: 0
+     rx7_packets: 0
+     rx7_bytes: 0
+     rx7_dropped: 0
+     rx7_xdp_drop: 0
+     rx7_xdp_tx: 0
+     rx7_xdp_tx_full: 0
+
+There are no signs of dropped packets, nor re-transmits (rq_num_oos/sq_num_oos),
+apart from when one transmit packet was deliberately corrupted.
+
+And pause is enabled for the Ethernet ports:
+$ ethtool -a ens5
+Pause parameters for ens5:
+Autonegotiate:  off
+RX:     on
+TX:     on
+
+$ ethtool -a ens5d1
+Pause parameters for ens5d1:
+Autonegotiate:  off
+RX:     on
+TX:     on
+
+
+Disabling both tx and rx pause didn't cause any rq_num_oos/sq_num_oos when ibv_generate_infiniband_test_load was
+subsequently run. 
+mr_halfword@Haswell-Ubuntu:~$ sudo ethtool -A ens5 tx off rx off
+[sudo] password for mr_halfword: 
+mr_halfword@Haswell-Ubuntu:~$ sudo ethtool -A ens5d1 tx off rx off
+mr_halfword@Haswell-Ubuntu:~$ ethtool -a ens5
+Pause parameters for ens5:
+Autonegotiate:  off
+RX:     off
+TX:     off
+
+mr_halfword@Haswell-Ubuntu:~$ ethtool -a ens5d1
+Pause parameters for ens5d1:
+Autonegotiate:  off
+RX:     off
+TX:     off
+

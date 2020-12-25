@@ -90,6 +90,7 @@ add_subdirectory ("${PROJECT_SOURCE_DIR}/parse_debug_information")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/ibv_time_rnr")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/ibv_round_trip_delay")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/usb_id_dongle")
+add_subdirectory ("${PROJECT_SOURCE_DIR}/ibv_display_local_infiniband_device_statistics")
 
 # Location of the source code for the linuxptp package, to gain access to the phc.[ch]
 set (LINUXPTP_ROOT "$ENV{HOME}/linuxptp-1.6")

@@ -1,4 +1,6 @@
-== Tests on a ConnectX-2 with loop back between the ports ==
+= 1. Tests on a ConnectX-2 with in a PCIe v2 x8 slot, with loop back between the ports =
+
+Fitted in PCEi v2 x8 slot in a Intel E5-2620 v3
 
 == QDR Infiniband with 4096 MTU ==
 
@@ -59,4 +61,44 @@ $ sudo ifconfig ens5 mtu 9600
 Where the maximum MTU of 9600 was found by increasing the requested MTU before "SIOCSIFMTU: Invalid argument" was reported
 
 ibv_devinfo reports active MTU is 4096
+
+
+= 2. Tests on a ConnectX-2 with in a PCIe v2 x1 slot, with loop back between the ports =
+
+Fitted in PCEi v2 x1 slot in a Xilinx ZU4EV
+
+== 10Gb RoCE with 1024 MTU ==
+
+Ethernet MTU set to default of 1500
+
+root@MYD_CZU4EV_RC:/media/sd-mmcblk1p2/root# ./ibv_generate_infiniband_test_load 0
+PRBS32 pattern period is 4294967295
+Press Ctrl-C to stop the Infiniband test load
+^C
+mlx4_0 rx_buffer compare : PASS
+mlx4_0 port 1 -> 2 RDMA write transmitted 665451495424 bytes in 3572.210914 seconds, 186.3 Mbytes/sec
+mlx4_0 port 1 transmitted 713739156456 bytes in 3572.210914 seconds, 199.8 Mbytes/sec
+mlx4_0 port 1 received 713739147408 bytes in 3572.210914 seconds, 199.8 Mbytes/sec
+mlx4_0 port 2 -> 1 RDMA write transmitted 665451495424 bytes in 3572.210930 seconds, 186.3 Mbytes/sec
+mlx4_0 port 2 transmitted 713739147408 bytes in 3572.210930 seconds, 199.8 Mbytes/sec
+mlx4_0 port 2 received 713739156456 bytes in 3572.210930 seconds, 199.8 Mbytes/sec
+
+
+== 10Gb RoCE with 4096 MTU ==
+
+Ethernet MTU set to max of 9600
+
+Subsequent investigation shows the mininum Ethernet MTU to get an active RoCE MTU of 4096, in an Ethernet MTU of 4192
+
+root@MYD_CZU4EV_RC:/media/sd-mmcblk1p2/root# ./ibv_generate_infiniband_test_load 0
+PRBS32 pattern period is 4294967295
+Press Ctrl-C to stop the Infiniband test load
+^C
+mlx4_0 rx_buffer compare : PASS
+mlx4_0 port 1 -> 2 RDMA write transmitted 1512365359104 bytes in 7958.601685 seconds, 190.0 Mbytes/sec
+mlx4_0 port 1 transmitted 1539801176052 bytes in 7958.601685 seconds, 193.5 Mbytes/sec
+mlx4_0 port 1 received 1539800955936 bytes in 7958.601685 seconds, 193.5 Mbytes/sec
+mlx4_0 port 2 -> 1 RDMA write transmitted 1512365359104 bytes in 7958.601700 seconds, 190.0 Mbytes/sec
+mlx4_0 port 2 transmitted 1539800955936 bytes in 7958.601700 seconds, 193.5 Mbytes/sec
+mlx4_0 port 2 received 1539801176052 bytes in 7958.601700 seconds, 193.5 Mbytes/sec
 
