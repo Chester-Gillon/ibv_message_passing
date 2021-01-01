@@ -454,3 +454,15 @@ Autonegotiate:  off
 RX:     off
 TX:     off
 
+
+== Reduced statistics in older Kernel ==
+
+The above was with Ubuntu 18.04 running a 4.15.0-128-generic
+
+With CentOS 6 and a 3.10.33-rt32.33.el6rt.x86_64 and the same type of ConnectX-2:
+a. There are no per-device statistics files.
+b. The per-port port_rcv_data and port_rcv_data stick with a max value of 4294967295, 
+   i.e. treated as 32-bit rather than 64-bit counters.
+
+The reporting of port throughput by ibv_generate_infiniband_test_load can be affected in the same way, in that if started
+after the port_rcv_data and port_rcv_data counters get to their max then the reported throughput appears is zero.
