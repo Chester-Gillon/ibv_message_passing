@@ -1,0 +1,456 @@
+Results from running snmp_response_time on a Scientific Linux release 6.10 host,
+with a 3.10.33-rt32.33.el6rt.x86_64 Kernel.
+
+SNMP target is running PetaLinux 2020.1 with 5.4.0-xilinx-v2020.1 Kernel
+
+host IP is 192.168.0.116
+target IP is 192.168.0.100
+
+== Running though target reboot ==
+
+snmp_response_time was set running while the target was running, the target was rebooted, and then wait to get response.
+
+[mr_halfword@sandy-centos release]$ snmp_response_time/snmp_response_time 192.168.0.100
+Press Ctrl-C to stop the test
+<< Initial results when target running >>
+SUCCESS : 101 results min response time = 0.000166 secs( 09:34:15.820734220) median response time = 0.000215 secs max response time = 0.000588 secs( 09:33:59.397937652)
+TIMEOUT : 0 results
+SUCCESS : 201 results min response time = 0.000155 secs( 09:34:38.851741008) median response time = 0.000212 secs max response time = 0.000588 secs( 09:33:59.397937652)
+TIMEOUT : 0 results
+<< Target reboot starts >>
+SUCCESS : 216 results min response time = 0.000155 secs( 09:34:38.851741008) median response time = 0.000211 secs max response time = 0.000588 secs( 09:33:59.397937652)
+TIMEOUT : 3 results min response time = 6.005289 secs( 09:34:42.657197168) median response time = 6.005943 secs max response time = 6.005945 secs( 09:34:55.068540422)
+SUCCESS : 216 results min response time = 0.000155 secs( 09:34:38.851741008) median response time = 0.000211 secs max response time = 0.000588 secs( 09:33:59.397937652)
+TIMEOUT : 6 results min response time = 6.005289 secs( 09:34:42.657197168) median response time = 6.005944 secs max response time = 6.005945 secs( 09:34:55.068540422)
+<< Target reboot complete >>
+SUCCESS : 290 results min response time = 0.000155 secs( 09:34:38.851741008) median response time = 0.000206 secs max response time = 5.005390 secs( 09:35:19.892540743)
+TIMEOUT : 6 results min response time = 6.005289 secs( 09:34:42.657197168) median response time = 6.005944 secs max response time = 6.005945 secs( 09:34:55.068540422)
+SUCCESS : 390 results min response time = 0.000155 secs( 09:34:38.851741008) median response time = 0.000202 secs max response time = 5.005390 secs( 09:35:19.892540743)
+TIMEOUT : 6 results min response time = 6.005289 secs( 09:34:42.657197168) median response time = 6.005944 secs max response time = 6.005945 secs( 09:34:55.068540422)
+^C
+SUCCESS : 404 results min response time = 0.000155 secs( 09:34:38.851741008) median response time = 0.000202 secs max response time = 5.005390 secs( 09:35:19.892540743)
+TIMEOUT : 6 results min response time = 6.005289 secs( 09:34:42.657197168) median response time = 6.005944 secs max response time = 6.005945 secs( 09:34:55.068540422)
+
+
+While the target is rebooting, the snmp_synch_response() calls which result in a TIMEOUT take 6.006 seconds.
+The default for snmplib is that each snmp_synch_response() sends a maximum of 5 retries, with a one second timeout for each request.
+The original request, and up to 5 retiries have the same request-id in the UDP packets
+
+When the target is running, the snmp_synch_response() calls get a response with a median time of 200 microseconds.
+
+As the target completed rebooting their was one successful snmp_synch_response() call with a response time of 5.005 seconds.
+A cpature made from tshark shows there was a response to the final retry in this case.
+Overall sequence was:
+a. Initial no response from the target.
+b. ICMP "Destination unreachable (Port unreachable)" errors from the target, when the network stack had initialised but before
+   snmpd was running.
+c. A response from snmp.
+
+No.     Time               Source                Destination           Protocol Length Info
+   1316 09:35:19.892556924 192.168.0.116         192.168.0.100         SNMP     85     get-request 1.3.6.1.2.1.1.1.0
+
+Frame 1316: 85 bytes on wire (680 bits), 85 bytes captured (680 bits) on interface 0
+Ethernet II, Src: AsustekC_a9:f5:6b (00:22:15:a9:f5:6b), Dst: Xilinx_00:22:01 (00:0a:35:00:22:01)
+Internet Protocol Version 4, Src: 192.168.0.116 (192.168.0.116), Dst: 192.168.0.100 (192.168.0.100)
+User Datagram Protocol, Src Port: 34759 (34759), Dst Port: snmp (161)
+Simple Network Management Protocol
+    version: v2c (1)
+    community: public
+    data: get-request (0)
+        get-request
+            request-id: 1437493470 <<< initial request
+            error-status: noError (0)
+            error-index: 0
+            variable-bindings: 1 item
+
+No.     Time               Source                Destination           Protocol Length Info
+   1320 09:35:20.233182911 64:66:24:d5:6c:82     Broadcast             ARP      60     Who has 192.168.0.100?  Tell 192.168.0.1
+
+Frame 1320: 60 bytes on wire (480 bits), 60 bytes captured (480 bits) on interface 0
+Ethernet II, Src: 64:66:24:d5:6c:82 (64:66:24:d5:6c:82), Dst: Broadcast (ff:ff:ff:ff:ff:ff)
+Address Resolution Protocol (request)
+
+No.     Time               Source                Destination           Protocol Length Info
+   1323 09:35:20.893499091 192.168.0.116         192.168.0.100         SNMP     85     get-request 1.3.6.1.2.1.1.1.0
+
+Frame 1323: 85 bytes on wire (680 bits), 85 bytes captured (680 bits) on interface 0
+Ethernet II, Src: AsustekC_a9:f5:6b (00:22:15:a9:f5:6b), Dst: Xilinx_00:22:01 (00:0a:35:00:22:01)
+Internet Protocol Version 4, Src: 192.168.0.116 (192.168.0.116), Dst: 192.168.0.100 (192.168.0.100)
+User Datagram Protocol, Src Port: 34759 (34759), Dst Port: snmp (161)
+Simple Network Management Protocol
+    version: v2c (1)
+    community: public
+    data: get-request (0)
+        get-request
+            request-id: 1437493470 <<< 1st retry
+            error-status: noError (0)
+            error-index: 0
+            variable-bindings: 1 item
+
+No.     Time               Source                Destination           Protocol Length Info
+   1324 09:35:21.237251091 64:66:24:d5:6c:82     Broadcast             ARP      60     Who has 192.168.0.100?  Tell 192.168.0.1
+
+Frame 1324: 60 bytes on wire (480 bits), 60 bytes captured (480 bits) on interface 0
+Ethernet II, Src: 64:66:24:d5:6c:82 (64:66:24:d5:6c:82), Dst: Broadcast (ff:ff:ff:ff:ff:ff)
+Address Resolution Protocol (request)
+
+No.     Time               Source                Destination           Protocol Length Info
+   1330 09:35:21.894500658 192.168.0.116         192.168.0.100         SNMP     85     get-request 1.3.6.1.2.1.1.1.0
+
+Frame 1330: 85 bytes on wire (680 bits), 85 bytes captured (680 bits) on interface 0
+Ethernet II, Src: AsustekC_a9:f5:6b (00:22:15:a9:f5:6b), Dst: Xilinx_00:22:01 (00:0a:35:00:22:01)
+Internet Protocol Version 4, Src: 192.168.0.116 (192.168.0.116), Dst: 192.168.0.100 (192.168.0.100)
+User Datagram Protocol, Src Port: 34759 (34759), Dst Port: snmp (161)
+Simple Network Management Protocol
+    version: v2c (1)
+    community: public
+    data: get-request (0)
+        get-request
+            request-id: 1437493470 <<< 2nd retry
+            error-status: noError (0)
+            error-index: 0
+            variable-bindings: 1 item
+
+No.     Time               Source                Destination           Protocol Length Info
+   1331 09:35:21.894709242 Xilinx_00:22:01       Broadcast             ARP      60     Who has 192.168.0.116?  Tell 192.168.0.100
+
+Frame 1331: 60 bytes on wire (480 bits), 60 bytes captured (480 bits) on interface 0
+Ethernet II, Src: Xilinx_00:22:01 (00:0a:35:00:22:01), Dst: Broadcast (ff:ff:ff:ff:ff:ff)
+Address Resolution Protocol (request)
+
+No.     Time               Source                Destination           Protocol Length Info
+   1332 09:35:21.894713818 AsustekC_a9:f5:6b     Xilinx_00:22:01       ARP      42     192.168.0.116 is at 00:22:15:a9:f5:6b
+
+Frame 1332: 42 bytes on wire (336 bits), 42 bytes captured (336 bits) on interface 0
+Ethernet II, Src: AsustekC_a9:f5:6b (00:22:15:a9:f5:6b), Dst: Xilinx_00:22:01 (00:0a:35:00:22:01)
+Address Resolution Protocol (reply)
+
+No.     Time               Source                Destination           Protocol Length Info
+   1333 09:35:21.894821925 192.168.0.100         192.168.0.116         ICMP     113    Destination unreachable (Port unreachable)
+
+Frame 1333: 113 bytes on wire (904 bits), 113 bytes captured (904 bits) on interface 0
+Ethernet II, Src: Xilinx_00:22:01 (00:0a:35:00:22:01), Dst: AsustekC_a9:f5:6b (00:22:15:a9:f5:6b)
+Internet Protocol Version 4, Src: 192.168.0.100 (192.168.0.100), Dst: 192.168.0.116 (192.168.0.116)
+Internet Control Message Protocol
+
+No.     Time               Source                Destination           Protocol Length Info
+   1334 09:35:21.895813453 Xilinx_00:22:01       Broadcast             ARP      60     Who has 192.168.0.1?  Tell 192.168.0.100
+
+Frame 1334: 60 bytes on wire (480 bits), 60 bytes captured (480 bits) on interface 0
+Ethernet II, Src: Xilinx_00:22:01 (00:0a:35:00:22:01), Dst: Broadcast (ff:ff:ff:ff:ff:ff)
+Address Resolution Protocol (request)
+
+No.     Time               Source                Destination           Protocol Length Info
+   1341 09:35:22.895496124 192.168.0.116         192.168.0.100         SNMP     85     get-request 1.3.6.1.2.1.1.1.0
+
+Frame 1341: 85 bytes on wire (680 bits), 85 bytes captured (680 bits) on interface 0
+Ethernet II, Src: AsustekC_a9:f5:6b (00:22:15:a9:f5:6b), Dst: Xilinx_00:22:01 (00:0a:35:00:22:01)
+Internet Protocol Version 4, Src: 192.168.0.116 (192.168.0.116), Dst: 192.168.0.100 (192.168.0.100)
+User Datagram Protocol, Src Port: 34759 (34759), Dst Port: snmp (161)
+Simple Network Management Protocol
+    version: v2c (1)
+    community: public
+    data: get-request (0)
+        get-request
+            request-id: 1437493470 <<< 3rd retry
+            error-status: noError (0)
+            error-index: 0
+            variable-bindings: 1 item
+
+No.     Time               Source                Destination           Protocol Length Info
+   1342 09:35:22.895663184 192.168.0.100         192.168.0.116         ICMP     113    Destination unreachable (Port unreachable)
+
+Frame 1342: 113 bytes on wire (904 bits), 113 bytes captured (904 bits) on interface 0
+Ethernet II, Src: Xilinx_00:22:01 (00:0a:35:00:22:01), Dst: AsustekC_a9:f5:6b (00:22:15:a9:f5:6b)
+Internet Protocol Version 4, Src: 192.168.0.100 (192.168.0.100), Dst: 192.168.0.116 (192.168.0.116)
+Internet Control Message Protocol
+
+No.     Time               Source                Destination           Protocol Length Info
+   1345 09:35:23.896497596 192.168.0.116         192.168.0.100         SNMP     85     get-request 1.3.6.1.2.1.1.1.0
+
+Frame 1345: 85 bytes on wire (680 bits), 85 bytes captured (680 bits) on interface 0
+Ethernet II, Src: AsustekC_a9:f5:6b (00:22:15:a9:f5:6b), Dst: Xilinx_00:22:01 (00:0a:35:00:22:01)
+Internet Protocol Version 4, Src: 192.168.0.116 (192.168.0.116), Dst: 192.168.0.100 (192.168.0.100)
+User Datagram Protocol, Src Port: 34759 (34759), Dst Port: snmp (161)
+Simple Network Management Protocol
+    version: v2c (1)
+    community: public
+    data: get-request (0)
+        get-request
+            request-id: 1437493470 <<< 4th retry
+            error-status: noError (0)
+            error-index: 0
+            variable-bindings: 1 item
+
+No.     Time               Source                Destination           Protocol Length Info
+   1347 09:35:23.896618510 192.168.0.100         192.168.0.116         ICMP     113    Destination unreachable (Port unreachable)
+
+Frame 1347: 113 bytes on wire (904 bits), 113 bytes captured (904 bits) on interface 0
+Ethernet II, Src: Xilinx_00:22:01 (00:0a:35:00:22:01), Dst: AsustekC_a9:f5:6b (00:22:15:a9:f5:6b)
+Internet Protocol Version 4, Src: 192.168.0.100 (192.168.0.100), Dst: 192.168.0.116 (192.168.0.116)
+Internet Control Message Protocol
+
+No.     Time               Source                Destination           Protocol Length Info
+   1354 09:35:24.897498110 192.168.0.116         192.168.0.100         SNMP     85     get-request 1.3.6.1.2.1.1.1.0
+
+Frame 1354: 85 bytes on wire (680 bits), 85 bytes captured (680 bits) on interface 0
+Ethernet II, Src: AsustekC_a9:f5:6b (00:22:15:a9:f5:6b), Dst: Xilinx_00:22:01 (00:0a:35:00:22:01)
+Internet Protocol Version 4, Src: 192.168.0.116 (192.168.0.116), Dst: 192.168.0.100 (192.168.0.100)
+User Datagram Protocol, Src Port: 34759 (34759), Dst Port: snmp (161)
+Simple Network Management Protocol
+    version: v2c (1)
+    community: public
+    data: get-request (0)
+        get-request
+            request-id: 1437493470 <<< 5th retry
+            error-status: noError (0)
+            error-index: 0
+            variable-bindings: 1 item
+
+No.     Time               Source                Destination           Protocol Length Info
+   1355 09:35:24.897901644 192.168.0.100         192.168.0.116         SNMP     169    get-response 1.3.6.1.2.1.1.1.0
+
+Frame 1355: 169 bytes on wire (1352 bits), 169 bytes captured (1352 bits) on interface 0
+Ethernet II, Src: Xilinx_00:22:01 (00:0a:35:00:22:01), Dst: AsustekC_a9:f5:6b (00:22:15:a9:f5:6b)
+Internet Protocol Version 4, Src: 192.168.0.100 (192.168.0.100), Dst: 192.168.0.116 (192.168.0.116)
+User Datagram Protocol, Src Port: snmp (161), Dst Port: 34759 (34759)
+Simple Network Management Protocol
+    version: v2c (1)
+    community: public
+    data: get-response (2)
+        get-response
+            request-id: 1437493470 <<< response to the 5th retry
+            error-status: noError (0)
+            error-index: 0
+            variable-bindings: 1 item
+
+
+== Long running test (over 22 minutes) ==
+
+Left snmp_response_time running for 22 minutes.
+
+[mr_halfword@sandy-centos release]$ snmp_response_time/snmp_response_time 192.168.0.100 snmp_long_run.csv
+Press Ctrl-C to stop the test
+SUCCESS : 101 results min response time = 0.000161 secs( 10:20:41.244744258) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 201 results min response time = 0.000161 secs( 10:20:41.244744258) median response time = 0.000204 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 301 results min response time = 0.000161 secs( 10:20:41.244744258) median response time = 0.000204 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 401 results min response time = 0.000161 secs( 10:20:41.244744258) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 501 results min response time = 0.000161 secs( 10:20:41.244744258) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 601 results min response time = 0.000161 secs( 10:20:41.244744258) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 701 results min response time = 0.000161 secs( 10:22:39.395806879) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 800 results min response time = 0.000161 secs( 10:22:39.395806879) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 900 results min response time = 0.000161 secs( 10:22:39.395806879) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 1000 results min response time = 0.000161 secs( 10:22:39.395806879) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 1100 results min response time = 0.000161 secs( 10:24:01.099627226) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 1200 results min response time = 0.000161 secs( 10:24:01.099627226) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 1300 results min response time = 0.000161 secs( 10:24:01.099627226) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 1400 results min response time = 0.000161 secs( 10:24:01.099627226) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 1500 results min response time = 0.000161 secs( 10:24:01.099627226) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 1599 results min response time = 0.000161 secs( 10:24:01.099627226) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 1699 results min response time = 0.000161 secs( 10:24:01.099627226) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 1799 results min response time = 0.000161 secs( 10:24:01.099627226) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 1899 results min response time = 0.000161 secs( 10:24:01.099627226) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 1999 results min response time = 0.000161 secs( 10:24:01.099627226) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 2099 results min response time = 0.000161 secs( 10:24:01.099627226) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 2199 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 2299 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 2398 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 2498 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 2598 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 2698 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 2798 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 2898 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 2998 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 3098 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000394 secs( 10:20:33.835109447)
+TIMEOUT : 0 results
+SUCCESS : 3197 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 3297 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 3397 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 3497 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 3597 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 3697 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 3797 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 3897 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 3996 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 4096 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 4196 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 4296 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 4396 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 4496 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 4596 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 4696 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 4795 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 4895 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 4995 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 5095 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 5195 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 5295 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 5395 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 5494 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 5594 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 5694 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 5794 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 5894 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 5994 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 6094 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 6194 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 6293 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 6393 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 6493 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 6593 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 6693 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 6793 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 6893 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 6993 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 7092 results min response time = 0.000159 secs( 10:27:48.990264980) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 7192 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 7292 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 7392 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 7492 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 7592 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 7692 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 7792 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 7891 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 7991 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.000521 secs( 10:31:08.444266564)
+TIMEOUT : 0 results
+SUCCESS : 8091 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 8191 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 8291 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 8391 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 8491 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 8591 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 8690 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 8790 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 8890 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 8990 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 9090 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 9190 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 9290 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 9390 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 9489 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 9589 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 9689 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 9789 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 9889 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 9989 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 10089 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 10189 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 10288 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 10388 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 10488 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+SUCCESS : 10588 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+^C
+SUCCESS : 10667 results min response time = 0.000158 secs( 10:44:33.467546902) median response time = 0.000203 secs max response time = 0.001051 secs( 10:47:26.487592259)
+TIMEOUT : 0 results
+[mr_halfword@sandy-centos release]$ 
+
+No TIMEOUTs occurred, and the max response time was 1051 microseconds, compared to a median of 200 microseconds.
+
+Looking at the Wireshark capture, when the max response time occurred, there were no other Ethernet frames between the
+SNMP request and response.
+
+During the test the PetaLinux target ARP's the address of the CentOS 6 host, but the CentOS 6 host isn't ARPing the target.

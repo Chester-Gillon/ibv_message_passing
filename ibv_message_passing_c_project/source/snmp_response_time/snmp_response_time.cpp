@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <map>
 #include <vector>
-#include <ctype.h>
+#include <cinttypes>
 
 #include <time.h>
 #include <signal.h>
