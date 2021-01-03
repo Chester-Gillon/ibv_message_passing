@@ -195,6 +195,24 @@ void open_ib_port_endpoint (ib_port_endpoint *const endpoint, const communicatio
         perror ("ibv_query_port failed");
         exit (EXIT_FAILURE);
     }
+
+    /* Check the Infinind port is active. If not active can complete initialisation, but transfers stall */
+    if (endpoint->port_attributes.state != IBV_PORT_ACTIVE)
+    {
+        const char *const port_states[] =
+        {
+             [IBV_PORT_NOP] = "NOP",
+             [IBV_PORT_DOWN] = "DOWN",
+             [IBV_PORT_INIT] = "INIT",
+             [IBV_PORT_ARMED] = "ARMED",
+             [IBV_PORT_ACTIVE] = "ACTIVE",
+             [IBV_PORT_ACTIVE_DEFER] = "ACTIVE_DEFER"
+        };
+
+        fprintf (stderr, "State of Infiniband port %u on device %s is %s (not active)\n",
+                 endpoint->port_num, ib_device, port_states[endpoint->port_attributes.state]);
+        exit (EXIT_FAILURE);
+    }
 }
 
 /**
