@@ -1,0 +1,399 @@
+== Topology configuration ==
+
+Create a "ring" topology, using 3 Mellanox ConnectX-2 VPI dual port cards connected using DAC cables.
+
+/-< port 2 Haswell Ubuntu port 1 <-> port 2 Sandy CentOS port 1 <-> port 2 MYD_CZU4EV_RC port 1 >-\
+|                                                                                                 |
+\-------------------------------------------------------------------------------------------------/
+
+Where:
+- Haswell Ubuntu running Ubuntu 18.04.5 LTS with 4.15.0-128-generic x86_64 Kernel
+- Sandy CentOS running Scientific Linux release 6.10 with 3.10.33-rt32.33.el6rt.x86_64 Kernel
+- MYD_CZU4EV_RC running PetaLinux 2020.1 with MYD_CZU4EV_RC aarch64 Kernel
+
+The x86_64 PCs have the ConnectX-2 running at its PCIe full speed and width:
+mr_halfword@Haswell-Ubuntu:~$ sudo lspci -vvv -d 15b3: | grep LnkSta
+[sudo] password for mr_halfword: 
+        LnkSta: Speed 5GT/s, Width x8, TrErr- Train- SlotClk- DLActive- BWMgmt- ABWMgmt-
+        LnkSta2: Current De-emphasis Level: -6dB, EqualizationComplete-, EqualizationPhase1-
+
+[mr_halfword@sandy-centos ~]$ sudo lspci -vvv -d 15b3: | grep LnkSta
+[sudo] password for mr_halfword: 
+        LnkSta: Speed 5GT/s, Width x8, TrErr- Train- SlotClk- DLActive- BWMgmt- ABWMgmt-
+        LnkSta2: Current De-emphasis Level: -6dB, EqualizationComplete-, EqualizationPhase1-
+
+Whereas the aarch64 board has only a single lane PCIe v2.0 connector and so is running at a degraded width:
+root@MYD_CZU4EV_RC:~# lspci -vvv -d 15b3: | grep LnkSta
+                LnkSta: Speed 5GT/s (ok), Width x1 (downgraded)
+                LnkSta2: Current De-emphasis Level: -6dB, EqualizationComplete-, EqualizationPhase1-
+
+
+== Connections using Infiniband ==
+
+OpenSM was run on the x86_64 PCs, to be able to allocate LIDs.
+
+OpenSM wasn't running on the aarch64 board due an issue trying to cross-compile opensm; haven't determined how to stop the
+cross-compiled opensm from using some native include files which leads to build errors.
+
+The LIDs allocated were:
+Haswell Ubuntu port 1:sm_lid:           2 port_lid:     2
+               port 2:sm_lid:           3 port_lid:     3
+Sandy CentOS   port 1:sm_lid:           4 port_lid:     4
+               port 2:sm_lid:           2 port_lid:     1
+MYD_CZU4EV_RC  port 1:sm_lid:           3 port_lid:     1
+               port 2:sm_lid:           4 port_lid:     5
+
+Two of the port have the same LID value, which is not unexpected since there are in different sub-nets; as a result of direct
+connections beteen ports.
+
+Running ibv_round_trip_delay using RDMA using 3 cores was successful with:
+a.
+root@MYD_CZU4EV_RC:/mnt/sd-mmcblk1p2/root# ./ibv_round_trip_delay --role=rdma_server --cores=1,2,3 --ib-dev=mlx4_0 --ib-port=1
+mr_halfword@Haswell-Ubuntu:~$ ~/ibv_message_passing/ibv_message_passing_c_project/bin/release/ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_client --cores=1,2,3 --ib-dev=mlx4_0 --ib-port=2
+
+Around 125775 messages/second on each core
+
+b.
+root@MYD_CZU4EV_RC:/mnt/sd-mmcblk1p2/root# ./ibv_round_trip_delay --role=rdma_server --cores=1,2,3 --ib-dev=mlx4_0 --ib-port=2
+[mr_halfword@sandy-centos ~]$ ~/ibv_message_passing/ibv_message_passing_c_project/bin/release/ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_client --cores=1,2,3 --ib-dev=mlx4_0 --ib-port=1
+
+Around 126965 messages/second on each core
+
+c.
+mr_halfword@Haswell-Ubuntu:~$ ~/ibv_message_passing/ibv_message_passing_c_project/bin/release/ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_server --cores=1,2,3 --ib-dev=mlx4_0 --ib-port=1
+[mr_halfword@sandy-centos ~]$ ~/ibv_message_passing/ibv_message_passing_c_project/bin/release/ibv_round_trip_delay/ibv_round_trip_delay --role=rdma_client --cores=1,2,3 --ib-dev=mlx4_0 --ib-port=2
+
+Around 278934 messages/second on each core
+
+
+Running ibv_message_bw with a transmitter on each x86_64 PC and two receivers on the aarch64 board was successful.
+root@MYD_CZU4EV_RC:/mnt/sd-mmcblk1p2/root# ./ibv_message_bw --thread=rx:0,rx:1 --ib-dev=mlx4_0,mlx4_0 --ib-port=1,2
+mr_halfword@Haswell-Ubuntu:~$ ~/ibv_message_passing/ibv_message_passing_c_project/bin/release/ibv_message_bw/ibv_message_bw --thread=tx:0 --ib-dev=mlx4_0 --ib-port=2
+[mr_halfword@sandy-centos ~]$ ~/ibv_message_passing/ibv_message_passing_c_project/bin/release/ibv_message_bw/ibv_message_bw --thread=tx:1 --ib-dev=mlx4_0 --ib-port=1
+
+The two receive ports on the aarch64 board were getting equal bandwidth, as shown by the final status on the aarch64 board:
+Rx_0 received 2085617664 data bytes in 1989 messages over last 10.0 seconds
+Rx_1 received 2085617664 data bytes in 1989 messages over last 10.0 seconds
+Rx_0 received 2086666240 data bytes in 1990 messages over last 10.0 seconds
+Rx_1 received 2086666240 data bytes in 1990 messages over last 10.0 seconds
+
+Rx_0 Total data bytes 103767080960 over 494.755997 seconds; 209.7 Mbytes/second
+Rx_0 Total messages 98960 over 494.755997 seconds; 200 messages/second
+Rx_0 Min message size=1048576 max message size=1048576 data verification=no
+Rx_0 minor page faults=1 (4196 -> 4197)
+Rx_0 major page faults=0 (0 -> 0)
+Rx_0 voluntary context switches=0 (45 -> 45)
+Rx_0 involuntary context switches=5504 (24 -> 5528)
+Rx_0 user time=494.716445 system time=0.002841
+
+Rx_1 Total data bytes 102652444672 over 492.081909 seconds; 208.6 Mbytes/second
+Rx_1 Total messages 97897 over 492.081909 seconds; 199 messages/second
+Rx_1 Min message size=1048576 max message size=1048576 data verification=no
+Rx_1 minor page faults=1 (4126 -> 4127)
+Rx_1 major page faults=0 (0 -> 0)
+Rx_1 voluntary context switches=0 (36 -> 36)
+Rx_1 involuntary context switches=12930 (14 -> 12944)
+Rx_1 user time=491.937881 system time=0.024512
+
+And ibv_display_local_infiniband_device_statistics running on the aarch64 board:
+Statistics after 1510 seconds
+Counter name                     Device  Port  Counter value(delta)
+port_xmit_data                   mlx4_0     1  1033066276(+49869)
+port_xmit_wait                   mlx4_0     1  153
+port_rcv_packets                 mlx4_0     1  90350462(+513275)
+port_rcv_data                    mlx4_0     1  26618421419(+524621677)
+link_downed                      mlx4_0     1  1
+port_xmit_packets                mlx4_0     1  65577458(+5972)
+port_xmit_data                   mlx4_0     2  768603440(+49894)
+port_xmit_wait                   mlx4_0     2  116
+port_rcv_packets                 mlx4_0     2  73333149(+513276)
+port_rcv_data                    mlx4_0     2  26127804975(+524622714)
+link_downed                      mlx4_0     2  2
+port_xmit_packets                mlx4_0     2  48812663(+5972)
+
+
+== Connection using Ethernet ==
+
+Switched all ports from Infiniband to Ethernet, and used ifconfig to set Ethernet MTU to 9600 to get an RDMA MTU of 4096.
+
+ethtool -a reports all ports have the following pause Pause parameters:
+Autonegotiate:  off
+RX:             on
+TX:             on
+
+=== Failed attempt when aarch64 board Ethernet ports not active ===
+
+Went to run the same ibv_message_bw test as above. All nodes connected OK and sent some messages but then stalled:
+root@MYD_CZU4EV_RC:/mnt/sd-mmcblk1p2/root# ./ibv_message_bw --thread=rx:0,rx:1 --ib-dev=mlx4_0,mlx4_0 --ib-port=1,2
+Rx_0 connected
+Rx_1 connected
+^C
+
+mr_halfword@Haswell-Ubuntu:~$ ~/ibv_message_passing/ibv_message_passing_c_project/bin/release/ibv_message_bw/ibv_message_bw --thread=tx:0 --ib-dev=mlx4_0 --ib-port=2
+Press Ctrl-C to tell the 1 transmit thread(s) to stop the test
+Tx_0 connected
+Tx_0 transmitted 16777216 data bytes in 16 messages over last 10.0 seconds
+Tx_0 transmitted 0 data bytes in 0 messages over last 10.0 seconds
+Tx_0 transmitted 0 data bytes in 0 messages over last 10.0 seconds
+
+[mr_halfword@sandy-centos ~]$ ~/ibv_message_passing/ibv_message_passing_c_project/bin/release/ibv_message_bw/ibv_message_bw --thread=tx:1 --ib-dev=mlx4_0 --ib-port=1
+Press Ctrl-C to tell the 1 transmit thread(s) to stop the test
+Tx_1 connected
+Tx_1 transmitted 16777216 data bytes in 16 messages over last 10.0 seconds
+Tx_1 transmitted 0 data bytes in 0 messages over last 10.0 seconds
+Tx_1 transmitted 0 data bytes in 0 messages over last 10.0 seconds
+
+And the ibv_display_local_infiniband_device_statistics on the aarch64 board reported:
+root@MYD_CZU4EV_RC:/mnt/sd-mmcblk1p2/root# ./ibv_display_local_infiniband_device_statistics 
+Press Ctrl-C to stop the Infiniband port statistics collection
+
+Statistics after 10 seconds
+Counter name                     Device  Port  Counter value(delta)
+
+Statistics after 20 seconds
+Counter name                     Device  Port  Counter value(delta)
+rq_num_oos                       mlx4_0        2(+2)
+port_xmit_data                   mlx4_0     1  707(+707)
+port_rcv_packets                 mlx4_0     1  2139(+2139)
+port_rcv_data                    mlx4_0     1  805083(+805083)
+port_xmit_packets                mlx4_0     1  33(+33)
+port_xmit_data                   mlx4_0     2  707(+707)
+port_rcv_packets                 mlx4_0     2  2182(+2182)
+port_rcv_data                    mlx4_0     2  821498(+821498)
+port_xmit_packets                mlx4_0     2  33(+33)
+
+Statistics after 30 seconds
+Counter name                     Device  Port  Counter value(delta)
+rq_num_oos                       mlx4_0        2
+port_xmit_data                   mlx4_0     1  707
+port_rcv_packets                 mlx4_0     1  2139
+port_rcv_data                    mlx4_0     1  805083
+port_xmit_packets                mlx4_0     1  33
+port_xmit_data                   mlx4_0     2  707
+port_rcv_packets                 mlx4_0     2  2182
+port_rcv_data                    mlx4_0     2  821498
+port_xmit_packets                mlx4_0     2  33
+
+It looks like the transmitters managed to send 16 off 1MB messages, which are the default ib_message_bw parameters,
+but the receive application didn't get any messages.
+
+rq_num_oos incremented by 2 on the aarch64 board.
+
+Another run produced the same result.
+
+On investigation, realised that had failed to notice that ibv_devinfo on the aarch64 board reported "state: PORT_DOWN (1)"
+for both ports. Used ifconfig up on both ports and ibv_devinfo then reported PORT_ACTIVE.
+
+=== Successful run when all ports were active and Ethernet ports have TX and RX pause enabled ===
+
+As no script for the aarch64 to change the ports from Infiniband to Ethernet, rebooted and run the following:
+root@MYD_CZU4EV_RC:~#  echo eth | tee /sys/module/mlx4_core/drivers/pci\:mlx4_core/00*/mlx4_port?
+eth
+[  103.542820] <mlx4_ib> mlx4_ib_add: counter index 2 for port 1 allocated 1
+[  103.549608] <mlx4_ib> mlx4_ib_add: counter index 1 for port 2 allocated 0
+[  103.589126] <mlx4_ib> mlx4_ib_add: counter index 3 for port 1 allocated 1
+[  103.595922] <mlx4_ib> mlx4_ib_add: counter index 4 for port 2 allocated 1
+[  103.609049] mlx4_en: Mellanox ConnectX HCA Ethernet driver v4.0-0
+root@MYD_CZU4EV_RC:~# [  103.616719] mlx4_en 0000:01:00.0: Activating port:1
+[  103.622092] mlx4_en: 0000:01:00.0: Port 1: enabling only PFC DCB ops
+[  103.629177] mlx4_en: 0000:01:00.0: Port 1: Using 4 TX rings
+[  103.634753] mlx4_en: 0000:01:00.0: Port 1: Using 1 RX rings
+[  103.640573] mlx4_en: 0000:01:00.0: Port 1: Initializing port
+[  103.647582] mlx4_en 0000:01:00.0: Activating port:2
+[  103.652610] mlx4_en: 0000:01:00.0: Port 2: enabling only PFC DCB ops
+[  103.661496] mlx4_en: 0000:01:00.0: Port 2: Using 4 TX rings
+[  103.667072] mlx4_en: 0000:01:00.0: Port 2: Using 1 RX rings
+[  103.672767] mlx4_en: 0000:01:00.0: Port 2: Initializing port
+[  105.896354] mlx4_en: eth1: Link Up
+[  105.899765] mlx4_en: eth2: Link Up
+[  105.951287] mlx4_en: eth1: Link Down
+[  106.001261] mlx4_en: eth1: Link Up
+
+root@MYD_CZU4EV_RC:~# ifconfig eth1 mtu 9600 up
+[  123.579756] mlx4_en: eth1: Steering Mode 1
+[  123.584147] mlx4_en: eth1: Optimized Non-RSS steering
+root@MYD_CZU4EV_RC:~# ifconfig eth2 mtu 9600 up
+[  127.059442] mlx4_en: eth2: Steering Mode 1
+[  127.063824] mlx4_en: eth2: Optimized Non-RSS steering
+root@MYD_CZU4EV_RC:~# ibv_devinfo
+hca_id: mlx4_0
+        transport:                      InfiniBand (0)
+        fw_ver:                         2.9.1200
+        node_guid:                      0002:c903:004b:feee
+        sys_image_guid:                 0002:c903:004b:fef1
+        vendor_id:                      0x02c9
+        vendor_part_id:                 26428
+        hw_ver:                         0xB0
+        board_id:                       MT_0FC0110009
+        phys_port_cnt:                  2
+                port:   1
+                        state:                  PORT_ACTIVE (4)
+                        max_mtu:                4096 (5)
+                        active_mtu:             4096 (5)
+                        sm_lid:                 0
+                        port_lid:               0
+                        port_lmc:               0x00
+                        link_layer:             Ethernet
+
+                port:   2
+                        state:                  PORT_ACTIVE (4)
+                        max_mtu:                4096 (5)
+                        active_mtu:             4096 (5)
+                        sm_lid:                 0
+                        port_lid:               0
+                        port_lmc:               0x00
+                        link_layer:             Ethernet
+
+Running ibv_message_bw with a transmitter on each x86_64 PC and two receivers on the aarch64 board was successful.
+root@MYD_CZU4EV_RC:/mnt/sd-mmcblk1p2/root# ./ibv_message_bw --thread=rx:0,rx:1 --ib-dev=mlx4_0,mlx4_0 --ib-port=1,2
+mr_halfword@Haswell-Ubuntu:~$ ~/ibv_message_passing/ibv_message_passing_c_project/bin/release/ibv_message_bw/ibv_message_bw --thread=tx:0 --ib-dev=mlx4_0 --ib-port=2
+[mr_halfword@sandy-centos ~]$ ~/ibv_message_passing/ibv_message_passing_c_project/bin/release/ibv_message_bw/ibv_message_bw --thread=tx:1 --ib-dev=mlx4_0 --ib-port=1
+
+The two receive ports on the aarch64 board were getting equal bandwidth, as shown by the final status on the aarch64 board:
+Rx_0 received 2085617664 data bytes in 1989 messages over last 10.0 seconds
+Rx_1 received 2086666240 data bytes in 1990 messages over last 10.0 seconds
+Rx_0 received 2085617664 data bytes in 1989 messages over last 10.0 seconds
+Rx_1 received 2085617664 data bytes in 1989 messages over last 10.0 seconds
+
+Rx_0 Total data bytes 396368019456 over 1900.375140 seconds; 208.6 Mbytes/second
+Rx_0 Total messages 378006 over 1900.375140 seconds; 199 messages/second
+Rx_0 Min message size=1048576 max message size=1048576 data verification=no
+Rx_0 minor page faults=1 (4195 -> 4196)
+Rx_0 major page faults=0 (0 -> 0)
+Rx_0 voluntary context switches=0 (19 -> 19)
+Rx_0 involuntary context switches=25467 (7 -> 25474)
+Rx_0 user time=1900.168950 system time=0.034221
+
+Rx_1 Total data bytes 396661620736 over 1901.076278 seconds; 208.7 Mbytes/second
+Rx_1 Total messages 378286 over 1901.076278 seconds; 199 messages/second
+Rx_1 Min message size=1048576 max message size=1048576 data verification=no
+Rx_1 minor page faults=1 (4125 -> 4126)
+Rx_1 major page faults=0 (0 -> 0)
+Rx_1 voluntary context switches=0 (23 -> 23)
+Rx_1 involuntary context switches=29031 (3 -> 29034)
+Rx_1 user time=1900.722404 system time=0.041322
+
+And ibv_display_local_infiniband_device_statistics running on the aarch64 board:
+Statistics after 1920 seconds
+Counter name                     Device  Port  Counter value(delta)
+port_xmit_data                   mlx4_0     1  23423000(+124312)
+port_rcv_packets                 mlx4_0     1  96687560(+513183)
+port_rcv_data                    mlx4_0     1  100034144247(+530945662)
+port_xmit_packets                mlx4_0     1  1124306(+5967)
+port_xmit_data                   mlx4_0     2  23422254(+124312)
+port_rcv_packets                 mlx4_0     2  96684708(+513181)
+port_rcv_data                    mlx4_0     2  100031193422(+530943577)
+port_xmit_packets                mlx4_0     2  1124270(+5967)
+
+
+=== Performance falls off when Ethernet pause disabled ===
+
+Disabled both TX and RX pause on all ports using:
+$ ethtool -A <port> tx off rx off
+
+Running ibv_message_bw with a transmitter on each x86_64 PC and two receivers on the aarch64 board as above.
+root@MYD_CZU4EV_RC:/mnt/sd-mmcblk1p2/root# ./ibv_message_bw --thread=rx:0,rx:1 --ib-dev=mlx4_0,mlx4_0 --ib-port=1,2
+mr_halfword@Haswell-Ubuntu:~$ ~/ibv_message_passing/ibv_message_passing_c_project/bin/release/ibv_message_bw/ibv_message_bw --thread=tx:0 --ib-dev=mlx4_0 --ib-port=2
+[mr_halfword@sandy-centos ~]$ ~/ibv_message_passing/ibv_message_passing_c_project/bin/release/ibv_message_bw/ibv_message_bw --thread=tx:1 --ib-dev=mlx4_0 --ib-port=1
+
+Connected OK, but throughput was dramatically slower than with pause enabled.
+
+E.g. from the start on the receiver:
+Rx_0 connected
+Rx_1 connected
+Rx_0 received 1048576 data bytes in 1 messages over last 10.0 seconds
+Rx_0 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_1 received 1048576 data bytes in 1 messages over last 10.0 seconds
+Rx_0 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_1 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_0 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_1 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_0 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_1 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_0 received 1048576 data bytes in 1 messages over last 10.0 seconds
+Rx_1 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_0 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_1 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_0 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_1 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_0 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_1 received 1048576 data bytes in 1 messages over last 10.0 seconds
+
+I.e. gaps where no forward progress of complete messages.
+
+At the receiver at the end of the test:
+Rx_1 received 1048576 data bytes in 1 messages over last 10.0 seconds
+Rx_0 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_1 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_0 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_1 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_0 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_1 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_0 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_1 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_0 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_1 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_0 received 0 data bytes in 0 messages over last 10.0 seconds
+Rx_1 received 0 data bytes in 0 messages over last 10.0 seconds
+
+Rx_0 Total data bytes 32505856 over 1430.507947 seconds; 0.0 Mbytes/second
+Rx_0 Total messages 31 over 1430.507947 seconds; 0 messages/second
+Rx_0 Min message size=1048576 max message size=1048576 data verification=no
+Rx_0 minor page faults=1 (4195 -> 4196)
+Rx_0 major page faults=0 (0 -> 0)
+Rx_0 voluntary context switches=0 (46 -> 46)
+Rx_0 involuntary context switches=16290 (28 -> 16318)
+Rx_0 user time=1484.579641 system time=0.000000
+
+Rx_1 Total data bytes 30408704 over 1667.012545 seconds; 0.0 Mbytes/second
+Rx_1 Total messages 29 over 1667.012545 seconds; 0 messages/second
+Rx_1 Min message size=1048576 max message size=1048576 data verification=no
+Rx_1 minor page faults=1 (4125 -> 4126)
+Rx_1 major page faults=0 (0 -> 0)
+Rx_1 voluntary context switches=0 (32 -> 32)
+Rx_1 involuntary context switches=20351 (18 -> 20369)
+Rx_1 user time=1736.220203 system time=0.000000
+
+From pressing Ctrl-C on the transmitters it took tens of minutes to actually shut down the test completly.
+
+ibv_display_local_infiniband_device_statistics on the aarch64 receiver:
+Statistics after 50 seconds
+Counter name                     Device  Port  Counter value(delta)
+rq_num_oos                       mlx4_0        2235(+583)
+port_xmit_data                   mlx4_0     1  24599727(+355524)
+port_rcv_packets                 mlx4_0     1  97576917(+8696)
+port_rcv_data                    mlx4_0     1  100952381543(+8339130)
+port_xmit_packets                mlx4_0     1  1183978(+18232)
+port_xmit_data                   mlx4_0     2  24615160(+326898)
+port_rcv_packets                 mlx4_0     2  97651344(+10226)
+port_rcv_data                    mlx4_0     2  101029413058(+9986094)
+port_xmit_packets                mlx4_0     2  1184712(+16764)
+
+ibv_display_local_infiniband_device_statistics on the Haswell Ubuntu transmitter: 
+Statistics after 50 seconds
+Counter name                     Device  Port  Counter value(delta)
+rq_num_wrfe                      mlx4_0        768
+sq_num_oos                       mlx4_0        7638(+103)
+sq_num_wrfe                      mlx4_0        128
+sq_num_tree                      mlx4_0        4
+port_xmit_data                   mlx4_0     2  102664172181(+19181468)
+port_rcv_packets                 mlx4_0     2  1510187(+3747)
+port_rcv_data                    mlx4_0     2  30961082(+73070)
+port_xmit_packets                mlx4_0     2  99216880(+18401)
+
+ibv_display_local_infiniband_device_statistics on the Sandy CentOS transmitter:
+Statistics after 50 seconds
+Counter name                     Device  Port  Counter value(delta)
+port_xmit_packets                mlx4_0     1  99892674(+71887)
+port_rcv_data                    mlx4_0     1  33804010(+315764)
+port_rcv_packets                 mlx4_0     1  1655924(+16193)
+port_xmit_data                   mlx4_0     1  288992172(+74989192)
+
+This shows continous re-transmits (increasing rq_num_oos and sq_num_oos statistics), which is an indication of packet loss
+caused by lack of flow-control dramatically affecting the throughput.
+
+There are no sq_num_oos reported on the Sandy CentOS PC, due to the old Kernel version not reporting the per-device statistics
+(the pseudo files are not created).
+
+Using ethtool to re-enable TX and TX pause on all ports then allowed the previous throughput to be repeated, with no
+further increments of sq_num_oos or rq_num_oos.
