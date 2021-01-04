@@ -115,6 +115,9 @@ c. The non-nero rq_num_wrfe (Responder - number of CQEs with error. Incremented 
    was from before ibv_generate_infiniband_test_load was started. Could have occurred when the ports where changed in turn
    from Infiniband to Ethernet link-layer.
 
+The later mlx5 has different per-device counters,
+see https://community.mellanox.com/s/article/understanding-mlx5-linux-counters-and-status-parameters
+
 After the test, ethtool did show one rx_error on the device for port 1:
 $ ethtool -S ens5
 NIC statistics:
@@ -466,3 +469,6 @@ b. The per-port port_rcv_data and port_rcv_data stick with a max value of 429496
 
 The reporting of port throughput by ibv_generate_infiniband_test_load can be affected in the same way, in that if started
 after the port_rcv_data and port_rcv_data counters get to their max then the reported throughput appears is zero.
+
+Looks like the mlx4 per-device statistics were first added in the v4.8 Kernel,
+https://elixir.bootlin.com/linux/v4.8/source/drivers/infiniband/hw/mlx4/main.c is when rq_num_oos appears in the diag_basic[] array.

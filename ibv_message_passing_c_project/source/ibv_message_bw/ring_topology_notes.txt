@@ -392,6 +392,8 @@ port_xmit_data                   mlx4_0     1  288992172(+74989192)
 This shows continous re-transmits (increasing rq_num_oos and sq_num_oos statistics), which is an indication of packet loss
 caused by lack of flow-control dramatically affecting the throughput.
 
+Should have tried running ethtool -S to get the NIC statistics and see if the dropped counters incremented.
+
 There are no sq_num_oos reported on the Sandy CentOS PC, due to the old Kernel version not reporting the per-device statistics
 (the pseudo files are not created).
 
