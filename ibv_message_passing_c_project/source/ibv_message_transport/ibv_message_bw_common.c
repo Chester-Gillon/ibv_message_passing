@@ -261,6 +261,7 @@ void intialise_slp_connection (communication_path_slp_connection *const slp_conn
              path_def->source_node, path_def->destination_node, path_def->instance);
     strcpy (slp_connection->remote_service_url, "");
 
+    /* This doesn't generate any SLP traffic */
     slp_status = SLPOpen (NULL, SLP_FALSE, &slp_connection->handle);
     check_assert (slp_status == SLP_OK, "SLPOpen");
 }
@@ -295,6 +296,7 @@ static void publish_memory_buffer_with_slp (const communication_path_slp_connect
              slp_connection->local_attributes.lid, slp_connection->local_attributes.psn, slp_connection->local_attributes.qp_num,
              slp_connection->local_attributes.qp_ready_to_receive,
              slp_connection->local_attributes.gid_index, gid);
+    /* This sends a Service Registration request to slpd on the loopback interface, and receives a Service Acknowledge reply */
     slp_status = SLPReg (slp_connection->handle, slp_connection->local_service_url, SLP_LIFETIME_MAXIMUM, NULL, attributes_text,
             SLP_TRUE, slp_reg_callback, &registration_status);
     check_assert (slp_status == SLP_OK, "SLPReg");
@@ -460,7 +462,10 @@ static void get_remote_buffer_attributes_from_slp (communication_path_slp_connec
     {
         if (strlen (slp_connection->remote_service_url) == 0)
         {
-            /* Attempt to find the service URL for the remote memory buffer */
+            /* Attempt to find the service URL for the remote memory buffer.
+             * This sends a Service Request to a multicast destination address,
+             * and receives Service Reply(s) to the source unicast address used for the Service Request.
+             * Service Requests stop being send when get no more Service Replies. */
             slp_status = SLPFindSrvs (slp_connection->handle, SLP_SERVICE_NAME, NULL, NULL,
                     slp_service_url_callback, slp_connection);
             check_assert (slp_status == SLP_OK, "SLPFindSrvs");
@@ -468,7 +473,9 @@ static void get_remote_buffer_attributes_from_slp (communication_path_slp_connec
 
         if (strlen (slp_connection->remote_service_url) > 0)
         {
-            /* The service URL is available, so attempt to retrieve the attributes */
+            /* The service URL is available, so attempt to retrieve the attributes.
+             * This sends an Attribute Request to a multicast destination address,
+             * and receives an Attribute Reply to the source unicast address used for the Attribute Request */
             slp_connection->remote_attributes_obtained = false;
             slp_status = SLPFindAttrs (slp_connection->handle, slp_connection->remote_service_url, "", "",
                     slp_service_attributes_callback, slp_connection);
@@ -534,6 +541,7 @@ void close_slp_connection (communication_path_slp_connection *const slp_connecti
     SLPError deregistration_status;
 
     /* de-register local_service_url */
+    /* This sends a Service Deregister request to slpd on the loopback interface, and receives a Service Acknowledge reply */
     slp_status = SLPDereg (slp_connection->handle, slp_connection->local_service_url, slp_reg_callback, &deregistration_status);
     if (slp_status == SLP_NETWORK_ERROR)
     {
