@@ -17,6 +17,7 @@
 #include <slp.h>
 
 #include "ibv_message_bw_interface.h"
+#include "ibv_message_bw_private.h"
 
 /** Defines the internal information for one message buffer used to receive the message and transmit flow control */
 typedef struct

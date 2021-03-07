@@ -7,6 +7,7 @@
  */
 
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -15,9 +16,6 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
-
-#include <infiniband/verbs.h>
-#include <slp.h>
 
 #include "ibv_message_bw_interface.h"
 

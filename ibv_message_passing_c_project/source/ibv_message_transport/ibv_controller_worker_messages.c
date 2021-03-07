@@ -11,9 +11,6 @@
 #include <string.h>
 #include <limits.h>
 
-#include <infiniband/verbs.h>
-#include <slp.h>
-
 #include "ibv_message_bw_interface.h"
 #include "ibv_controller_worker_messages.h"
 

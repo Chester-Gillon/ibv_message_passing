@@ -22,6 +22,7 @@
 #include <arpa/inet.h>
 
 #include "ibv_message_bw_interface.h"
+#include "ibv_message_bw_private.h"
 
 /**
  * @brief Perform a page size aligned allocation

@@ -60,8 +60,9 @@
 #include <signal.h>
 #include <netinet/sctp.h>
 #include <poll.h>
+#include <time.h>
+#include <pthread.h>
 
-#include <infiniband/verbs.h>
 #include <slp.h>
 
 #include "ibv_message_bw_interface.h"

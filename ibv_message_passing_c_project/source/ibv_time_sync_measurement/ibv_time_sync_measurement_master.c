@@ -13,8 +13,7 @@
 #include <limits.h>
 #include <signal.h>
 
-#include <infiniband/verbs.h>
-#include <slp.h>
+#include <time.h>
 #include <sys/mman.h>
 
 #include "ibv_message_bw_interface.h"

@@ -26,7 +26,6 @@
 #include <numa.h>
 #include <numaif.h>
 
-#include <infiniband/verbs.h>
 #include <slp.h>
 
 #include "ibv_message_bw_interface.h"

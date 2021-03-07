@@ -29,17 +29,6 @@ cd ${ADA_SPECS_DIR}
 ${GNAT_GPLUSPLUS} -fdump-ada-spec -std=c++03 ${SCRIPT_PATH}/ibv_message_bw_interface_ada.h
 ${GNAT_GPLUSPLUS} -fdump-ada-spec -std=c++03 ${SCRIPT_PATH}/ibv_controller_worker_messages_ada.h
 
-# The infiniband/verbs.h file has some structure and constant/enumeration names which only differ in case.
-# The resulting generated ada spec is invalid due to conflicting declarations, as ada is case insensitive.
-# Rename the conflicting constants/enumerations to make the ada spec valid.
-sed -i 's/IBV_QP_CAP/IBV_QP_CAP_ENUM/g' infiniband_verbs_h.ads
-sed -i 's/IBV_QP_STATE/IBV_QP_STATE_CONST/g' infiniband_verbs_h.ads
-sed -i 's/IBV_FLOW_SPEC_ETH/IBV_FLOW_SPEC_ETH_CONST/g' infiniband_verbs_h.ads
-sed -i 's/IBV_FLOW_SPEC_IPV4/IBV_FLOW_SPEC_IPV4_CONST/g' infiniband_verbs_h.ads
-sed -i 's/IBV_FLOW_SPEC_IPV6/IBV_FLOW_SPEC_IPV6_CONST/g' infiniband_verbs_h.ads
-sed -i 's/IBV_FLOW_SPEC_ACTION_TAG/IBV_FLOW_SPEC_ACTION_TAG_CONST/g' infiniband_verbs_h.ads
-sed -i 's/IBV_FLOW_SPEC_ACTION_DROP/IBV_FLOW_SPEC_ACTION_DROP_CONST/g' infiniband_verbs_h.ads
-
 # -fdump-ada-spec inserts a pragma to select Ada 2005, but GNAT Community Edition 2018 no longer recognises switches or pragmas
 # to select Ada2005 or earlier. Therefore, change to Ada 2012 to prevent warnings about an unrecognised pragma.
 sed -i 's/pragma Ada_2005;/pragma Ada_2012;/g' *.ads

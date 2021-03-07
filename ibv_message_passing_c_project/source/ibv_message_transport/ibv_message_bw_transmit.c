@@ -17,6 +17,7 @@
 #include <slp.h>
 
 #include "ibv_message_bw_interface.h"
+#include "ibv_message_bw_private.h"
 
 /** To enforce the header being received after the data of each message is available,
  *  the data is sent in one WQE followed by the header */
