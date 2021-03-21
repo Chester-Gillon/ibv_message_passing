@@ -16,6 +16,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <pthread.h>
+#include <slp.h>
 
 #include "ibv_message_bw_interface.h"
 
@@ -61,6 +63,22 @@ static test_process_t test_processes[NUM_PROCESSES] =
 };
 
 
+/**
+ * @brief Thread which queries a SLP property
+ * @details This is to investigate potential issues when a thread initialises libslp while the main thread is spwaning
+ *          other processes.
+ */
+static void *report_slp_property_thread (void *const args)
+{
+    const char *const property_name = "net.slp.activeDADetection";
+    const char *const property_value = SLPGetProperty (property_name);
+
+    printf ("%s = %s\n", property_name, property_value);
+
+    return NULL;
+}
+
+
 int main (int argc, char *argv[])
 {
     int process_index;
@@ -68,6 +86,11 @@ int main (int argc, char *argv[])
     int num_active_processes;
     int rc;
     siginfo_t info;
+    pthread_t property_thread;
+    void *thread_return;
+
+    rc = pthread_create (&property_thread, NULL, report_slp_property_thread, NULL);
+    CHECK_ASSERT (rc == 0);
 
     /* Spawn the child processes */
     num_active_processes = 0;
@@ -112,6 +135,9 @@ int main (int argc, char *argv[])
             }
         }
     }
+
+    rc = pthread_join (property_thread, &thread_return);
+    CHECK_ASSERT (rc == 0);
 
     return EXIT_SUCCESS;
 }
