@@ -51,7 +51,7 @@ procedure Ibv_Controller_Process_Main is
                                             Interfaces.C.To_Ada (Item => msgs.worker_ready.worker_executable_pathname(0..max_name_index), Trim_Nul => false));
 
                when others =>
-                  ibv_message_bw_interface_h.check_assert (assertion => Interfaces.C.Extensions.bool (false),
+                  ibv_message_bw_interface_h.check_assert (assertion => false,
                                                            message => Interfaces.C.Strings.New_String ("await_workers_ready unexpected message"));
             end case;
          end;
@@ -92,14 +92,14 @@ procedure Ibv_Controller_Process_Main is
                         expected_sum := expected_sum + natural (data_to_sum_random.Random (data_generator));
                      end loop;
                      if expected_sum /= natural (msgs.sum_result.sum) then
-                        ibv_message_bw_interface_h.check_assert (assertion => Interfaces.C.Extensions.bool (false),
+                        ibv_message_bw_interface_h.check_assert (assertion => false,
                                                                  message => Interfaces.C.Strings.New_String ("process_sum_result_replies wrong sum"));
                      end if;
                      num_outstanding_replies := num_outstanding_replies - 1;
                      ibv_message_bw_interface_h.free_message (rx_buffer);
 
                   when others =>
-                     ibv_message_bw_interface_h.check_assert (assertion => Interfaces.C.Extensions.bool (false),
+                     ibv_message_bw_interface_h.check_assert (assertion => false,
                                                               message => Interfaces.C.Strings.New_String ("process_sum_result_replies unexpected message"));
                end case;
             end;
@@ -201,7 +201,7 @@ procedure Ibv_Controller_Process_Main is
    communication_context : ibv_message_bw_interface_h.communication_context_handle;
    paths_to_workers : paths_to_workers_array;
    num_requests_per_worker : ibv_controller_worker_messages_h.request_shutdown_msg_num_requests_per_worker_array := (others => 0);
-   controller_and_workers_on_separate_pcs : Interfaces.C.Extensions.bool := Interfaces.C.Extensions.bool (false);
+   controller_and_workers_on_separate_pcs : Interfaces.C.Extensions.bool := false;
 begin
    -- Initialise, establishing connection with the workers
    if Ada.Command_Line.Argument_Count >= 1 then
