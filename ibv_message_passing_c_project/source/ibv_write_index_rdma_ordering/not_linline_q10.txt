@@ -1,0 +1,798 @@
+No.     Time           Source                Destination           Protocol Length Info
+      1 0.000000000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 1: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 010000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+      2 0.000009000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 2: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  06 00 00 00                                       ....
+    Data: 06000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+      3 0.000010000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 3: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 020000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+      4 0.000010000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 4: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  07 00 00 00                                       ....
+    Data: 07000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+      5 0.000010000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 5: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 030000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+      6 0.000011000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 6: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  07 00 00 00                                       ....
+    Data: 07000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+      7 0.000011000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 7: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  04 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 040000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+      8 0.000011000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 8: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  08 00 00 00                                       ....
+    Data: 08000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+      9 0.000011000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 9: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  05 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 050000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+     10 0.000012000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 10: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  08 00 00 00                                       ....
+    Data: 08000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+     11 0.000012000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 11: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  06 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 060000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+     12 0.000022000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 12: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  09 00 00 00                                       ....
+    Data: 09000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+     13 0.000023000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 13: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  07 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 070000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+     14 0.000023000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 14: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  0a 00 00 00                                       ....
+    Data: 0a000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+     15 0.000023000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 15: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  08 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 080000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+     16 0.000024000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 16: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  0a 00 00 00                                       ....
+    Data: 0a000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+     17 0.000024000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 17: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     18 0.000024000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 18: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  09 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 090000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+     19 0.000024000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 19: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  0a 00 00 00                                       ....
+    Data: 0a000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+     20 0.000025000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 20: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  0a 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 0a0000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+     21 0.000025000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 21: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  0a 00 00 00                                       ....
+    Data: 0a000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+     22 0.000025000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 22: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     23 0.000026000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 23: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     24 0.000026000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 24: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     25 0.000026000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 25: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     26 0.000026000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 26: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     27 0.000027000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 27: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     28 0.000027000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 28: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     29 0.000027000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 29: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     30 0.000027000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 30: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     31 0.000028000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 31: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     32 0.000028000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 32: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     33 0.000028000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 33: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     34 0.000029000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 34: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  0b 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 0b0000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+     35 0.000029000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 35: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  0d 00 00 00                                       ....
+    Data: 0d000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+     36 0.000029000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 36: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  0c 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 0c0000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+     37 0.000029000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 37: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  0d 00 00 00                                       ....
+    Data: 0d000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+     38 0.000030000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 38: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     39 0.000030000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 39: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     40 0.000030000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 40: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     41 0.000031000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 41: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     42 0.000031000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 42: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  0d 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 0d0000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+     43 0.000031000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 43: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  10 00 00 00                                       ....
+    Data: 10000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+     44 0.000031000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 44: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  0e 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 0e0000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+     45 0.000032000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 45: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  11 00 00 00                                       ....
+    Data: 11000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+     46 0.000052000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 46: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  0f 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 0f0000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+     47 0.000052000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 47: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     48 0.000052000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 48: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  12 00 00 00                                       ....
+    Data: 12000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+     49 0.000052000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 49: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  10 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 100000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+     50 0.000053000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 50: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     51 0.000053000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 51: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     52 0.000053000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 52: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     53 0.000053000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 53: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  13 00 00 00                                       ....
+    Data: 13000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+     54 0.000054000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 54: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  11 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 110000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+     55 0.000054000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 55: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  14 00 00 00                                       ....
+    Data: 14000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+     56 0.000054000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 56: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  12 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 120000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+     57 0.000055000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 57: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  14 00 00 00                                       ....
+    Data: 14000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+     58 0.000055000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 58: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     59 0.000066000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 59: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     60 0.000066000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 60: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     61 0.000066000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 61: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  13 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 130000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+     62 0.000067000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 62: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  14 00 00 00                                       ....
+    Data: 14000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+     63 0.000067000    LID: 2                LID: 3                InfiniBand 106    RC RDMA Write Only QP=0x000228 
+
+Frame 63: 106 bytes on wire (848 bits), 106 bytes captured (848 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (64 bytes)
+
+0000  14 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0020  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+    Data: 140000000000000000000000000000000000000000000000000000000000000000000000…
+    [Length: 64]
+
+No.     Time           Source                Destination           Protocol Length Info
+     64 0.000067000    LID: 2                LID: 3                InfiniBand 46     RC RDMA Write Only QP=0x000228 
+
+Frame 64: 46 bytes on wire (368 bits), 46 bytes captured (368 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+Data (4 bytes)
+
+0000  14 00 00 00                                       ....
+    Data: 14000000
+    [Length: 4]
+
+No.     Time           Source                Destination           Protocol Length Info
+     65 0.000067000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 65: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     66 0.000068000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 66: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     67 0.000068000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 67: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     68 0.000068000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 68: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     69 0.000068000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 69: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     70 0.000069000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 70: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     71 0.000069000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 71: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     72 0.000069000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 72: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     73 0.000069000    LID: 3                LID: 2                InfiniBand 30     RC Acknowledge QP=0x000227 
+
+Frame 73: 30 bytes on wire (240 bits), 30 bytes captured (240 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     74 4.275791100    LID: 65535            LID: 65535            InfiniBand 290    UD Send Only QP=0x000000 SubnGet(SMInfo)
+
+Frame 74: 290 bytes on wire (2320 bits), 290 bytes captured (2320 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     75 4.276044102    LID: 65535            LID: 65535            InfiniBand 290    UD Send Only QP=0x000000 SubnGetResp(SMInfo)
+
+Frame 75: 290 bytes on wire (2320 bits), 290 bytes captured (2320 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     76 4.280345134    LID: 65535            LID: 65535            InfiniBand 290    UD Send Only QP=0x000000 SubnGet(SMInfo)
+
+Frame 76: 290 bytes on wire (2320 bits), 290 bytes captured (2320 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
+
+No.     Time           Source                Destination           Protocol Length Info
+     77 4.280605136    LID: 65535            LID: 65535            InfiniBand 290    UD Send Only QP=0x000000 SubnGetResp(SMInfo)
+
+Frame 77: 290 bytes on wire (2320 bits), 290 bytes captured (2320 bits) on interface Port A (ERF Interface 0), id 0
+Extensible Record Format
+InfiniBand
