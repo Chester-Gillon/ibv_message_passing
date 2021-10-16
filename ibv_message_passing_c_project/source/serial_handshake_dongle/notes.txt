@@ -1,0 +1,53 @@
+1) Output with no connections on the pins, which shows all inputs read as zero:
+Outputs   Inputs
+DTR RTS   DCD DSR CTS RI  
+ 0   0     0   0   0   0  
+ 1   0     0   0   0   0  
+ 0   1     0   0   0   0  
+ 1   1     0   0   0   0  
+
+
+Output with the serial port connected to the management console on a network switch, which shows some inputs static
+at zero and others at one:
+Outputs   Inputs
+DTR RTS   DCD DSR CTS RI  
+ 0   0     1   0   1   0  
+ 1   0     1   0   1   0  
+ 0   1     1   0   1   0  
+ 1   1     1   0   1   0  
+
+
+Output with the following connections made, which shows the output values being read back on the expected input pins:
+- pin 4 (DTR) connected to pin 1 (DCD)
+- pin 7 (RTS) connected to pin 6 (DSR)
+
+Outputs   Inputs
+DTR RTS   DCD DSR CTS RI  
+ 0   0     0   0   0   0  
+ 1   0     1   0   0   0  
+ 0   1     0   1   0   0  
+ 1   1     1   1   0   0  
+
+
+Output with the following connections made, which shows the output values being read back on the expected input pins:
+- pin 4 (DTR) connected to pin 6 (DSR)
+- pin 7 (RTS) connected to pin 8 (CTS)
+
+Outputs   Inputs
+DTR RTS   DCD DSR CTS RI  
+ 0   0     0   0   0   0  
+ 1   0     0   1   0   0  
+ 0   1     0   0   1   0  
+ 1   1     0   1   1   0  
+
+
+Output with the following connections made, which shows the output values being read back on the expected input pins:
+- pin 4 (DTR) connected to pin 8 (CTS)
+- pin 7 (RTS) connected to pin 9 (RI)
+
+Outputs   Inputs
+DTR RTS   DCD DSR CTS RI  
+ 0   0     0   0   0   0  
+ 1   0     0   0   1   0  
+ 0   1     0   0   0   1  
+ 1   1     0   0   1   1  

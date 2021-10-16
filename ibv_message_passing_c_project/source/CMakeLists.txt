@@ -98,6 +98,7 @@ add_subdirectory ("${PROJECT_SOURCE_DIR}/usb_id_dongle")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/ibv_display_local_infiniband_device_statistics")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/snmp_response_time")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/ibv_write_index_rdma_ordering")
+add_subdirectory ("${PROJECT_SOURCE_DIR}/serial_handshake_dongle")
 
 # Location of the source code for the linuxptp package, to gain access to the phc.[ch]
 set (LINUXPTP_ROOT "$ENV{HOME}/linuxptp-1.6")
