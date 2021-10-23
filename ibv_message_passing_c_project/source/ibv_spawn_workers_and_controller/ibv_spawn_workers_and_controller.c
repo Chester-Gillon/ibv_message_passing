@@ -20,10 +20,11 @@
 #include <slp.h>
 
 #include "ibv_message_bw_interface.h"
+#include "ibv_shared_library_test.h"
 
 
 /** The number of processes spawned */
-#define NUM_PROCESSES 4
+#define NUM_PROCESSES 5
 
 
 /** Used to spawn one test process */
@@ -59,6 +60,11 @@ static test_process_t test_processes[NUM_PROCESSES] =
     {
         .executable_file = "ibv_worker_process",
         .argv = {"ibv_worker_process", "3", "0", NULL}
+    },
+    /* C test of spawning a process which uses a shared library not from system library path */
+    {
+        .executable_file = "ibv_shared_library_user",
+        .argv = {"ibv_shared_library_user", NULL}
     }
 };
 
@@ -88,6 +94,8 @@ int main (int argc, char *argv[])
     siginfo_t info;
     pthread_t property_thread;
     void *thread_return;
+
+    shared_library_test (argv[0]);
 
     rc = pthread_create (&property_thread, NULL, report_slp_property_thread, NULL);
     CHECK_ASSERT (rc == 0);
