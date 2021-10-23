@@ -20,6 +20,7 @@ ln -fs ../../../../ibv_message_passing_ada_project/obj/coverage/ibv_controller_p
 ln -fs ../ibv_spawn_workers_and_controller/ibv_shared_library_user .
 ln -fs ../ibv_spawn_workers_and_controller/libibv_shared_library_test.so .
 ln -fs ../ibv_spawn_workers_and_controller/ibv_spawn_workers_and_controller .
+sudo setcap cap_setuid+ep ../ibv_spawn_workers_and_controller/ibv_spawn_workers_and_controller
 LD_LIBRARY_PATH=. ./ibv_spawn_workers_and_controller
 popd
 

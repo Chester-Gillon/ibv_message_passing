@@ -51,3 +51,18 @@ Worker 3 processed 3354 requests
 Worker 3 processed 3354 requests
 Worker 3 processed 3354 requests
 ~/ibv_message_passing
+
+
+2. Test that with an executable with capabilties, LD_LIBRARY_PATH is ignored
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The collect_coverage.sh script was modified to set a capability on the ibv_spawn_workers_and_controller executable:
+mr_halfword@Haswell-Ubuntu:~/ibv_message_passing/ibv_message_passing_c_project/bin/coverage/linked_exes$ getcap ../ibv_spawn_workers_and_controller/ibv_spawn_workers_and_controller
+../ibv_spawn_workers_and_controller/ibv_spawn_workers_and_controller = cap_setuid+ep
+
+And the test now fails as the shared library can't be found:
+mr_halfword@Haswell-Ubuntu:~/ibv_message_passing$ ./collect_coverage.sh 
+~/ibv_message_passing/ibv_message_passing_c_project/bin/coverage ~/ibv_message_passing
+./ibv_spawn_workers_and_controller: error while loading shared libraries: libibv_shared_library_test.so: cannot open shared object file: No such file or directory
+~/ibv_message_passing
+
