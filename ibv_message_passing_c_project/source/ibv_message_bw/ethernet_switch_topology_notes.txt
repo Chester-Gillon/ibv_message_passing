@@ -1,0 +1,352 @@
+== Ethernet switch used ==
+
+Used the switch T1700G-28TQ v2.1 which has 4 10GE SFP+ Slots.
+
+To connect a 10G port on the switch to a ConnectX-2 used a CVR-QSFP-SFP10G QSFP to SFP+ adapter plugged into the
+SQFP port of the ConnectX-2, and then a SFP+ DAC cable to the port on the switch
+
+
+== Factory default T1700G-28TQ configuration ==
+
+With the switch containing factory defaults connected the two ports of the ConnectX-2 in the Haswell-Ubuntu workstation
+to ports 25 and 26 in the switch. When ubuntu_mlx4_to_eth.sh was run to change the ConnectX-2 ports from Infiniband
+to Ethernet the links became active with 1 lane at 10G:
+$ ibstatus 
+Infiniband device 'mlx4_0' port 1 status:
+    default gid:     fe80:0000:0000:0000:0202:c9ff:fe50:4174
+    base lid:    0x0
+    sm lid:      0x0
+    state:       4: ACTIVE
+    phys state:  5: LinkUp
+    rate:        10 Gb/sec (1X QDR)
+    link_layer:  Ethernet
+
+Infiniband device 'mlx4_0' port 2 status:
+    default gid:     fe80:0000:0000:0000:0202:c9ff:fe50:4175
+    base lid:    0x0
+    sm lid:      0x0
+    state:       4: ACTIVE
+    phys state:  5: LinkUp
+    rate:        10 Gb/sec (1X QDR)
+    link_layer:  Ethernet
+
+Even when QSFP DAC cables were used to directly connect ConnectX-2 ports together, the ConnectX-2 only uses one lane
+when configured with an Ethernet link layer. I.e. no difference to when connected to the switch which only has one
+10G lane in a SFP+ connector.
+
+The default pause control settings in the ConnectX-2 ports:
+$ ethtool -a ens5
+Pause parameters for ens5:
+Autonegotiate:  off
+RX:     on
+TX:     on
+
+ibv_devinfo reports the active_mtu is 1024. ip link reports the ConnectX-2 ports have a MTU of 1500.
+
+A bi-directional throughput test was run:
+$ ibv_message_bw/ibv_message_bw --thread=rx:0,rx:1 --ib-dev=mlx4_0,mlx4_0 --ib-port=2,1
+$ ibv_message_bw/ibv_message_bw --thread=tx:0,tx:1 --ib-dev=mlx4_0,mlx4_0 --ib-port=1,2
+
+Tx_0 Total data bytes 14192147955712 over 12442.530430 seconds; 1140.6 Mbytes/second
+Tx_0 Total messages 13534687 over 12442.530430 seconds; 1088 messages/second
+Tx_0 Min message size=1048576 max message size=1048576 data verification=no
+Tx_0 minor page faults=3092 (4194 -> 7286)
+Tx_0 major page faults=0 (0 -> 0)
+Tx_0 voluntary context switches=0 (53 -> 53)
+Tx_0 involuntary context switches=16228 (0 -> 16228)
+Tx_0 user time=12442.031569 system time=0.253181
+
+Tx_1 Total data bytes 14190920073216 over 12441.455072 seconds; 1140.6 Mbytes/second
+Tx_1 Total messages 13533516 over 12441.455072 seconds; 1088 messages/second
+Tx_1 Min message size=1048576 max message size=1048576 data verification=no
+Tx_1 minor page faults=3232 (4154 -> 7386)
+Tx_1 major page faults=0 (0 -> 0)
+Tx_1 voluntary context switches=0 (76 -> 76)
+Tx_1 involuntary context switches=10056 (3 -> 10059)
+Tx_1 user time=12440.920157 system time=0.349598
+
+Rx_0 Total data bytes 14192147955712 over 12442.529504 seconds; 1140.6 Mbytes/second
+Rx_0 Total messages 13534687 over 12442.529504 seconds; 1088 messages/second
+Rx_0 Min message size=1048576 max message size=1048576 data verification=no
+Rx_0 minor page faults=2396 (4191 -> 6587)
+Rx_0 major page faults=0 (0 -> 0)
+Rx_0 voluntary context switches=0 (23 -> 23)
+Rx_0 involuntary context switches=19826 (0 -> 19826)
+Rx_0 user time=12441.487704 system time=0.306416
+
+Rx_1 Total data bytes 14190920073216 over 12441.454134 seconds; 1140.6 Mbytes/second
+Rx_1 Total messages 13533516 over 12441.454134 seconds; 1088 messages/second
+Rx_1 Min message size=1048576 max message size=1048576 data verification=no
+Rx_1 minor page faults=2278 (4151 -> 6429)
+Rx_1 major page faults=0 (0 -> 0)
+Rx_1 voluntary context switches=0 (22 -> 22)
+Rx_1 involuntary context switches=28396 (7 -> 28403)
+Rx_1 user time=12440.312451 system time=0.313425
+
+And results from generating a test load.
+$ ibv_generate_infiniband_test_load/ibv_generate_infiniband_test_load 0
+PRBS32 pattern period is 4294967295
+Press Ctrl-C to stop the Infiniband test load
+^C
+mlx4_0 rx_buffer compare : PASS
+mlx4_0 port 1 -> 2 RDMA write transmitted 212332445696 bytes in 185.884852 seconds, 1142.3 Mbytes/sec
+mlx4_0 port 1 transmitted 227740092872 bytes in 185.884852 seconds, 1225.2 Mbytes/sec
+mlx4_0 port 1 received 227740093104 bytes in 185.884852 seconds, 1225.2 Mbytes/sec
+mlx4_0 port 2 -> 1 RDMA write transmitted 212332445696 bytes in 185.884862 seconds, 1142.3 Mbytes/sec
+mlx4_0 port 2 transmitted 227740093104 bytes in 185.884862 seconds, 1225.2 Mbytes/sec
+mlx4_0 port 2 received 227740092872 bytes in 185.884862 seconds, 1225.2 Mbytes/sec
+
+From https://en.wikipedia.org/wiki/10_Gigabit_Ethernet#Physical_layer_modules :
+   Data rate: 10 Gbit/s - Line code: 64b/66b × NRZ - Line rate: 10.3125 GBd - Full-Duplex
+
+So, maximum data rate for packets is 1250 Mbytes/sec, for which ibv_generate_infiniband_test_load came at 98%
+with the full duplex rate on the ConnectX-2 port.
+
+The factory default configuration from the switch was saved in T1700G-28TQ_factory_defaults.cfg
+
+
+== SSH issues with switch firmware ==
+
+The above was with the factory loaded V2 firmware.
+
+Used the GUI to enable ssh, and changed the IP address.
+
+First attempt connect failed due to matching key exchange:
+$ ssh admin@192.168.0.91
+Unable to negotiate with 192.168.0.91 port 22: no matching key exchange method found. Their offer: diffie-hellman-group1-sha1
+
+This is because OpenSSH has disabled by default some of the older, less secure mechanisms.
+
+Set the key exchange and got further:
+$ ssh -oKexAlgorithms=+diffie-hellman-group1-sha1 admin@192.168.0.91
+Unable to negotiate with 192.168.0.91 port 22: no matching host key type found. Their offer: ssh-dss
+
+Set the host key and got further:
+$ ssh -oKexAlgorithms=+diffie-hellman-group1-sha1 -oHostKeyAlgorithms=+ssh-dss admin@192.168.0.91
+Unable to negotiate with 192.168.0.91 port 22: no matching cipher found. Their offer: aes128-cbc,aes192-cbc,aes256-cbc,blowfish-cbc,cast128-cbc,3des-cbc
+
+After trying cipher types managed to connect:
+$ ssh -oKexAlgorithms=+diffie-hellman-group1-sha1 -oHostKeyAlgorithms=+ssh-dss -c blowfish-cbc admin@192.168.0.91
+Unknown cipher type 'blowfish-cbc'
+
+$ ssh -oKexAlgorithms=+diffie-hellman-group1-sha1 -oHostKeyAlgorithms=+ssh-dss -c aes256-cbc admin@192.168.0.91
+admin@192.168.0.91's password: 
+
+T1700G-28TQ>
+
+
+And the switch information:
+T1700G-28TQ#show system-info 
+ Master Unit ID       - 1
+ System Description   - JetStream 24-Port Gigabit Stackable Smart Switch with 4 10GE SFP+ Slots
+ Device Name          - T1700G-28TQ
+ Device Location      - SHENZHEN
+ Contact Information  - www.tp-link.com
+ MAC                  - <snip>
+ System Time          - 2006-01-01 13:21:15
+ Running Time:        - 0 day - 5 hour - 22 min - 18 sec
+
+Device Info
+Unit 1
+ Unit State                 - Ready
+ Hardware Version           - T1700G-28TQRev2
+ Firmware Version           - 2.0.1 Build 20170608 Rel.61525(s)
+ Power Supply Module        - Operational
+ Redundant Power Supply     - Not Support
+
+Reset and didn't save any of the changes.
+
+Updating the firmware to "3.0.0 Build 20190108 Rel.62365(s)" didn't change the supported ssh options.
+T1700G-28TQ>enable
+
+T1700G-28TQ#show system-info                                                   
+ Master Unit ID       - 1
+ System Description   - JetStream 24-Port Gigabit Stackable Smart Switch with 4 10GE SFP+ Slots
+ Device Name          - T1700G-28TQ
+ Device Location      - SHENZHEN
+ Contact Information  - www.tp-link.com
+ MAC                  - <snip>
+ System Time          - 2006-01-01 08:19:05
+
+Device Info
+Unit 1
+ Unit State                 - Ready
+ Hardware Version           - T1700G-28TQ 3.0
+ Firmware Version           - 3.0.0 Build 20190108 Rel.62365(s)
+ Bootloader Version         - TP-LINK  BOOTUTIL(v1.0.0)
+ Serial Number              - 
+ Running Time               - 0 day - 0 hour - 20 min - 19 sec
+ Power Supply Module        - Operational
+ Redundant Power Supply     - Not Support
+
+
+T1700G-28TQ#show ip ssh
+
+ Global Config:      
+  SSH Server:         Enabled
+  Protocol V1:        Enabled
+  Protocol V2:        Enabled
+  Session Timeout:    360
+  MAX Clients:        5
+  Port:               22
+
+ Encryption Algorithm: 
+  AES128-CBC:         Enabled
+  AES192-CBC:         Enabled
+  AES256-CBC:         Enabled
+  Blowfish-CBC:       Enabled
+  Cast128-CBC:        Enabled
+  3DES-CBC:           Enabled
+
+ Data Integrity Algorithm: 
+  HMAC-SHA1:          Enabled
+  HMAC-MD5:           Enabled
+
+The above was using the ssh client from the 1:7.6p1-4ubuntu0.5 amd64 package installed on a Ubuntu 18.04.6 LTS system.
+
+Whereas using the ssh client from openssh-clients-5.3p1-124.el6_10.x86_64 on a Scientific Linux release 6.10 system
+didn't have any issues with offered ssh options, and connected without an initial rejection:
+[mr_halfword@sandy-centos ~]$ ssh admin@192.168.0.91
+The authenticity of host '192.168.0.91 (192.168.0.91)' can't be established.
+DSA key fingerprint is 6e:3c:a1:10:ab:02:7f:73:d8:aa:7e:40:d0:51:6e:f8.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added '192.168.0.91' (DSA) to the list of known hosts.
+Authenticated with partial success.
+admin@192.168.0.91's password: 
+
+T1700G-28TQ>enable
+
+
+== Changing the MTU ==
+
+The T1700G-28TQ has a default global MTU of 1518.
+
+On the PC increased the MTU on the ConnextX-2 to the maximum supported of 9600:
+$ sudo ifconfig ens5 mtu 9600
+$ sudo ifconfig ens5d1 mtu 9600
+
+And ibv_devinfo showed the active_mtu increased from 1024 to 4096.
+
+However, RoCEv1 communication failed: 
+$ ibv_generate_infiniband_test_load/ibv_generate_infiniband_test_load 0
+PRBS32 pattern period is 4294967295
+Press Ctrl-C to stop the Infiniband test load
+Assertion failed : wc.status == IBV_WC_SUCCESS
+
+Which corresponded with the sq_num_wrfe and sq_num_tree error counters increasing.
+
+On the switch increased it's MTU to the maximum support of 9216
+
+ibv_generate_infiniband_test_load was now successfully, and the port data rate had increased from 1225.2 Mbytes/sec with
+a RoCEv1 MTU of 1024 to 1243.2 Mbytes/sec with a RoCEv2 MTU of 4096:
+$ ibv_generate_infiniband_test_load/ibv_generate_infiniband_test_load 0
+PRBS32 pattern period is 4294967295
+Press Ctrl-C to stop the Infiniband test load
+^C
+mlx4_0 rx_buffer compare : PASS
+mlx4_0 port 1 -> 2 RDMA write transmitted 153813516288 bytes in 125.966971 seconds, 1221.1 Mbytes/sec
+mlx4_0 port 1 transmitted 156603844484 bytes in 125.966971 seconds, 1243.2 Mbytes/sec
+mlx4_0 port 1 received 156603845264 bytes in 125.966971 seconds, 1243.2 Mbytes/sec
+mlx4_0 port 2 -> 1 RDMA write transmitted 153813516288 bytes in 125.968216 seconds, 1221.1 Mbytes/sec
+mlx4_0 port 2 transmitted 156603845264 bytes in 125.968216 seconds, 1243.2 Mbytes/sec
+mlx4_0 port 2 received 156603844480 bytes in 125.968216 seconds, 1243.2 Mbytes/sec
+
+
+== Enabling port-mirroring to show that traffic can pass between 1G copper and 10G SFP+ ports ==
+
+Tempoarily enabled port-mirroring the switch:
+T1700G-28TQ#show monitor session
+
+Monitor Session:         1
+Destination Port:    Gi1/0/4
+Source Ports(Ingress):   Te1/0/25-26
+Source Ports(Egress):    N/A
+
+Ports 25 and 26 are the 10G ports connected to the ConnectX-2 in Haswell-Ubuntu workstation.
+Port 4 is the 1G port in the Sandy-Ubuntu PC.
+
+Where the ingress traffic on ports 25-26 is mirrored to port 4. Due to the bandwidth differences, the mirror port may
+drop some traffic.
+
+On the monitor PC set the MTU on eth0 to 9000 (exact maximum MTU not investigated) and ran wireshark to capture traffic.
+
+On Haswell-Ubuntu ran ibv_time_dma_flush which generates a realtively small amount of traffic.
+
+The wireshark capture on the monitor port did show RoCE captures. E.g. the first two captured frames:
+Frame 52: 4182 bytes on wire (33456 bits), 4182 bytes captured (33456 bits) on interface 0
+Ethernet II, Src: Mellanox_50:41:74 (00:02:c9:50:41:74), Dst: Mellanox_50:41:75 (00:02:c9:50:41:75)
+    Destination: Mellanox_50:41:75 (00:02:c9:50:41:75)
+    Source: Mellanox_50:41:74 (00:02:c9:50:41:74)
+    Type: RDMA over Converged Ethernet (0x8915)
+InfiniBand
+    Global Route Header
+        0110 .... = IP Version: 6
+        .... 0000 0000 .... = Traffic Class: 0
+        .... .... .... 0000 0000 0000 0000 0000 = Flow Label: 0
+        Payload Length: 4128
+        Next Header: 27
+        Hop Limit: 1
+        Source GID: fe80::202:c9ff:fe50:4174
+        Destination GID: fe80::202:c9ff:fe50:4175
+    Base Transport Header
+        Opcode: Reliable Connection (RC) - RDMA WRITE First (6)
+        0... .... = Solicited Event: False
+        .1.. .... = MigReq: True
+        ..00 .... = Pad Count: 0
+        .... 0000 = Header Version: 0
+        Partition Key: 65535
+        Reserved: 00
+        Destination Queue Pair: 0x00028a
+        0... .... = Acknowledge Request: False
+        .000 0000 = Reserved (7 bits): 0
+        Packet Sequence Number: 0
+    RETH - RDMA Extended Transport Header
+        Virtual Address: 139676435058752
+        Remote Key: 1744835073
+        DMA Length: 134217728
+    Invariant CRC: 0x6deb7a0f
+Data (4096 bytes)
+    Data: 000000000000000000000000000000000000000000000000...
+    [Length: 4096]
+
+Frame 53: 4166 bytes on wire (33328 bits), 4166 bytes captured (33328 bits) on interface 0
+Ethernet II, Src: Mellanox_50:41:74 (00:02:c9:50:41:74), Dst: Mellanox_50:41:75 (00:02:c9:50:41:75)
+    Destination: Mellanox_50:41:75 (00:02:c9:50:41:75)
+    Source: Mellanox_50:41:74 (00:02:c9:50:41:74)
+    Type: RDMA over Converged Ethernet (0x8915)
+InfiniBand
+    Global Route Header
+        0110 .... = IP Version: 6
+        .... 0000 0000 .... = Traffic Class: 0
+        .... .... .... 0000 0000 0000 0000 0000 = Flow Label: 0
+        Payload Length: 4112
+        Next Header: 27
+        Hop Limit: 1
+        Source GID: fe80::202:c9ff:fe50:4174
+        Destination GID: fe80::202:c9ff:fe50:4175
+    Base Transport Header
+        Opcode: Reliable Connection (RC) - RDMA WRITE Middle (7)
+        0... .... = Solicited Event: False
+        .1.. .... = MigReq: True
+        ..00 .... = Pad Count: 0
+        .... 0000 = Header Version: 0
+        Partition Key: 65535
+        Reserved: 00
+        Destination Queue Pair: 0x00028a
+        0... .... = Acknowledge Request: False
+        .000 0000 = Reserved (7 bits): 0
+        Packet Sequence Number: 1
+    Invariant CRC: 0x6480aa38
+Data (4096 bytes)
+    Data: 000000000000000000000000000000000000000000000000...
+    [Length: 4096]
+
+Where the capture shows:
+- RoCEv1 frames, as indicated by the ethertype
+- The data payload of the 4096 maximum MTU for Infiniband transport
+- Jumbo Ethernet frames, where the number of bytes captured includes the Infiniband headers.
+
+While looking at the capture saw some unexpected 192.168.0/24 IP addresses. Turned out that while the ubuntu_mlx4_to_eth.sh
+scripts set some static IP addresses on the ConnectX-2 ports when changing the link layer from Infiniband to Ethernet that
+the Ubuntu network manager seemed to have allocated IP address using DHCP.
+That also shows that packets can flow between the 1G and 10G ports.
