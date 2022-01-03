@@ -1,0 +1,739 @@
+== Introduction ==
+
+Notes about using a ConnectX-2 VPI configured with an Ethernet link-layer for perfoming the switch-test function
+initially developed in https://github.com/chester-gillon/switch_test using PCAP to transmit/receive raw frames.
+
+The test environment was:
+a. A HP Z640 workstation, with dual E5-2620 v3 processors.
+b. Ubuntu 18.04.6 LTS with a 4.15.0-163-generic Kernel.
+c. A Mellanox ConnectX-2 MHQH29C with firmware 2.9.1000 (the latest available for PSID MT_0FC0110009).
+d. No specific real-time programming techniques.
+e. The ubuntu_mlx4_to_eth.sh script to switch the ConnectX-2 ports from Infiniband to Ethernet after Linux has booted.
+f. A tp-link T1700G-28TQ as the injection switch with:
+   - 10G ports 27 and 28 connected to the ConnectX-2 ports 1 and 2.
+   - 10G ports 25 and 26 connected by a DAC cable, as a loop-back for maximum throughput at 10G.
+   - 10/100/1000M ports ports 1 and 24 connected to the tp-Link TL-SF1024 10/100M unmanaged switch.
+   - Ports 1 to 26 being untagged members of one VLAN 1001 .. 1026 each.
+   - Ports 27 and 28 being tagged members of all VLANs 1001 .. 1026.
+
+Each test frames takes a total of 12336 bit-times which includes
+  preamble + Start frame delimiter + frame + Frame check sequence + Interpacket gap 
+
+
+== ibv_raw_packet_tx rate ==
+
+The following shows the average transmit rate achieved by ibv_raw_packet_tx over 10 seconds;
+$ ibv_switch_test/ibv_raw_packet_tx  -i mlx4_0 -n 1 -p 25,26
+Send 8096001 frames over 10.000094 secs, average 809592.5 Hz
+
+On a 10G link the expected rate for the size of the frames used in 810635, so 99.87% of the thoeretical
+line rate.
+
+
+== Behaviour of different Queue-Pairs with VLANs ==
+
+For the Queue-Pair types which are built upon RDMA, RoCE GIDs are used to select the source and destination addresses.
+
+The add_vlans_for_switch_test.sh script was used to map a GID to a VLAN / MAC address / IPv6 link-local address combination.
+
+While the PCAP based switch_test could use a single Ethernet interface for transmit and receive, with unicast Queue-Pairs
+if both ends are on the same interface then no packets are output; it seems the packets are looped internally.
+That happens even with the IBV_QPT_UD even when source and destination GIDS are different.
+
+Therefore, if Queue-Pairs are to be used then need separate transmit and receive interfaces.
+The same range of VLANs are mapped to two interfaces, but with different MAC addresses and GIDs on each interface.
+
+The output from the script which adds VLANs on both ConnectX-2 ports:
+$ sudo ./ibv_message_passing_c_project/source/ibv_switch_test/add_vlans_for_switch_test.sh ens5 0 ; sudo ./ibv_message_passing_c_project/source/ibv_switch_test/add_vlans_for_switch_test.sh ens5d1 1
+[sudo] password for mr_halfword: 
+Added VLAN with VID == 1001 to IF -:ens5:-
+Added VLAN with VID == 1002 to IF -:ens5:-
+Added VLAN with VID == 1003 to IF -:ens5:-
+Added VLAN with VID == 1004 to IF -:ens5:-
+Added VLAN with VID == 1005 to IF -:ens5:-
+Added VLAN with VID == 1006 to IF -:ens5:-
+Added VLAN with VID == 1007 to IF -:ens5:-
+Added VLAN with VID == 1008 to IF -:ens5:-
+Added VLAN with VID == 1009 to IF -:ens5:-
+Added VLAN with VID == 1010 to IF -:ens5:-
+Added VLAN with VID == 1011 to IF -:ens5:-
+Added VLAN with VID == 1012 to IF -:ens5:-
+Added VLAN with VID == 1013 to IF -:ens5:-
+Added VLAN with VID == 1014 to IF -:ens5:-
+Added VLAN with VID == 1015 to IF -:ens5:-
+Added VLAN with VID == 1016 to IF -:ens5:-
+Added VLAN with VID == 1017 to IF -:ens5:-
+Added VLAN with VID == 1018 to IF -:ens5:-
+Added VLAN with VID == 1019 to IF -:ens5:-
+Added VLAN with VID == 1020 to IF -:ens5:-
+Added VLAN with VID == 1021 to IF -:ens5:-
+Added VLAN with VID == 1022 to IF -:ens5:-
+Added VLAN with VID == 1023 to IF -:ens5:-
+Added VLAN with VID == 1024 to IF -:ens5:-
+Added VLAN with VID == 1025 to IF -:ens5:-
+Added VLAN with VID == 1026 to IF -:ens5:-
+Added VLAN with VID == 1027 to IF -:ens5:-
+Added VLAN with VID == 1028 to IF -:ens5:-
+Added VLAN with VID == 1029 to IF -:ens5:-
+Added VLAN with VID == 1030 to IF -:ens5:-
+Added VLAN with VID == 1031 to IF -:ens5:-
+Added VLAN with VID == 1032 to IF -:ens5:-
+Added VLAN with VID == 1033 to IF -:ens5:-
+Added VLAN with VID == 1034 to IF -:ens5:-
+Added VLAN with VID == 1035 to IF -:ens5:-
+Added VLAN with VID == 1036 to IF -:ens5:-
+Added VLAN with VID == 1037 to IF -:ens5:-
+Added VLAN with VID == 1038 to IF -:ens5:-
+Added VLAN with VID == 1039 to IF -:ens5:-
+Added VLAN with VID == 1040 to IF -:ens5:-
+Added VLAN with VID == 1041 to IF -:ens5:-
+Added VLAN with VID == 1042 to IF -:ens5:-
+Added VLAN with VID == 1043 to IF -:ens5:-
+Added VLAN with VID == 1044 to IF -:ens5:-
+Added VLAN with VID == 1045 to IF -:ens5:-
+Added VLAN with VID == 1046 to IF -:ens5:-
+Added VLAN with VID == 1047 to IF -:ens5:-
+Added VLAN with VID == 1048 to IF -:ens5:-
+Added VLAN with VID == 1001 to IF -:ens5d1:-
+Added VLAN with VID == 1002 to IF -:ens5d1:-
+Added VLAN with VID == 1003 to IF -:ens5d1:-
+Added VLAN with VID == 1004 to IF -:ens5d1:-
+Added VLAN with VID == 1005 to IF -:ens5d1:-
+Added VLAN with VID == 1006 to IF -:ens5d1:-
+Added VLAN with VID == 1007 to IF -:ens5d1:-
+Added VLAN with VID == 1008 to IF -:ens5d1:-
+Added VLAN with VID == 1009 to IF -:ens5d1:-
+Added VLAN with VID == 1010 to IF -:ens5d1:-
+Added VLAN with VID == 1011 to IF -:ens5d1:-
+Added VLAN with VID == 1012 to IF -:ens5d1:-
+Added VLAN with VID == 1013 to IF -:ens5d1:-
+Added VLAN with VID == 1014 to IF -:ens5d1:-
+Added VLAN with VID == 1015 to IF -:ens5d1:-
+Added VLAN with VID == 1016 to IF -:ens5d1:-
+Added VLAN with VID == 1017 to IF -:ens5d1:-
+Added VLAN with VID == 1018 to IF -:ens5d1:-
+Added VLAN with VID == 1019 to IF -:ens5d1:-
+Added VLAN with VID == 1020 to IF -:ens5d1:-
+Added VLAN with VID == 1021 to IF -:ens5d1:-
+Added VLAN with VID == 1022 to IF -:ens5d1:-
+Added VLAN with VID == 1023 to IF -:ens5d1:-
+Added VLAN with VID == 1024 to IF -:ens5d1:-
+Added VLAN with VID == 1025 to IF -:ens5d1:-
+Added VLAN with VID == 1026 to IF -:ens5d1:-
+Added VLAN with VID == 1027 to IF -:ens5d1:-
+Added VLAN with VID == 1028 to IF -:ens5d1:-
+Added VLAN with VID == 1029 to IF -:ens5d1:-
+Added VLAN with VID == 1030 to IF -:ens5d1:-
+Added VLAN with VID == 1031 to IF -:ens5d1:-
+Added VLAN with VID == 1032 to IF -:ens5d1:-
+Added VLAN with VID == 1033 to IF -:ens5d1:-
+Added VLAN with VID == 1034 to IF -:ens5d1:-
+Added VLAN with VID == 1035 to IF -:ens5d1:-
+Added VLAN with VID == 1036 to IF -:ens5d1:-
+Added VLAN with VID == 1037 to IF -:ens5d1:-
+Added VLAN with VID == 1038 to IF -:ens5d1:-
+Added VLAN with VID == 1039 to IF -:ens5d1:-
+Added VLAN with VID == 1040 to IF -:ens5d1:-
+Added VLAN with VID == 1041 to IF -:ens5d1:-
+Added VLAN with VID == 1042 to IF -:ens5d1:-
+Added VLAN with VID == 1043 to IF -:ens5d1:-
+Added VLAN with VID == 1044 to IF -:ens5d1:-
+Added VLAN with VID == 1045 to IF -:ens5d1:-
+Added VLAN with VID == 1046 to IF -:ens5d1:-
+Added VLAN with VID == 1047 to IF -:ens5d1:-
+Added VLAN with VID == 1048 to IF -:ens5d1:-
+
+The resulting interface addresses:
+$ ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: eno1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether ec:b1:d7:3e:5f:f1 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.0.118/24 brd 192.168.0.255 scope global noprefixroute eno1
+       valid_lft forever preferred_lft forever
+    inet6 fe80::ac79:9ebc:a4c0:a3c2/64 scope link noprefixroute 
+       valid_lft forever preferred_lft forever
+17: ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc mq state UP group default qlen 1000
+    link/ether 00:02:c9:50:41:74 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::202:c9ff:fe50:4174/64 scope link 
+       valid_lft forever preferred_lft forever
+18: ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc mq state UP group default qlen 1000
+    link/ether 00:02:c9:50:41:75 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::202:c9ff:fe50:4175/64 scope link 
+       valid_lft forever preferred_lft forever
+19: ens5.1001@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:01 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:1/64 scope link 
+       valid_lft forever preferred_lft forever
+20: ens5.1002@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:02 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:2/64 scope link 
+       valid_lft forever preferred_lft forever
+21: ens5.1003@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:03 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:3/64 scope link 
+       valid_lft forever preferred_lft forever
+22: ens5.1004@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:04 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:4/64 scope link 
+       valid_lft forever preferred_lft forever
+23: ens5.1005@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:05 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:5/64 scope link 
+       valid_lft forever preferred_lft forever
+24: ens5.1006@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:06 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:6/64 scope link 
+       valid_lft forever preferred_lft forever
+25: ens5.1007@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:07 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:7/64 scope link 
+       valid_lft forever preferred_lft forever
+26: ens5.1008@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:08 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:8/64 scope link 
+       valid_lft forever preferred_lft forever
+27: ens5.1009@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:09 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:9/64 scope link 
+       valid_lft forever preferred_lft forever
+28: ens5.1010@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:0a brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:a/64 scope link 
+       valid_lft forever preferred_lft forever
+29: ens5.1011@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:0b brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:b/64 scope link 
+       valid_lft forever preferred_lft forever
+30: ens5.1012@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:0c brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:c/64 scope link 
+       valid_lft forever preferred_lft forever
+31: ens5.1013@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:0d brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:d/64 scope link 
+       valid_lft forever preferred_lft forever
+32: ens5.1014@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:0e brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:e/64 scope link 
+       valid_lft forever preferred_lft forever
+33: ens5.1015@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:0f brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:f/64 scope link 
+       valid_lft forever preferred_lft forever
+34: ens5.1016@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:10 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:10/64 scope link 
+       valid_lft forever preferred_lft forever
+35: ens5.1017@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:11 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:11/64 scope link 
+       valid_lft forever preferred_lft forever
+36: ens5.1018@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:12 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:12/64 scope link 
+       valid_lft forever preferred_lft forever
+37: ens5.1019@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:13 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:13/64 scope link 
+       valid_lft forever preferred_lft forever
+38: ens5.1020@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:14 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:14/64 scope link 
+       valid_lft forever preferred_lft forever
+39: ens5.1021@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:15 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:15/64 scope link 
+       valid_lft forever preferred_lft forever
+40: ens5.1022@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:16 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:16/64 scope link 
+       valid_lft forever preferred_lft forever
+41: ens5.1023@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:17 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:17/64 scope link 
+       valid_lft forever preferred_lft forever
+42: ens5.1024@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:18 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:18/64 scope link 
+       valid_lft forever preferred_lft forever
+43: ens5.1025@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:19 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:19/64 scope link 
+       valid_lft forever preferred_lft forever
+44: ens5.1026@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:1a brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:1a/64 scope link 
+       valid_lft forever preferred_lft forever
+45: ens5.1027@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:1b brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:1b/64 scope link 
+       valid_lft forever preferred_lft forever
+46: ens5.1028@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:1c brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:1c/64 scope link 
+       valid_lft forever preferred_lft forever
+47: ens5.1029@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:1d brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:1d/64 scope link 
+       valid_lft forever preferred_lft forever
+48: ens5.1030@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:1e brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:1e/64 scope link 
+       valid_lft forever preferred_lft forever
+49: ens5.1031@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:1f brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:1f/64 scope link 
+       valid_lft forever preferred_lft forever
+50: ens5.1032@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:20 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:20/64 scope link 
+       valid_lft forever preferred_lft forever
+51: ens5.1033@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:21 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:21/64 scope link 
+       valid_lft forever preferred_lft forever
+52: ens5.1034@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:22 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:22/64 scope link 
+       valid_lft forever preferred_lft forever
+53: ens5.1035@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:23 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:23/64 scope link 
+       valid_lft forever preferred_lft forever
+54: ens5.1036@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:24 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:24/64 scope link 
+       valid_lft forever preferred_lft forever
+55: ens5.1037@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:25 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:25/64 scope link 
+       valid_lft forever preferred_lft forever
+56: ens5.1038@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:26 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:26/64 scope link 
+       valid_lft forever preferred_lft forever
+57: ens5.1039@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:27 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:27/64 scope link 
+       valid_lft forever preferred_lft forever
+58: ens5.1040@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:28 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:28/64 scope link 
+       valid_lft forever preferred_lft forever
+59: ens5.1041@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:29 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:29/64 scope link 
+       valid_lft forever preferred_lft forever
+60: ens5.1042@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:2a brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:2a/64 scope link 
+       valid_lft forever preferred_lft forever
+61: ens5.1043@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:2b brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:2b/64 scope link 
+       valid_lft forever preferred_lft forever
+62: ens5.1044@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:2c brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:2c/64 scope link 
+       valid_lft forever preferred_lft forever
+63: ens5.1045@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:2d brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:2d/64 scope link 
+       valid_lft forever preferred_lft forever
+64: ens5.1046@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:2e brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:2e/64 scope link 
+       valid_lft forever preferred_lft forever
+65: ens5.1047@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:2f brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:2f/64 scope link 
+       valid_lft forever preferred_lft forever
+66: ens5.1048@ens5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:01:00:00:30 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::1ff:fe00:30/64 scope link 
+       valid_lft forever preferred_lft forever
+67: ens5d1.1001@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:01 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:1/64 scope link 
+       valid_lft forever preferred_lft forever
+68: ens5d1.1002@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:02 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:2/64 scope link 
+       valid_lft forever preferred_lft forever
+69: ens5d1.1003@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:03 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:3/64 scope link 
+       valid_lft forever preferred_lft forever
+70: ens5d1.1004@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:04 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:4/64 scope link 
+       valid_lft forever preferred_lft forever
+71: ens5d1.1005@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:05 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:5/64 scope link 
+       valid_lft forever preferred_lft forever
+72: ens5d1.1006@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:06 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:6/64 scope link 
+       valid_lft forever preferred_lft forever
+73: ens5d1.1007@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:07 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:7/64 scope link 
+       valid_lft forever preferred_lft forever
+74: ens5d1.1008@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:08 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:8/64 scope link 
+       valid_lft forever preferred_lft forever
+75: ens5d1.1009@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:09 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:9/64 scope link 
+       valid_lft forever preferred_lft forever
+76: ens5d1.1010@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:0a brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:a/64 scope link 
+       valid_lft forever preferred_lft forever
+77: ens5d1.1011@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:0b brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:b/64 scope link 
+       valid_lft forever preferred_lft forever
+78: ens5d1.1012@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:0c brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:c/64 scope link 
+       valid_lft forever preferred_lft forever
+79: ens5d1.1013@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:0d brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:d/64 scope link 
+       valid_lft forever preferred_lft forever
+80: ens5d1.1014@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:0e brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:e/64 scope link 
+       valid_lft forever preferred_lft forever
+81: ens5d1.1015@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:0f brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:f/64 scope link 
+       valid_lft forever preferred_lft forever
+82: ens5d1.1016@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:10 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:10/64 scope link 
+       valid_lft forever preferred_lft forever
+83: ens5d1.1017@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:11 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:11/64 scope link 
+       valid_lft forever preferred_lft forever
+84: ens5d1.1018@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:12 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:12/64 scope link 
+       valid_lft forever preferred_lft forever
+85: ens5d1.1019@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:13 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:13/64 scope link 
+       valid_lft forever preferred_lft forever
+86: ens5d1.1020@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:14 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:14/64 scope link 
+       valid_lft forever preferred_lft forever
+87: ens5d1.1021@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:15 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:15/64 scope link 
+       valid_lft forever preferred_lft forever
+88: ens5d1.1022@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:16 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:16/64 scope link 
+       valid_lft forever preferred_lft forever
+89: ens5d1.1023@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:17 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:17/64 scope link 
+       valid_lft forever preferred_lft forever
+90: ens5d1.1024@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:18 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:18/64 scope link 
+       valid_lft forever preferred_lft forever
+91: ens5d1.1025@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:19 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:19/64 scope link 
+       valid_lft forever preferred_lft forever
+92: ens5d1.1026@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:1a brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:1a/64 scope link 
+       valid_lft forever preferred_lft forever
+93: ens5d1.1027@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:1b brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:1b/64 scope link 
+       valid_lft forever preferred_lft forever
+94: ens5d1.1028@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:1c brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:1c/64 scope link 
+       valid_lft forever preferred_lft forever
+95: ens5d1.1029@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:1d brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:1d/64 scope link 
+       valid_lft forever preferred_lft forever
+96: ens5d1.1030@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:1e brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:1e/64 scope link 
+       valid_lft forever preferred_lft forever
+97: ens5d1.1031@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:1f brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:1f/64 scope link 
+       valid_lft forever preferred_lft forever
+98: ens5d1.1032@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:20 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:20/64 scope link 
+       valid_lft forever preferred_lft forever
+99: ens5d1.1033@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:21 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:21/64 scope link 
+       valid_lft forever preferred_lft forever
+100: ens5d1.1034@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:22 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:22/64 scope link 
+       valid_lft forever preferred_lft forever
+101: ens5d1.1035@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:23 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:23/64 scope link 
+       valid_lft forever preferred_lft forever
+102: ens5d1.1036@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:24 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:24/64 scope link 
+       valid_lft forever preferred_lft forever
+103: ens5d1.1037@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:25 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:25/64 scope link 
+       valid_lft forever preferred_lft forever
+104: ens5d1.1038@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:26 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:26/64 scope link 
+       valid_lft forever preferred_lft forever
+105: ens5d1.1039@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:27 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:27/64 scope link 
+       valid_lft forever preferred_lft forever
+106: ens5d1.1040@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:28 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:28/64 scope link 
+       valid_lft forever preferred_lft forever
+107: ens5d1.1041@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:29 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:29/64 scope link 
+       valid_lft forever preferred_lft forever
+108: ens5d1.1042@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:2a brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:2a/64 scope link 
+       valid_lft forever preferred_lft forever
+109: ens5d1.1043@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:2b brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:2b/64 scope link 
+       valid_lft forever preferred_lft forever
+110: ens5d1.1044@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:2c brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:2c/64 scope link 
+       valid_lft forever preferred_lft forever
+111: ens5d1.1045@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:2d brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:2d/64 scope link 
+       valid_lft forever preferred_lft forever
+112: ens5d1.1046@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:2e brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:2e/64 scope link 
+       valid_lft forever preferred_lft forever
+113: ens5d1.1047@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:2f brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:2f/64 scope link 
+       valid_lft forever preferred_lft forever
+114: ens5d1.1048@ens5d1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9216 qdisc noqueue state UP group default qlen 1000
+    link/ether 02:00:02:00:00:30 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::2ff:fe00:30/64 scope link 
+       valid_lft forever preferred_lft forever
+mr_halfword@Haswell-Ubuntu:~/ibv_message_passing$ 
+
+And the GIDs:
+$ ~/mlnx-tools/ofed_scripts/show_gids 
+DEV PORT    INDEX   GID                 IPv4        VER DEV
+--- ----    -----   ---                 ------------    --- ---
+mlx4_0  1   0   fe80:0000:0000:0000:0202:c9ff:fe50:4174         v1  ens5
+mlx4_0  1   1   fe80:0000:0000:0000:0000:01ff:fe00:0001         v1  ens5.1001
+mlx4_0  1   10  fe80:0000:0000:0000:0000:01ff:fe00:000a         v1  ens5.1010
+mlx4_0  1   11  fe80:0000:0000:0000:0000:01ff:fe00:000b         v1  ens5.1011
+mlx4_0  1   12  fe80:0000:0000:0000:0000:01ff:fe00:000c         v1  ens5.1012
+mlx4_0  1   13  fe80:0000:0000:0000:0000:01ff:fe00:000d         v1  ens5.1013
+mlx4_0  1   14  fe80:0000:0000:0000:0000:01ff:fe00:000e         v1  ens5.1014
+mlx4_0  1   15  fe80:0000:0000:0000:0000:01ff:fe00:000f         v1  ens5.1015
+mlx4_0  1   16  fe80:0000:0000:0000:0000:01ff:fe00:0010         v1  ens5.1016
+mlx4_0  1   17  fe80:0000:0000:0000:0000:01ff:fe00:0011         v1  ens5.1017
+mlx4_0  1   18  fe80:0000:0000:0000:0000:01ff:fe00:0012         v1  ens5.1018
+mlx4_0  1   19  fe80:0000:0000:0000:0000:01ff:fe00:0013         v1  ens5.1019
+mlx4_0  1   2   fe80:0000:0000:0000:0000:01ff:fe00:0002         v1  ens5.1002
+mlx4_0  1   20  fe80:0000:0000:0000:0000:01ff:fe00:0014         v1  ens5.1020
+mlx4_0  1   21  fe80:0000:0000:0000:0000:01ff:fe00:0015         v1  ens5.1021
+mlx4_0  1   22  fe80:0000:0000:0000:0000:01ff:fe00:0016         v1  ens5.1022
+mlx4_0  1   23  fe80:0000:0000:0000:0000:01ff:fe00:0017         v1  ens5.1023
+mlx4_0  1   24  fe80:0000:0000:0000:0000:01ff:fe00:0018         v1  ens5.1024
+mlx4_0  1   25  fe80:0000:0000:0000:0000:01ff:fe00:0019         v1  ens5.1025
+mlx4_0  1   26  fe80:0000:0000:0000:0000:01ff:fe00:001a         v1  ens5.1026
+mlx4_0  1   27  fe80:0000:0000:0000:0000:01ff:fe00:001b         v1  ens5.1027
+mlx4_0  1   28  fe80:0000:0000:0000:0000:01ff:fe00:001c         v1  ens5.1028
+mlx4_0  1   29  fe80:0000:0000:0000:0000:01ff:fe00:001d         v1  ens5.1029
+mlx4_0  1   3   fe80:0000:0000:0000:0000:01ff:fe00:0003         v1  ens5.1003
+mlx4_0  1   30  fe80:0000:0000:0000:0000:01ff:fe00:001e         v1  ens5.1030
+mlx4_0  1   31  fe80:0000:0000:0000:0000:01ff:fe00:001f         v1  ens5.1031
+mlx4_0  1   32  fe80:0000:0000:0000:0000:01ff:fe00:0020         v1  ens5.1032
+mlx4_0  1   33  fe80:0000:0000:0000:0000:01ff:fe00:0021         v1  ens5.1033
+mlx4_0  1   34  fe80:0000:0000:0000:0000:01ff:fe00:0022         v1  ens5.1034
+mlx4_0  1   35  fe80:0000:0000:0000:0000:01ff:fe00:0023         v1  ens5.1035
+mlx4_0  1   36  fe80:0000:0000:0000:0000:01ff:fe00:0024         v1  ens5.1036
+mlx4_0  1   37  fe80:0000:0000:0000:0000:01ff:fe00:0025         v1  ens5.1037
+mlx4_0  1   38  fe80:0000:0000:0000:0000:01ff:fe00:0026         v1  ens5.1038
+mlx4_0  1   39  fe80:0000:0000:0000:0000:01ff:fe00:0027         v1  ens5.1039
+mlx4_0  1   4   fe80:0000:0000:0000:0000:01ff:fe00:0004         v1  ens5.1004
+mlx4_0  1   40  fe80:0000:0000:0000:0000:01ff:fe00:0028         v1  ens5.1040
+mlx4_0  1   41  fe80:0000:0000:0000:0000:01ff:fe00:0029         v1  ens5.1041
+mlx4_0  1   42  fe80:0000:0000:0000:0000:01ff:fe00:002a         v1  ens5.1042
+mlx4_0  1   43  fe80:0000:0000:0000:0000:01ff:fe00:002b         v1  ens5.1043
+mlx4_0  1   44  fe80:0000:0000:0000:0000:01ff:fe00:002c         v1  ens5.1044
+mlx4_0  1   45  fe80:0000:0000:0000:0000:01ff:fe00:002d         v1  ens5.1045
+mlx4_0  1   46  fe80:0000:0000:0000:0000:01ff:fe00:002e         v1  ens5.1046
+mlx4_0  1   47  fe80:0000:0000:0000:0000:01ff:fe00:002f         v1  ens5.1047
+mlx4_0  1   48  fe80:0000:0000:0000:0000:01ff:fe00:0030         v1  ens5.1048
+mlx4_0  1   5   fe80:0000:0000:0000:0000:01ff:fe00:0005         v1  ens5.1005
+mlx4_0  1   6   fe80:0000:0000:0000:0000:01ff:fe00:0006         v1  ens5.1006
+mlx4_0  1   7   fe80:0000:0000:0000:0000:01ff:fe00:0007         v1  ens5.1007
+mlx4_0  1   8   fe80:0000:0000:0000:0000:01ff:fe00:0008         v1  ens5.1008
+mlx4_0  1   9   fe80:0000:0000:0000:0000:01ff:fe00:0009         v1  ens5.1009
+mlx4_0  2   0   fe80:0000:0000:0000:0202:c9ff:fe50:4175         v1  ens5d1
+mlx4_0  2   1   fe80:0000:0000:0000:0000:02ff:fe00:0001         v1  ens5d1.1001
+mlx4_0  2   10  fe80:0000:0000:0000:0000:02ff:fe00:000a         v1  ens5d1.1010
+mlx4_0  2   11  fe80:0000:0000:0000:0000:02ff:fe00:000b         v1  ens5d1.1011
+mlx4_0  2   12  fe80:0000:0000:0000:0000:02ff:fe00:000c         v1  ens5d1.1012
+mlx4_0  2   13  fe80:0000:0000:0000:0000:02ff:fe00:000d         v1  ens5d1.1013
+mlx4_0  2   14  fe80:0000:0000:0000:0000:02ff:fe00:000e         v1  ens5d1.1014
+mlx4_0  2   15  fe80:0000:0000:0000:0000:02ff:fe00:000f         v1  ens5d1.1015
+mlx4_0  2   16  fe80:0000:0000:0000:0000:02ff:fe00:0010         v1  ens5d1.1016
+mlx4_0  2   17  fe80:0000:0000:0000:0000:02ff:fe00:0011         v1  ens5d1.1017
+mlx4_0  2   18  fe80:0000:0000:0000:0000:02ff:fe00:0012         v1  ens5d1.1018
+mlx4_0  2   19  fe80:0000:0000:0000:0000:02ff:fe00:0013         v1  ens5d1.1019
+mlx4_0  2   2   fe80:0000:0000:0000:0000:02ff:fe00:0002         v1  ens5d1.1002
+mlx4_0  2   20  fe80:0000:0000:0000:0000:02ff:fe00:0014         v1  ens5d1.1020
+mlx4_0  2   21  fe80:0000:0000:0000:0000:02ff:fe00:0015         v1  ens5d1.1021
+mlx4_0  2   22  fe80:0000:0000:0000:0000:02ff:fe00:0016         v1  ens5d1.1022
+mlx4_0  2   23  fe80:0000:0000:0000:0000:02ff:fe00:0017         v1  ens5d1.1023
+mlx4_0  2   24  fe80:0000:0000:0000:0000:02ff:fe00:0018         v1  ens5d1.1024
+mlx4_0  2   25  fe80:0000:0000:0000:0000:02ff:fe00:0019         v1  ens5d1.1025
+mlx4_0  2   26  fe80:0000:0000:0000:0000:02ff:fe00:001a         v1  ens5d1.1026
+mlx4_0  2   27  fe80:0000:0000:0000:0000:02ff:fe00:001b         v1  ens5d1.1027
+mlx4_0  2   28  fe80:0000:0000:0000:0000:02ff:fe00:001c         v1  ens5d1.1028
+mlx4_0  2   29  fe80:0000:0000:0000:0000:02ff:fe00:001d         v1  ens5d1.1029
+mlx4_0  2   3   fe80:0000:0000:0000:0000:02ff:fe00:0003         v1  ens5d1.1003
+mlx4_0  2   30  fe80:0000:0000:0000:0000:02ff:fe00:001e         v1  ens5d1.1030
+mlx4_0  2   31  fe80:0000:0000:0000:0000:02ff:fe00:001f         v1  ens5d1.1031
+mlx4_0  2   32  fe80:0000:0000:0000:0000:02ff:fe00:0020         v1  ens5d1.1032
+mlx4_0  2   33  fe80:0000:0000:0000:0000:02ff:fe00:0021         v1  ens5d1.1033
+mlx4_0  2   34  fe80:0000:0000:0000:0000:02ff:fe00:0022         v1  ens5d1.1034
+mlx4_0  2   35  fe80:0000:0000:0000:0000:02ff:fe00:0023         v1  ens5d1.1035
+mlx4_0  2   36  fe80:0000:0000:0000:0000:02ff:fe00:0024         v1  ens5d1.1036
+mlx4_0  2   37  fe80:0000:0000:0000:0000:02ff:fe00:0025         v1  ens5d1.1037
+mlx4_0  2   38  fe80:0000:0000:0000:0000:02ff:fe00:0026         v1  ens5d1.1038
+mlx4_0  2   39  fe80:0000:0000:0000:0000:02ff:fe00:0027         v1  ens5d1.1039
+mlx4_0  2   4   fe80:0000:0000:0000:0000:02ff:fe00:0004         v1  ens5d1.1004
+mlx4_0  2   40  fe80:0000:0000:0000:0000:02ff:fe00:0028         v1  ens5d1.1040
+mlx4_0  2   41  fe80:0000:0000:0000:0000:02ff:fe00:0029         v1  ens5d1.1041
+mlx4_0  2   42  fe80:0000:0000:0000:0000:02ff:fe00:002a         v1  ens5d1.1042
+mlx4_0  2   43  fe80:0000:0000:0000:0000:02ff:fe00:002b         v1  ens5d1.1043
+mlx4_0  2   44  fe80:0000:0000:0000:0000:02ff:fe00:002c         v1  ens5d1.1044
+mlx4_0  2   45  fe80:0000:0000:0000:0000:02ff:fe00:002d         v1  ens5d1.1045
+mlx4_0  2   46  fe80:0000:0000:0000:0000:02ff:fe00:002e         v1  ens5d1.1046
+mlx4_0  2   47  fe80:0000:0000:0000:0000:02ff:fe00:002f         v1  ens5d1.1047
+mlx4_0  2   48  fe80:0000:0000:0000:0000:02ff:fe00:0030         v1  ens5d1.1048
+mlx4_0  2   5   fe80:0000:0000:0000:0000:02ff:fe00:0005         v1  ens5d1.1005
+mlx4_0  2   6   fe80:0000:0000:0000:0000:02ff:fe00:0006         v1  ens5d1.1006
+mlx4_0  2   7   fe80:0000:0000:0000:0000:02ff:fe00:0007         v1  ens5d1.1007
+mlx4_0  2   8   fe80:0000:0000:0000:0000:02ff:fe00:0008         v1  ens5d1.1008
+mlx4_0  2   9   fe80:0000:0000:0000:0000:02ff:fe00:0009         v1  ens5d1.1009
+n_gids_found=98
+
+A test using IBV_QPT_RC is successful, in that can transmit and receive on different VLANs (with the loopback between 
+injection switch ports 25 and 26 changing the transmit to receive VLAN):
+$ ibv_rc_pingpong -d mlx4_0 -i 1 -g 25
+  local address:  LID 0x0000, QPN 0x00023c, PSN 0xc78b8d, GID fe80::1ff:fe00:19
+  remote address: LID 0x0000, QPN 0x00023d, PSN 0x7138c2, GID fe80::2ff:fe00:1a
+8192000 bytes in 0.02 seconds = 2983.79 Mbit/sec
+1000 iters in 0.02 seconds = 21.96 usec/iter
+
+$ ibv_rc_pingpong -d mlx4_0 -i 2 -g 26 localhost 
+  local address:  LID 0x0000, QPN 0x00023d, PSN 0x7138c2, GID fe80::2ff:fe00:1a
+  remote address: LID 0x0000, QPN 0x00023c, PSN 0xc78b8d, GID fe80::1ff:fe00:19
+8192000 bytes in 0.02 seconds = 3004.58 Mbit/sec
+1000 iters in 0.02 seconds = 21.81 usec/iter
+mr_halfword@Haswell-Ubuntu:~/ibv_message_passing$ 
+
+Using a mirror port in the injection switch and Wireshark shows the expected VLAN and source / destination MAC addresses used.
+
+
+A test using IBV_QPT_UC is successful, in that can transmit and receive on different VLANs (with the loopback between 
+injection switch ports 25 and 26 changing the transmit to receive VLAN):
+$ ibv_uc_pingpong -d mlx4_0 -i 1 -g 25
+  local address:  LID 0x0000, QPN 0x00023e, PSN 0xb4b4e1, GID fe80::1ff:fe00:19
+
+  remote address: LID 0x0000, QPN 0x00023f, PSN 0x2f989d, GID fe80::2ff:fe00:1a
+8192000 bytes in 0.02 seconds = 2999.22 Mbit/sec
+1000 iters in 0.02 seconds = 21.85 usec/iter
+
+$ ibv_uc_pingpong -d mlx4_0 -i 2 -g 26 localhost 
+  local address:  LID 0x0000, QPN 0x00023f, PSN 0x2f989d, GID fe80::2ff:fe00:1a
+  remote address: LID 0x0000, QPN 0x00023e, PSN 0xb4b4e1, GID fe80::1ff:fe00:19
+8192000 bytes in 0.02 seconds = 3018.70 Mbit/sec
+1000 iters in 0.02 seconds = 21.71 usec/iter
+
+
+A test using IBV_QPT_UD fails. The test doesn't complete, and has to be killed:
+$ ibv_ud_pingpong -d mlx4_0 -i 1 -g 25
+  local address:  LID 0x0000, QPN 0x000240, PSN 0x1475ba: GID fe80::1ff:fe00:19
+  remote address: LID 0x0000, QPN 0x000241, PSN 0x71fd44, GID fe80::2ff:fe00:1a
+^C
+
+$ ibv_ud_pingpong -d mlx4_0 -i 2 -g 26 localhost 
+  local address:  LID 0x0000, QPN 0x000241, PSN 0x71fd44: GID fe80::2ff:fe00:1a
+  remote address: LID 0x0000, QPN 0x000240, PSN 0x1475ba, GID fe80::1ff:fe00:19
+^C
+
+Using a mirror port in the injection switch and Wireshark shows only a single frame was transmitted:
+No.     Time           Source                Destination           Protocol Length Info
+   3481 1013.413088447 GID: fe80::2ff:fe00:1a GID: fe80::1ff:fe00:19 InfiniBand 2126   UD Send Only 
+
+Frame 3481: 2126 bytes on wire (17008 bits), 2126 bytes captured (17008 bits) on interface 0
+Ethernet II, Src: Mellanox_50:41:75 (00:02:c9:50:41:75), Dst: 02:00:01:00:00:19 (02:00:01:00:00:19)
+InfiniBand
+    Global Route Header
+        0110 .... = IP Version: 6
+        .... 0000 0000 .... = Traffic Class: 0
+        .... .... .... 0000 0000 0000 0000 0000 = Flow Label: 0
+        Payload Length: 2072
+        Next Header: 27
+        Hop Limit: 1
+        Source GID: fe80::2ff:fe00:1a (fe80::2ff:fe00:1a)
+        Destination GID: fe80::1ff:fe00:19 (fe80::1ff:fe00:19)
+    Base Transport Header
+    DETH - Datagram Extended Transport Header
+    Invariant CRC: 0x7b7b7937
+    Variant CRC: 0x8800
+
+The issue is that the source MAC address is from GID zero and there is no VLAN (GID zero has no VLAN).
+Debugging into the ibv_post_send() call can see the source GID is set in the UD segment written to
+the mlx4_wqe_datagram_seg av.gid_index field written to the device, but the gid_index seems to be ignored
+by the device and GID index zero is used instead.
+
+Where the structure is defined in https://github.com/linux-rdma/rdma-core/blob/master/providers/mlx4/mlx4dv.h
+
+Other fields in the same structure, e.g. mac[] which gives the destination MAC address are used by the
+device to form the Ethernet frame sent. 
+
+Not sure if the source GID being ignored in the address header passed to the ibv_post_send() call for IBV_QPT_UD
+is a bug or a limitation of the ConnectX-2 VPI device.
+
+With IBV_QPT_RC or IBV_QPT_UC the source GID is set when the Queue-Pair is transitioned to Ready-To-Receive.
+
+Whereas with a IBV_QPT_UD the source GID can only be specified duringf the send.
