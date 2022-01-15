@@ -1944,3 +1944,197 @@ Source  Destination ports --->
 Total test intervals with failures = 2 : last failure 20:57:00.733
 Max pending rx frames = 6 out of 6
 
+
+== To get maximum standard Ethernet MTU frames with RDMA UC Queue-Pairs over ROCEv1 ==
+
+The switch under test needs to see the maximum standard MTU without VLAN tags, with an Ethernet payload of 1500.
+
+This can be done with RoCEv1 by setting the UC message size to 1444 and the path MTU to 2048.
+
+The following was run:
+$ ~/rdma-core/build/bin/ibv_uc_pingpong -d mlx4_0 -i 2 -g 25 -s 1444 -m 2048
+  local address:  LID 0x0000, QPN 0x000262, PSN 0x70d05b, GID fe80::2ff:fe00:19
+  eth_mac=02:00:01:00:00:1A  vid=1025
+  remote address: LID 0x0000, QPN 0x000263, PSN 0xc43eda, GID fe80::1ff:fe00:1a
+2888000 bytes in 0.02 seconds = 954.24 Mbit/sec
+1000 iters in 0.02 seconds = 24.21 usec/iter
+
+$ ~/rdma-core/build/bin/ibv_uc_pingpong -d mlx4_0 -i 1 -g 26 localhost -s 1444 -m 2048
+  local address:  LID 0x0000, QPN 0x000263, PSN 0xc43eda, GID fe80::1ff:fe00:1a
+  remote address: LID 0x0000, QPN 0x000262, PSN 0x70d05b, GID fe80::2ff:fe00:19
+  eth_mac=02:00:02:00:00:19  vid=1026
+2888000 bytes in 0.02 seconds = 1184.40 Mbit/sec
+1000 iters in 0.02 seconds = 19.51 usec/iter
+
+And an injection switch mirror port used to capture the traffic.
+
+Wireshark showed 1518 bytes captured in each RoCEv1 frame containing:
+- 14 bytes of Ethernet header - source MAC, destination MAC, Ethertype 802.1Q Virtual LAN (0x8100)
+- 4 bytes for VLAN tag - the type is RDMA over Converged Ethernet (0x8915)
+- 40 bytes for Infiniband Global Route Header
+- 12 bytes for Base Transport Header
+- 1444 bytes for tue UC message size
+- 4 bytes for Invariant CRC
+
+Temporarily changed the injection switch VLAN configuration so that the PSID for port 26 was 1027 rather than 1026.
+This caused the ibv_uc_pingpong test to fail to receive any messages. Therefore, Queue-Pair receipt only works if
+the frames are received on the VLAN to which the Queue-Pair is bound.
+
+For the switch_test this means any flooded frames shouldn't be received on a Queue-Pair and so the test can't
+directly record flooded frames (while the switch under test is learning MAC addresses).
+
+By comparing the change in /sys/class/infiniband/<device>/ports/<port>/counters/port_rcv_packets counters against the
+number of frames received, may be able to estimate the number of flooded frames.
+
+
+== Summary table from ibv_uc_flooded_packets ==
+
+The following is the summary table from running ibv_uc_flooded_packets:
+
+Num    Known  Num      Tx      Last flood
+ports  MACs   flooded  frames  iteration   Host port direction option
+    2      4        2       8           1  reverse except all port combinations tested
+    2      4        2       8           1  reverse exception destination_tested_port_index resets
+    2      4        2       8           0  change all port combinations tested
+    3      6        3      24           0  reverse except all port combinations tested
+    3      5        2      24           0  reverse exception destination_tested_port_index resets
+    3      6        6      24           0  change all port combinations tested
+    4      8        1      48           0  reverse except all port combinations tested
+    4      8        6      48           1  reverse exception destination_tested_port_index resets
+    4      8       12      48           0  change all port combinations tested
+    5     10        8      80           0  reverse except all port combinations tested
+    5     10        2      80           0  reverse exception destination_tested_port_index resets
+    5     10       20      80           0  change all port combinations tested
+    6     12        1     120           0  reverse except all port combinations tested
+    6     12       14     120           1  reverse exception destination_tested_port_index resets
+    6     12       30     120           0  change all port combinations tested
+    7     14       15     168           0  reverse except all port combinations tested
+    7     14        2     168           0  reverse exception destination_tested_port_index resets
+    7     14       42     168           0  change all port combinations tested
+    8     16        1     224           0  reverse except all port combinations tested
+    8     16       26     224           1  reverse exception destination_tested_port_index resets
+    8     16       56     224           0  change all port combinations tested
+    9     18       24     288           0  reverse except all port combinations tested
+    9     18        2     288           0  reverse exception destination_tested_port_index resets
+    9     18       72     288           0  change all port combinations tested
+   10     20        1     360           0  reverse except all port combinations tested
+   10     20       42     360           1  reverse exception destination_tested_port_index resets
+   10     20       90     360           0  change all port combinations tested
+   11     22       35     440           0  reverse except all port combinations tested
+   11     22        2     440           0  reverse exception destination_tested_port_index resets
+   11     22      110     440           0  change all port combinations tested
+   12     24        1     528           0  reverse except all port combinations tested
+   12     24       62     528           1  reverse exception destination_tested_port_index resets
+   12     24      132     528           0  change all port combinations tested
+   13     26       48     624           0  reverse except all port combinations tested
+   13     26        2     624           0  reverse exception destination_tested_port_index resets
+   13     26      156     624           0  change all port combinations tested
+   14     28        1     728           0  reverse except all port combinations tested
+   14     28       86     728           1  reverse exception destination_tested_port_index resets
+   14     28      182     728           0  change all port combinations tested
+   15     30       63     840           0  reverse except all port combinations tested
+   15     30        2     840           0  reverse exception destination_tested_port_index resets
+   15     30      210     840           0  change all port combinations tested
+   16     32        1     960           0  reverse except all port combinations tested
+   16     32      114     960           1  reverse exception destination_tested_port_index resets
+   16     32      240     960           0  change all port combinations tested
+   17     34       80    1088           0  reverse except all port combinations tested
+   17     34        2    1088           0  reverse exception destination_tested_port_index resets
+   17     34      272    1088           0  change all port combinations tested
+   18     36        1    1224           0  reverse except all port combinations tested
+   18     36      146    1224           1  reverse exception destination_tested_port_index resets
+   18     36      306    1224           0  change all port combinations tested
+   19     38       99    1368           0  reverse except all port combinations tested
+   19     38        2    1368           0  reverse exception destination_tested_port_index resets
+   19     38      342    1368           0  change all port combinations tested
+   20     40        1    1520           0  reverse except all port combinations tested
+   20     40      182    1520           1  reverse exception destination_tested_port_index resets
+   20     40      380    1520           0  change all port combinations tested
+   21     42      120    1680           0  reverse except all port combinations tested
+   21     42        2    1680           0  reverse exception destination_tested_port_index resets
+   21     42      420    1680           0  change all port combinations tested
+   22     44        1    1848           0  reverse except all port combinations tested
+   22     44      222    1848           1  reverse exception destination_tested_port_index resets
+   22     44      462    1848           0  change all port combinations tested
+   23     46      143    2024           0  reverse except all port combinations tested
+   23     46        2    2024           0  reverse exception destination_tested_port_index resets
+   23     46      506    2024           0  change all port combinations tested
+   24     48        1    2208           0  reverse except all port combinations tested
+   24     48      266    2208           1  reverse exception destination_tested_port_index resets
+   24     48      552    2208           0  change all port combinations tested
+   25     50      168    2400           0  reverse except all port combinations tested
+   25     50        2    2400           0  reverse exception destination_tested_port_index resets
+   25     50      600    2400           0  change all port combinations tested
+   26     52        1    2600           0  reverse except all port combinations tested
+   26     52      314    2600           1  reverse exception destination_tested_port_index resets
+   26     52      650    2600           0  change all port combinations tested
+   27     54      195    2808           0  reverse except all port combinations tested
+   27     54        2    2808           0  reverse exception destination_tested_port_index resets
+   27     54      702    2808           0  change all port combinations tested
+   28     56        1    3024           0  reverse except all port combinations tested
+   28     56      366    3024           1  reverse exception destination_tested_port_index resets
+   28     56      756    3024           0  change all port combinations tested
+   29     58      224    3248           0  reverse except all port combinations tested
+   29     58        2    3248           0  reverse exception destination_tested_port_index resets
+   29     58      812    3248           0  change all port combinations tested
+   30     60        1    3480           0  reverse except all port combinations tested
+   30     60      422    3480           1  reverse exception destination_tested_port_index resets
+   30     60      870    3480           0  change all port combinations tested
+   31     62      255    3720           0  reverse except all port combinations tested
+   31     62        2    3720           0  reverse exception destination_tested_port_index resets
+   31     62      930    3720           0  change all port combinations tested
+   32     64        1    3968           0  reverse except all port combinations tested
+   32     64      482    3968           1  reverse exception destination_tested_port_index resets
+   32     64      992    3968           0  change all port combinations tested
+   33     66      288    4224           0  reverse except all port combinations tested
+   33     66        2    4224           0  reverse exception destination_tested_port_index resets
+   33     66     1056    4224           0  change all port combinations tested
+   34     68        1    4488           0  reverse except all port combinations tested
+   34     68      546    4488           1  reverse exception destination_tested_port_index resets
+   34     68     1122    4488           0  change all port combinations tested
+   35     70      323    4760           0  reverse except all port combinations tested
+   35     70        2    4760           0  reverse exception destination_tested_port_index resets
+   35     70     1190    4760           0  change all port combinations tested
+   36     72        1    5040           0  reverse except all port combinations tested
+   36     72      614    5040           1  reverse exception destination_tested_port_index resets
+   36     72     1260    5040           0  change all port combinations tested
+   37     74      360    5328           0  reverse except all port combinations tested
+   37     74        2    5328           0  reverse exception destination_tested_port_index resets
+   37     74     1332    5328           0  change all port combinations tested
+   38     76        1    5624           0  reverse except all port combinations tested
+   38     76      686    5624           1  reverse exception destination_tested_port_index resets
+   38     76     1406    5624           0  change all port combinations tested
+   39     78      399    5928           0  reverse except all port combinations tested
+   39     78        2    5928           0  reverse exception destination_tested_port_index resets
+   39     78     1482    5928           0  change all port combinations tested
+   40     80        1    6240           0  reverse except all port combinations tested
+   40     80      762    6240           1  reverse exception destination_tested_port_index resets
+   40     80     1560    6240           0  change all port combinations tested
+   41     82      440    6560           0  reverse except all port combinations tested
+   41     82        2    6560           0  reverse exception destination_tested_port_index resets
+   41     82     1640    6560           0  change all port combinations tested
+   42     84        1    6888           0  reverse except all port combinations tested
+   42     84      842    6888           1  reverse exception destination_tested_port_index resets
+   42     84     1722    6888           0  change all port combinations tested
+   43     86      483    7224           0  reverse except all port combinations tested
+   43     86        2    7224           0  reverse exception destination_tested_port_index resets
+   43     86     1806    7224           0  change all port combinations tested
+   44     88        1    7568           0  reverse except all port combinations tested
+   44     88      926    7568           1  reverse exception destination_tested_port_index resets
+   44     88     1892    7568           0  change all port combinations tested
+   45     90      528    7920           0  reverse except all port combinations tested
+   45     90        2    7920           0  reverse exception destination_tested_port_index resets
+   45     90     1980    7920           0  change all port combinations tested
+   46     92        1    8280           0  reverse except all port combinations tested
+   46     92     1014    8280           1  reverse exception destination_tested_port_index resets
+   46     92     2070    8280           0  change all port combinations tested
+   47     94      575    8648           0  reverse except all port combinations tested
+   47     94        2    8648           0  reverse exception destination_tested_port_index resets
+   47     94     2162    8648           0  change all port combinations tested
+   48     96        1    9024           0  reverse except all port combinations tested
+   48     96     1106    9024           1  reverse exception destination_tested_port_index resets
+   48     96     2256    9024           0  change all port combinations tested
+
+This shows the optimum way to change the host port directions to minimum the number of frames which get flooded is:
+- "reverse exception destination_tested_port_index resets" when testing an odd number of ports.
+- "reverse except all port combinations tested" when testing an even number of ports.
