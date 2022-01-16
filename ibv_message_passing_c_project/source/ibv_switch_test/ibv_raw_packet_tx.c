@@ -392,14 +392,6 @@ static void read_command_line_arguments (const int argc, char *argv[])
     char junk;
     uint32_t port_num;
 
-    /* Default to testing all defined switch ports */
-    num_tested_port_indices = 0;
-    for (uint32_t port_index = 0; port_index < NUM_DEFINED_PORTS; port_index++)
-    {
-        tested_port_indices[num_tested_port_indices] = port_index;
-        num_tested_port_indices++;
-    }
-
     /* Process the command line arguments */
     option = getopt (argc, argv, optstring);
     while (option != -1)

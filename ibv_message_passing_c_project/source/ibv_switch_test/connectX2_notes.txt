@@ -1973,7 +1973,7 @@ Wireshark showed 1518 bytes captured in each RoCEv1 frame containing:
 - 4 bytes for VLAN tag - the type is RDMA over Converged Ethernet (0x8915)
 - 40 bytes for Infiniband Global Route Header
 - 12 bytes for Base Transport Header
-- 1444 bytes for tue UC message size
+- 1444 bytes for the UC message size
 - 4 bytes for Invariant CRC
 
 Temporarily changed the injection switch VLAN configuration so that the PSID for port 26 was 1027 rather than 1026.
