@@ -12,10 +12,25 @@
 #include <stdio.h>
 #include <inttypes.h>
 
+#include <sys/time.h>
 #include <limits.h>
 #include <unistd.h>
+#include <semaphore.h>
+#include <signal.h>
 
 #include <infiniband/verbs.h>
+
+
+/* Define a string to report the Operating System just to report in result filenames,
+ * when comparing results from multiple runs in the same directory in a PC which can be dual-booted. */
+#ifdef _WIN32
+#define OS_NAME "windows"
+#else
+#define OS_NAME "linux"
+#endif
+
+
+#define NSECS_PER_SEC 1000000000LL
 
 
 /* Used to index arrays indexed by the host interfaces "ends" used to transmit/receive frames, where which end is used
@@ -175,6 +190,8 @@ typedef struct
     /* The relative time from the start of the test that the frame was sent or received.
        This is using the monotonic time used by the test busy-polling loop. */
     int64_t relative_test_time;
+    /* Which host RDMA endpoint the frame was transmitted from */
+    host_port_end_t tx_end;
     /* The length of the received UC message payload */
     uint32_t byte_len;
     /* When frame_type is other than FRAME_RECORD_RX_OTHER the sequence number of the frame.
@@ -187,6 +204,10 @@ typedef struct
     /* Set true for a FRAME_RECORD_TX_TEST_FRAME for which there is no matching FRAME_RECORD_RX_TEST_FRAME */
     bool frame_missed;
 } frame_record_t;
+
+
+/* File used to store a copy of the output written to the console */
+static FILE *console_file;
 
 
 /* Command line argument which specifies the test interval in seconds, which is the interval over which statistics are
@@ -266,6 +287,15 @@ typedef struct
 } host_port_uc_messages;
 
 
+/* Work request identities used to determine if a work completion was for a transmit or receive message */
+#define RX_WR_ID 0
+#define TX_WR_ID 1
+
+
+/* The length of the completion queue, for the maximum number of outstanding work-requests */
+#define CQ_LENGTH (NUM_PENDING_TX_FRAMES + NOMINAL_TOTAL_PENDING_RX_FRAMES)
+
+
 /* Defines the RDMA context used for one host endpoint used to transmit/receive test frames.
  * To allow for operation with RDMA devices which only have one port, each endpoint has its own protection domain,
  * and thus memory region and SRQ. */
@@ -295,9 +325,88 @@ typedef struct
     /* Queue-Pairs, indexed by each [source_port][destination_port] combination.
      * The elements for source_port==destination are not used. */
     struct ibv_qp *qps[NUM_DEFINED_PORTS][NUM_DEFINED_PORTS];
+    /* Contains space to poll for completion status */
+    struct ibv_wc wcs[CQ_LENGTH];
+    /* Index into test_messages.tx_messages for the next message to transmitted */
+    uint32_t next_tx_index;
+    /* Set when the work-request posted for next_tx_index zero has signalled for completion, and this stops
+     * index zero being re-used until the completion has been seen. Prevents overwriting a transmit message
+     * buffer which is waiting to completion transmission, but limits having to poll for completion to
+     * 1 out of NUM_PENDING_TX_FRAMES transmitted frames. */
+    bool tx_completion_pending;
+    /* Index into next_rx_index.rx_messages for the next message buffer receive work-request to be posted.
+     * At initialisation receive work-requests are posted for all message buffers, and as each buffer
+     * work-request is polled as completed, the work-request for the buffer is re-posted to try and keep
+     * all buffers posted for receive to avoid dropping messages. */
+    uint32_t next_rx_index;
+    /* Contains the pending receive frames, indexed by [source_port][destination_port].
+     * This is stored per host endpoint to avoid issues with messages between the same combination of source/destination
+     * on the switch under test being read out-of-order when polling for receipt completion on each host endpoint. */
+    pending_rx_frames_t pending_rx_frames[NUM_DEFINED_PORTS][NUM_DEFINED_PORTS];
     /* Allocates space for the transmit/receive messages, for which work requests can be posted */
     host_port_uc_messages test_messages;
 } host_port_endpoint_t;
+
+
+/* Contains the statistics for test frames for one combination of source / destination ports for one test interval */
+typedef struct
+{
+    /* The number of expected receive frames during the test interval */
+    uint32_t num_valid_rx_frames;
+    /* The number of missing receive frames during the test interval */
+    uint32_t num_missing_rx_frames;
+    /* The number of frames transmitted during the test interval */
+    uint32_t num_tx_frames;
+} port_frame_statistics_t;
+
+
+/* Contains the statistics for test frames transmitted and received over one test interval in which the statistics
+ * are accumulated. The transmit and receive counts may not match, if there are frames which are pending being received
+ * at the end of the interval. */
+typedef struct
+{
+    /* The monotonic start and end time of the test interval, to give the duration over which the statistics were accumulated */
+    int64_t interval_start_time;
+    int64_t interval_end_time;
+    /* The counts of different types of frames during the test interval, across all ports tested */
+    uint32_t frame_counts[FRAME_RECORD_ARRAY_SIZE];
+    /* Receive frame counts, indexed by each [source_port][destination_port] combination */
+    port_frame_statistics_t port_frame_statistics[NUM_DEFINED_PORTS][NUM_DEFINED_PORTS];
+    /* Counts the total number of missing frames during the test interval */
+    uint32_t total_missing_frames;
+    /* The maximum value of num_pending_rx_frames which has been seen for any source / destination port combination during
+     * the test. Used to collect debug information about how close to the MAX_PENDING_RX_FRAMES a test without any errors is
+     * getting. This value can get to the maximum if missed frames get reported during the test when the transmission detects
+     * all pending rx sequence numbers are in use.
+     *
+     * If Rx Unexpected frames are reported and max_pending_rx_frames is MAX_PENDING_RX_FRAMES this suggests the maximum value
+     * should be increased to allow for the latency in the frames being sent by the switches and getting thtough the software. */
+    uint32_t max_pending_rx_frames;
+    /* Set true in the final statistics before the transmit/receive thread exits */
+    bool final_statistics;
+} frame_test_statistics_t;
+
+
+/* Used to record frames transmitted or received for debug purposes */
+typedef struct
+{
+    /* The allocated length of the frame_records[] array. When zero frames are not recorded */
+    uint32_t allocated_length;
+    /* The number of entries in the frame_records[] array which are currently populated */
+    uint32_t num_frame_records;
+    /* Array used to record frames */
+    frame_record_t *frame_records;
+} frame_records_t;
+
+
+/* The options for how the host ports directions are changed during the test */
+typedef enum
+{
+    /* The direction of the host ports reverses every frame, except once all port combinations tested */
+    DIRECTION_REVERSE_EXCEPT_ALL_PORT_COMBINATIONS_TESTED,
+    /* The direction of the host ports reverses every frame, except once the destination_tested_port_index resets */
+    DIRECTION_REVERSE_EXCEPT_DESTINATION_TESTED_PORT_INDEX_RESETS
+} host_port_direction_option_t;
 
 
 /* The context used for the thread which sends/receive the test frames */
@@ -305,7 +414,90 @@ typedef struct
 {
     /* The pair of RDMA ports on the host used to transmit/receive test frames */
     host_port_endpoint_t host_ports[HOST_PORT_END_ARRAY_SIZE];
+    /* The next sequence number to be transmitted */
+    uint32_t next_tx_sequence_number;
+    /* The next index into tested_port_indices[] for the next destination port to use for a transmitted frame */
+    uint32_t destination_tested_port_index;
+    /* The next modulo offset from destination_tested_port_index to use as the source port for a transmitted frame */
+    uint32_t source_port_offset;
+    /* For the next test frame transmitted which of the host_ports[] elements are used for transmit/receive */
+    host_port_end_t host_tx_port;
+    host_port_end_t host_rx_port;
+    /* Controls when the host_tx_port and host_rx_port to minimise the number of flooded frames by the switch under
+     * test as it learns the MAC addresses. */
+    host_port_direction_option_t host_port_direction_option;
+    /* Used to accumulate the statistics for the current test interval */
+    frame_test_statistics_t statistics;
+    /* Monotonic time at which the current test interval ends, which is when the statistics are published and then reset */
+    int64_t test_interval_end_time;
+    /* Optionally used to record frames for debug */
+    frame_records_t frame_recording;
+    /* Controls the rate at which transmit frames are generated:
+     * - When true a timer is used to limit the maximum rate at which frames are transmitted.
+     *   This can be used when the available bandwidth on the link to the injection switch exceeds that available to distribute
+     *   the total bandwidth across all ports in the switch under test.
+     *
+     *   E.g. if the link to the injection switch is 1G and the links to the switch under test are 100M, then if less than 10
+     *   ports are tested then need to rate limit the transmission.
+     *
+     * - When false frames are transmitted as quickly as possible. */
+    bool tx_rate_limited;
+    /* When tx_rate_limited is true, the monotonic time between each frame transmitted */
+    int64_t tx_interval;
+    /* When tx_rate_limited is true, the monotonic time at which to transmit the next frame */
+    int64_t tx_time_of_next_frame;
+    /* The maximum number of pending receive frames for each source / destination port combination during the test */
+    uint32_t pending_rx_sequence_numbers_length;
 } frame_tx_rx_thread_context_t;
+
+
+/* Contains the information for the results summary over multiple test intervals */
+typedef struct
+{
+    /* Filename used for the per-port counts */
+    char per_port_counts_csv_filename[PATH_MAX];
+    /* File to which the per-port counts are written */
+    FILE *per_port_counts_csv_file;
+    /* The number of test intervals which have had failures, due to missed frames */
+    uint32_t num_test_intervals_with_failures;
+    /* The string containing the time of the last test interval which had a failure */
+    char time_of_last_failure[80];
+} results_summary_t;
+
+
+/* test_statistics contains the statistics from the most recent completed test interval.
+ * It is written by the transmit_receive_thread, and read by the main thread to report the test progress.
+ *
+ * The semphores control the access by:
+ * a. The free semaphore is initialised to 1, and the populated semaphore to 0.
+ * b. The main thread blocks in sem_wait (test_statistics_populated) waiting for results.
+ * c. At the end of a test interval the transmit_receive_thread:
+ *    - sem_wait (test_statistics_free) which should not block unless the main thread isn't keeping up with reporting
+ *      the test progress.
+ *    - Stores the results for the completed test interval in test_statistics
+ *    - sem_post (test_statistics_populated) to wake up the main thread.
+ * d. When the main thread is woken up from sem_wait(test_statistics_populated):
+ *    - Reports the contents of test_statistics
+ *    - sem_post (test_statistics_free) to indicate has processed test_statistics
+ * e. The sequence starts again from b.
+ */
+static frame_test_statistics_t test_statistics;
+static sem_t test_statistics_free;
+static sem_t test_statistics_populated;
+
+
+/* Set true in a signal handler when Ctrl-C is used to request a running test stops */
+static volatile bool test_stop_requested;
+
+
+/**
+ * @brief Signal handler to request a running test stops
+ * @param[in] sig Not used
+ */
+static void stop_test_handler (const int sig)
+{
+    test_stop_requested = true;
+}
 
 
 /**
@@ -323,12 +515,61 @@ static void check_assert (const bool assertion, const char *format, ...)
         va_list args;
 
         va_start (args, format);
-        fprintf (stderr, "Assertion failed : ");
-        vfprintf (stderr, format, args);
+        printf ("Assertion failed : ");
+        vprintf (format, args);
         va_end (args);
-        fprintf (stderr, "\n");
+        printf ("\n");
+
+        if (console_file != NULL)
+        {
+            va_start (args, format);
+            fprintf (console_file, "Assertion failed : ");
+            vfprintf (console_file, format, args);
+            va_end (args);
+            fprintf (console_file, "\n");
+        }
+
         exit (EXIT_FAILURE);
     }
+}
+
+
+/*
+ * @brief Write formatted output to the console and a log file
+ * @param[in] format printf style format string
+ * @param[in] ... printf arguments
+ */
+static void console_printf (const char *const format, ...) __attribute__((format(printf,1,2)));
+static void console_printf (const char *const format, ...)
+{
+    va_list args;
+
+    va_start (args, format);
+    vfprintf (console_file, format, args);
+    va_end (args);
+
+    va_start (args, format);
+    vprintf (format, args);
+    va_end (args);
+}
+
+
+/*
+ * @brief Return a monotonic time in integer nanoseconds
+ */
+static int64_t get_monotonic_time (void)
+{
+    int rc;
+    struct timespec now;
+
+    rc = clock_gettime (CLOCK_MONOTONIC, &now);
+    if (rc != 0)
+    {
+        console_printf ("clock_getime(CLOCK_MONOTONIC) failed\n");
+        exit (EXIT_FAILURE);
+    }
+
+    return (now.tv_sec * NSECS_PER_SEC) + now.tv_nsec;
 }
 
 
@@ -700,10 +941,38 @@ static uint32_t get_random_psn (void)
 
 
 /**
- * @brief Open the host RDMA endpoints, using the RDMA devices and ports specified in the command line arguments.
- * @param[in/out] tx_rx_thread_context The thread context to store the endpoints in.
+ * @brief Post the next receive buffer work-request to the shared receive queue for a host RDMA endpoint
+ * @param[in,out] endpoint Which endpoint to post the receive work-request on
  */
-static void open_host_endpoints (frame_tx_rx_thread_context_t *const tx_rx_thread_context)
+static void post_endpoint_next_receive_wr (host_port_endpoint_t *const endpoint)
+{
+    struct ibv_sge sg_entry =
+    {
+        .addr = (uint64_t) &endpoint->test_messages.rx_messages[endpoint->next_rx_index],
+        .length = sizeof (endpoint->test_messages.rx_messages[endpoint->next_rx_index]),
+        .lkey = endpoint->mr->lkey
+    };
+    struct ibv_recv_wr recv_wr =
+    {
+        .wr_id = RX_WR_ID,
+        .next = NULL,
+        .sg_list = &sg_entry,
+        .num_sge = 1
+    };
+    struct ibv_recv_wr *bad_recv_wr;
+    int rc;
+
+    rc = ibv_post_srq_recv (endpoint->srq, &recv_wr, &bad_recv_wr);
+    CHECK_ASSERT (rc == 0);
+    endpoint->next_rx_index = (endpoint->next_rx_index + 1) % NOMINAL_TOTAL_PENDING_RX_FRAMES;
+}
+
+
+/**
+ * @brief Open the host RDMA endpoints, using the RDMA devices and ports specified in the command line arguments.
+ * @param[in/out] context The thread context to store the endpoints in.
+ */
+static void open_host_endpoints (frame_tx_rx_thread_context_t *const context)
 {
     int num_ibv_devices = 0;
     struct ibv_device **device_list;
@@ -712,15 +981,16 @@ static void open_host_endpoints (frame_tx_rx_thread_context_t *const tx_rx_threa
     uint32_t source_port_index;
     uint32_t destination_port_index;
     struct ibv_qp_attr qp_attr;
+    host_port_end_t port_end;
 
     /* Find all RDMA devices */
     device_list = ibv_get_device_list (&num_ibv_devices);
     check_assert (num_ibv_devices > 0, "No RDMA devices found");
 
     /* Perform the initialisation which can operate on each endpoint independently */
-    for (host_port_end_t port_end = 0; port_end < HOST_PORT_END_ARRAY_SIZE; port_end++)
+    for (port_end = 0; port_end < HOST_PORT_END_ARRAY_SIZE; port_end++)
     {
-        host_port_endpoint_t *const endpoint = &tx_rx_thread_context->host_ports[port_end];
+        host_port_endpoint_t *const endpoint = &context->host_ports[port_end];
 
         /* Open the RDMA device */
         endpoint->rdma_device = NULL;
@@ -764,8 +1034,7 @@ static void open_host_endpoints (frame_tx_rx_thread_context_t *const tx_rx_threa
 
         /* Allocation completion queue, sized for transmit and receive.
          * While only transmit message is signalled for completion, allows space in case the transmit completes with an error. */
-        endpoint->cq = ibv_create_cq (endpoint->rdma_device, NUM_PENDING_TX_FRAMES + NOMINAL_TOTAL_PENDING_RX_FRAMES,
-                NULL, NULL, 0);
+        endpoint->cq = ibv_create_cq (endpoint->rdma_device, CQ_LENGTH, NULL, NULL, 0);
         CHECK_ASSERT (endpoint->cq != NULL);
 
         /* Register memory region to access the test_messages */
@@ -780,6 +1049,11 @@ static void open_host_endpoints (frame_tx_rx_thread_context_t *const tx_rx_threa
         };
         endpoint->srq = ibv_create_srq (endpoint->pd, &srq_init_attr);
         CHECK_ASSERT (endpoint->srq != NULL);
+
+        /* Initialise the message buffer indices used for the endpoint */
+        endpoint->next_tx_index = 0;
+        endpoint->tx_completion_pending = false;
+        endpoint->next_rx_index = 0;
 
         for (source_port_index = 0; source_port_index < NUM_DEFINED_PORTS; source_port_index++)
         {
@@ -836,8 +1110,8 @@ static void open_host_endpoints (frame_tx_rx_thread_context_t *const tx_rx_threa
                 for (host_port_end_t send_end = 0; send_end < HOST_PORT_END_ARRAY_SIZE; send_end++)
                 {
                     const host_port_end_t recv_end = (send_end == HOST_PORT_END_A) ? HOST_PORT_END_B : HOST_PORT_END_A;
-                    host_port_endpoint_t *const send_endpoint = &tx_rx_thread_context->host_ports[send_end];
-                    host_port_endpoint_t *const recv_endpoint = &tx_rx_thread_context->host_ports[recv_end];
+                    host_port_endpoint_t *const send_endpoint = &context->host_ports[send_end];
+                    host_port_endpoint_t *const recv_endpoint = &context->host_ports[recv_end];
                     const uint32_t psn = get_random_psn ();
 
                     /* Transition the Queue-Pair to Ready To Receive.
@@ -868,6 +1142,769 @@ static void open_host_endpoints (frame_tx_rx_thread_context_t *const tx_rx_threa
             }
         }
     }
+
+    /* Post receive work-requests for all message buffers */
+    for (port_end = 0; port_end < HOST_PORT_END_ARRAY_SIZE; port_end++)
+    {
+        host_port_endpoint_t *const endpoint = &context->host_ports[port_end];
+
+        do
+        {
+            post_endpoint_next_receive_wr (endpoint);
+        } while (endpoint->next_rx_index != 0);
+    }
+}
+
+
+/*
+ * @brief Reset the statistics which are accumulated over one test interval
+ * @param[in/out] statistics The statistics to reset
+ */
+static void reset_frame_test_statistics (frame_test_statistics_t *const statistics)
+{
+    for (frame_record_type_t frame_type = 0; frame_type < FRAME_RECORD_ARRAY_SIZE; frame_type++)
+    {
+        statistics->frame_counts[frame_type] = 0;
+    }
+    statistics->total_missing_frames = 0;
+    for (uint32_t source_port_index = 0; source_port_index < NUM_DEFINED_PORTS; source_port_index++)
+    {
+        for (uint32_t destination_port_index = 0; destination_port_index < NUM_DEFINED_PORTS; destination_port_index++)
+        {
+            port_frame_statistics_t *const port_stats =
+                    &statistics->port_frame_statistics[source_port_index][destination_port_index];
+
+            port_stats->num_valid_rx_frames = 0;
+            port_stats->num_missing_rx_frames = 0;
+            port_stats->num_tx_frames = 0;
+        }
+    }
+}
+
+
+/**
+ * @brief Initialise the context for the transmit/receive thread, for the start of the test
+ * @param[out] context The initialised context
+ */
+static void transmit_receive_initialise (frame_tx_rx_thread_context_t *const context)
+{
+    open_host_endpoints (context);
+    context->next_tx_sequence_number = 1;
+    context->destination_tested_port_index = 0;
+    context->source_port_offset = 1;
+    context->host_tx_port = HOST_PORT_END_A;
+    context->host_rx_port = HOST_PORT_END_B;
+
+    /* Select how the host port direction is changed to minimise the number of flooded frames from the switch under test,
+     * by minimising the number of times the switch sees an unknown destination MAC address as learns MAC addresses.
+     * This is selected according to if are testing an odd or even number of ports, as determined by running the
+     * ibv_uc_flooded_packets program. */
+    const bool odd_number_of_ports_tested = (num_tested_port_indices % 1) == 1;
+    context->host_port_direction_option = odd_number_of_ports_tested ?
+            DIRECTION_REVERSE_EXCEPT_DESTINATION_TESTED_PORT_INDEX_RESETS : DIRECTION_REVERSE_EXCEPT_ALL_PORT_COMBINATIONS_TESTED;
+
+    reset_frame_test_statistics (&context->statistics);
+    context->statistics.max_pending_rx_frames = 0;
+    context->statistics.final_statistics = false;
+
+    if (arg_frame_debug_enabled)
+    {
+        /* Allocate space to record all expected frames within one test duration */
+        const size_t nominal_records_per_test = 3; /* tx frame, copy of tx frame, rx frame */
+        const size_t max_frame_rate = 82000; /* Slightly more than max non-jumbo frames can be sent on a 1 Gb link */
+        context->frame_recording.allocated_length = max_frame_rate * nominal_records_per_test * (uint32_t) arg_test_interval_secs;
+        context->frame_recording.frame_records = calloc
+                (context->frame_recording.allocated_length, sizeof (context->frame_recording.frame_records[0]));
+    }
+    else
+    {
+        context->frame_recording.allocated_length = 0;
+        context->frame_recording.frame_records = NULL;
+    }
+    context->frame_recording.num_frame_records = 0;
+
+    const int64_t now = get_monotonic_time ();
+    context->statistics.interval_start_time = now;
+    context->test_interval_end_time = now + (arg_test_interval_secs * NSECS_PER_SEC);
+
+    context->tx_rate_limited = arg_max_frame_rate_hz > 0;
+    if (context->tx_rate_limited)
+    {
+        context->tx_interval = NSECS_PER_SEC / arg_max_frame_rate_hz;
+        context->tx_time_of_next_frame = now;
+    }
+
+    /* Calculate the number of pending rx frames which can be stored per tested source / destination port combination.
+     * This aims for a nomimal total number of pending rx frames divided among the the number of combinations tested. */
+    const uint32_t num_tested_port_combinations = num_tested_port_indices * (num_tested_port_indices - 1);
+    context->pending_rx_sequence_numbers_length = NOMINAL_TOTAL_PENDING_RX_FRAMES / num_tested_port_combinations;
+    if (context->pending_rx_sequence_numbers_length < MIN_PENDING_RX_FRAMES_PER_PORT_COMBO)
+    {
+        context->pending_rx_sequence_numbers_length = MIN_PENDING_RX_FRAMES_PER_PORT_COMBO;
+    }
+
+    for (host_port_end_t port_end = 0; port_end < HOST_PORT_END_ARRAY_SIZE; port_end++)
+    {
+        host_port_endpoint_t *const endpoint = &context->host_ports[port_end];
+
+        for (uint32_t source_port_index = 0; source_port_index < NUM_DEFINED_PORTS; source_port_index++)
+        {
+            for (uint32_t destination_port_index = 0; destination_port_index < NUM_DEFINED_PORTS; destination_port_index++)
+            {
+                pending_rx_frames_t *const pending = &endpoint->pending_rx_frames[source_port_index][destination_port_index];
+
+                pending->pending_rx_sequence_numbers = NULL;
+                pending->tx_frame_records = NULL;
+                pending->num_pending_rx_frames = 0;
+                pending->tx_index = 0;
+                pending->rx_index = 0;
+            }
+        }
+
+        /* Allocate space for pending rx frames for each tested source / destination port combination tested */
+        const uint32_t pending_rx_sequence_numbers_pool_size =
+                num_tested_port_combinations * context->pending_rx_sequence_numbers_length;
+        uint32_t *const pending_rx_sequence_numbers_pool = calloc (pending_rx_sequence_numbers_pool_size, sizeof (uint32_t));
+        frame_record_t **const tx_frame_records_pool = calloc (pending_rx_sequence_numbers_pool_size, sizeof (frame_record_t *));
+
+        uint32_t pool_index = 0;
+        for (uint32_t source_tested_port_index = 0; source_tested_port_index < num_tested_port_indices; source_tested_port_index++)
+        {
+            const uint32_t source_port_index = tested_port_indices[source_tested_port_index];
+
+            for (uint32_t destination_tested_port_index = 0;
+                 destination_tested_port_index < num_tested_port_indices;
+                 destination_tested_port_index++)
+            {
+                const uint32_t destination_port_index = tested_port_indices[destination_tested_port_index];
+
+                if (source_port_index != destination_port_index)
+                {
+                    pending_rx_frames_t *const pending = &endpoint->pending_rx_frames[source_port_index][destination_port_index];
+
+                    pending->pending_rx_sequence_numbers = &pending_rx_sequence_numbers_pool[pool_index];
+                    pending->tx_frame_records = &tx_frame_records_pool[pool_index];
+                    pool_index += context->pending_rx_sequence_numbers_length;
+                }
+            }
+        }
+    }
+}
+
+
+/*
+ * @brief When enabled by a command line option, record a transmit/receive frame for debug
+ * @param[in/out] context Context to record the frame in
+ * @param[in] frame_record The frame to record.
+ * @return Returns a pointer to the recorded frame entry, or NULL if not recorded.
+ *         Allows the caller to refer to the recorded frame for later updating the frame_missed field.
+ */
+static frame_record_t *record_frame_for_debug (frame_tx_rx_thread_context_t *const context,
+                                               const frame_record_t *const frame_record)
+{
+    frame_record_t *recorded_frame = NULL;
+
+    if (context->frame_recording.num_frame_records < context->frame_recording.allocated_length)
+    {
+        recorded_frame = &context->frame_recording.frame_records[context->frame_recording.num_frame_records];
+        *recorded_frame = *frame_record;
+        recorded_frame->frame_missed = false;
+        context->frame_recording.num_frame_records++;
+    }
+
+    return recorded_frame;
+}
+
+
+/*
+ * @brief Identify if an Ethernet frame, generated from a unreliable-connected message, is one used by the test.
+ * @details If the Ethernet frame is one used by the test also extracts the source/destination port indices
+ *          and the sequence number.
+ * @param[in] context The context used to send/receive test frames.
+ * @param[in] rx_end The host end used for the message receipt.
+ * @param[in] wc When non-null the receive work-request completion.
+ *               When NULL indicates are being called to record a transmitted test frame
+ * @param[in] message The message to identify
+ * @param[out] frame_record Contains information for the identified frame.
+ *                          For a receive frame haven't yet performed the checks against the pending receive frames.
+ */
+static void identify_frame (const frame_tx_rx_thread_context_t *const context,
+                            const host_port_end_t rx_end,
+                            const struct ibv_wc *const wc, const uc_test_message_t *const message,
+                            frame_record_t *const frame_record)
+{
+    if (wc != NULL)
+    {
+        /* Use the len from the received frame */
+        frame_record->byte_len = wc->byte_len;
+    }
+    else
+    {
+        /* Set the len for the transmitted frame */
+        frame_record->byte_len = sizeof (uc_test_message_t);
+    }
+
+    frame_record->relative_test_time = get_monotonic_time () - context->statistics.interval_start_time;
+
+    /* Determine if the frame is one generated by the test program, validating the message contents */
+    bool is_test_frame = frame_record->byte_len >= sizeof (uc_test_message_t);
+
+    if (is_test_frame)
+    {
+        is_test_frame = (message->source_port_index < NUM_DEFINED_PORTS) &&
+                (message->destination_port_index < NUM_DEFINED_PORTS);
+
+        /* For a receive frame verify the source and destination Queue-Pair numbers match that for the source and destination
+         * port indices, as a way of checking the message and was received on the expected Queue-Pair and thus VLAN. */
+        if (is_test_frame && (wc != NULL))
+        {
+            const host_port_end_t tx_end = (rx_end == HOST_PORT_END_A) ? HOST_PORT_END_B : HOST_PORT_END_A;
+            const host_port_endpoint_t *const tx_endpoint = &context->host_ports[tx_end];
+            const host_port_endpoint_t *const rx_endpoint = &context->host_ports[tx_end];
+            const struct ibv_qp *const tx_qp = tx_endpoint->qps[message->source_port_index][message->destination_qp_num];
+            const struct ibv_qp *const rx_qp = rx_endpoint->qps[message->source_port_index][message->destination_qp_num];
+
+            is_test_frame = (tx_qp != NULL) && (message->source_qp_num == tx_qp->qp_num) &&
+                    (rx_qp != NULL) && (message->destination_qp_num == rx_qp->qp_num);
+        }
+    }
+
+    /* Set the initial identified frame type. FRAME_RECORD_RX_TEST_FRAME may be modified following
+     * subsequent checks against the pending receive frames */
+    if (is_test_frame)
+    {
+        frame_record->test_sequence_number = message->test_sequence_number;
+        frame_record->frame_type = (wc != NULL) ? FRAME_RECORD_RX_TEST_FRAME : FRAME_RECORD_TX_TEST_FRAME;
+    }
+    else
+    {
+        frame_record->frame_type = FRAME_RECORD_RX_OTHER;
+    }
+}
+
+
+/*
+ * @brief Called when a received frame has been identified as a test frame, to update the list of pending frames
+ * @param[in/out] context Context to update the pending frames for
+ * @param[in] rx_end The host end used for the message receipt.
+ * @param[in/out] frame_record The received frame to compare against the list of pending frames.
+ *                             On output the frame_type has been updated to identify which sub-type of receive frame it is.
+ */
+static void handle_pending_rx_frame (frame_tx_rx_thread_context_t *const context, const host_port_end_t rx_end,
+                                     frame_record_t *const frame_record)
+{
+    host_port_endpoint_t *const endpoint = &context->host_ports[rx_end];
+    pending_rx_frames_t *const pending =
+            &endpoint->pending_rx_frames[frame_record->source_port_index][frame_record->destination_port_index];
+    port_frame_statistics_t *const port_stats =
+            &context->statistics.port_frame_statistics[frame_record->source_port_index][frame_record->destination_port_index];
+
+    bool pending_match_found = false;
+    while ((!pending_match_found) && (pending->num_pending_rx_frames > 0))
+    {
+        if (frame_record->test_sequence_number == pending->pending_rx_sequence_numbers[pending->rx_index])
+        {
+            /* This is an expected pending receive frame */
+            port_stats->num_valid_rx_frames++;
+            frame_record->frame_type = FRAME_RECORD_RX_TEST_FRAME;
+            pending_match_found = true;
+        }
+        else
+        {
+            /* The sequence number is not the next expected pending, which means a preceeding frame has been missed */
+            port_stats->num_missing_rx_frames++;
+            context->statistics.total_missing_frames++;
+            if (pending->tx_frame_records[pending->rx_index] != NULL)
+            {
+                pending->tx_frame_records[pending->rx_index]->frame_missed = true;
+            }
+        }
+
+        pending->num_pending_rx_frames--;
+        pending->tx_frame_records[pending->rx_index] = NULL;
+        pending->rx_index = (pending->rx_index + 1) % context->pending_rx_sequence_numbers_length;
+    }
+
+    if (!pending_match_found)
+    {
+        frame_record->frame_type = FRAME_RECORD_RX_UNEXPECTED_FRAME;
+    }
+}
+
+
+/**
+ * @brief Poll for all transmit or receive work-request completions, emptying the completion queues.
+ * @details By emptying the completion queues this gives completion to processing received frames over transmitting,
+ *          to try and avoid received frames being missed due to no posted receive work-request.
+ * @param[in,out] context The context to poll for completions.
+ */
+static void poll_for_tx_or_rx_completions (frame_tx_rx_thread_context_t *const context)
+{
+    int num_completions;
+    frame_record_t frame_record;
+
+    for (host_port_end_t port_end = 0; port_end < HOST_PORT_END_ARRAY_SIZE; port_end++)
+    {
+        host_port_endpoint_t *const endpoint = &context->host_ports[port_end];
+
+        num_completions = ibv_poll_cq (endpoint->cq, CQ_LENGTH, endpoint->wcs);
+        CHECK_ASSERT (num_completions >= 0);
+        for (int completion_index = 0; completion_index < num_completions; completion_index++)
+        {
+            const struct ibv_wc *const wc = &endpoint->wcs[completion_index];
+
+            /* Since connected unreliable Queue-Pairs are used don't expect a non-successful completion status even if
+             * test frames are missed. If the work-request fails the Queue-Pair could have transitioned to the error
+             * state so abort if a non-successful status and report diagnostic information. */
+            if (wc->status != IBV_WC_SUCCESS)
+            {
+                console_printf ("%s port %" PRIu8 " work-request ID %" PRIu64 " failed with %s\n",
+                        endpoint->rdma_device->device->name, endpoint->rdma_port_num, wc->wr_id, ibv_wc_status_str (wc->status));
+                exit (EXIT_FAILURE);
+            }
+
+            switch (wc->wr_id)
+            {
+            case RX_WR_ID:
+                /* Process received message */
+                identify_frame (context, port_end, wc, &endpoint->test_messages.rx_messages[endpoint->next_rx_index],
+                        &frame_record);
+                if (frame_record.frame_type != FRAME_RECORD_RX_OTHER)
+                {
+                    handle_pending_rx_frame (context, port_end, &frame_record);
+                }
+                context->statistics.frame_counts[frame_record.frame_type]++;
+                record_frame_for_debug (context, &frame_record);
+
+                /* After the receive message buffer has been processed, re-post a receive work-request for it */
+                post_endpoint_next_receive_wr (endpoint);
+                break;
+
+            case TX_WR_ID:
+                /* Just check a transmit completion was pending, and indicate no longer pending */
+                CHECK_ASSERT (endpoint->tx_completion_pending);
+                endpoint->tx_completion_pending = false;
+                break;
+
+            default:
+                check_assert (false, "Unexpected wr_id %" PRIu64, wc->wr_id);
+                break;
+            }
+        }
+    }
+}
+
+
+/*
+ * @brief Sequence transmitting the next test frame, cycling around combinations of the source and destination ports
+ * @details This also records the frame as pending receipt, identified with the combination of source/destination port
+ *          and sequence number.
+ * @param[in/out] context Context used transmitting frames.
+ */
+static void transmit_next_test_frame (frame_tx_rx_thread_context_t *const context)
+{
+    int rc;
+    const uint32_t source_tested_port_index =
+            (context->destination_tested_port_index + context->source_port_offset) % num_tested_port_indices;
+    const uint32_t destination_port_index = tested_port_indices[context->destination_tested_port_index];
+    const uint32_t source_port_index = tested_port_indices[source_tested_port_index];
+    host_port_endpoint_t *const tx_endpoint = &context->host_ports[context->host_tx_port];
+    host_port_endpoint_t *const rx_endpoint = &context->host_ports[context->host_rx_port];
+    struct ibv_qp *const tx_qp = tx_endpoint->qps[source_port_index][destination_port_index];
+    struct ibv_qp *const rx_qp = rx_endpoint->qps[source_port_index][destination_port_index];
+    pending_rx_frames_t *const pending = &rx_endpoint->pending_rx_frames[source_port_index][destination_port_index];
+    port_frame_statistics_t *const port_stats =
+            &context->statistics.port_frame_statistics[source_port_index][destination_port_index];
+    uc_test_message_t *const tx_message = &tx_endpoint->test_messages.tx_messages[tx_endpoint->next_tx_index];
+
+    /* Populate the test message and queue it for transmission */
+    tx_message->test_sequence_number = context->next_tx_sequence_number;
+    tx_message->source_port_index = source_port_index;
+    tx_message->destination_port_index = destination_port_index;
+    tx_message->source_qp_num = tx_qp->qp_num;
+    tx_message->destination_qp_num = rx_qp->qp_num;
+
+    struct ibv_sge sg_entry =
+    {
+        .addr = (uint64_t) tx_message,
+        .length = sizeof (uc_test_message_t),
+        .lkey = tx_endpoint->mr->lkey
+    };
+    struct ibv_send_wr send_wr =
+    {
+        .wr_id = TX_WR_ID,
+        .next = NULL,
+        .sg_list = &sg_entry,
+        .num_sge = 1,
+        .opcode = IBV_WR_SEND,
+        .send_flags = 0
+    };
+    struct ibv_send_wr *bad_wr;
+
+    if (tx_endpoint->next_tx_index == 0)
+    {
+        send_wr.send_flags |= IBV_SEND_SIGNALED;
+        tx_endpoint->tx_completion_pending = true;
+    }
+
+    rc = ibv_post_send (tx_qp, &send_wr, &bad_wr);
+    CHECK_ASSERT (rc == 0);
+
+    /* When debug is enabled identify the transmit frame and record it */
+    frame_record_t *recorded_frame = NULL;
+    if (arg_frame_debug_enabled)
+    {
+        frame_record_t frame_record;
+
+        identify_frame (context, context->host_rx_port, NULL, tx_message, &frame_record);
+        recorded_frame = record_frame_for_debug (context, &frame_record);
+    }
+
+    /* Update transmit frame counts */
+    context->statistics.frame_counts[FRAME_RECORD_TX_TEST_FRAME]++;
+    port_stats->num_tx_frames++;
+
+    /* If the maximum number of receive frames are pending, then mark the oldest as missing */
+    if (pending->num_pending_rx_frames == context->pending_rx_sequence_numbers_length)
+    {
+        port_stats->num_missing_rx_frames++;
+        context->statistics.total_missing_frames++;
+        pending->num_pending_rx_frames--;
+        if (pending->tx_frame_records[pending->rx_index] != NULL)
+        {
+            pending->tx_frame_records[pending->rx_index]->frame_missed = true;
+        }
+        pending->rx_index = (pending->rx_index + 1) % context->pending_rx_sequence_numbers_length;
+    }
+
+    /* Record the transmitted frame as pending receipt */
+    pending->pending_rx_sequence_numbers[pending->tx_index] = context->next_tx_sequence_number;
+    pending->tx_frame_records[pending->tx_index] = recorded_frame;
+    pending->tx_index = (pending->tx_index + 1) % context->pending_rx_sequence_numbers_length;
+    pending->num_pending_rx_frames++;
+    if (pending->num_pending_rx_frames > context->statistics.max_pending_rx_frames)
+    {
+        context->statistics.max_pending_rx_frames = pending->num_pending_rx_frames;
+    }
+
+    /* Advance to the next frame which will be transmitted, and determine when to swap the host ports */
+    bool swap_host_ports = true;
+    tx_endpoint->next_tx_index = (tx_endpoint->next_tx_index + 1) % NUM_PENDING_TX_FRAMES;
+    context->next_tx_sequence_number++;
+    context->destination_tested_port_index = (context->destination_tested_port_index + 1) % num_tested_port_indices;
+    if (context->destination_tested_port_index == 0)
+    {
+        if (context->host_port_direction_option == DIRECTION_REVERSE_EXCEPT_DESTINATION_TESTED_PORT_INDEX_RESETS)
+        {
+            swap_host_ports = false;
+        }
+        context->source_port_offset++;
+        if (context->source_port_offset == num_tested_port_indices)
+        {
+            context->source_port_offset = 1;
+            if (context->host_port_direction_option == DIRECTION_REVERSE_EXCEPT_ALL_PORT_COMBINATIONS_TESTED)
+            {
+                swap_host_ports = false;
+            }
+        }
+    }
+
+    if (swap_host_ports)
+    {
+        const uint32_t current_host_rx_port = context->host_rx_port;
+
+        context->host_rx_port = context->host_tx_port;
+        context->host_tx_port = current_host_rx_port;
+    }
+}
+
+
+/*
+ * @brief Thread which transmits test frames and checks for receipt of the frames from the switch under test
+ * @param[out] arg The context for the thread.
+ */
+static void *transmit_receive_thread (void *arg)
+{
+    frame_tx_rx_thread_context_t *const context = arg;
+    bool exit_requested = false;
+    int64_t now;
+    int rc;
+
+    transmit_receive_initialise (context);
+
+    /* Run test until requested to exit.
+     * This gives preference to polling for receipt of test frames, and when no available frame transmits the next test frame.
+     * This tries to send frames at the maximum possible rate, and relies upon the poll for frame receipt not causing any
+     * frames to be discarded by ensuring receive work-requests are kept posted. */
+    while (!exit_requested)
+    {
+        now = get_monotonic_time ();
+
+        /* Poll for completion, which processes received test frames */
+        poll_for_tx_or_rx_completions (context);
+
+        if ((context->host_ports[context->host_tx_port].next_tx_index == 0) &&
+                  context->host_ports[context->host_tx_port].tx_completion_pending)
+        {
+            /* All transmit buffers in use, waiting for completion to be signalled before the next transmit can occur */
+        }
+        else if (!context->tx_rate_limited)
+        {
+            /* Transmit frames as quickly as possible */
+            transmit_next_test_frame (context);
+        }
+        else if (now >= context->tx_time_of_next_frame)
+        {
+            /* Transmit frames, with the rate limited to a maximum */
+            transmit_next_test_frame (context);
+            context->tx_time_of_next_frame += context->tx_interval;
+        }
+
+        if (now > context->test_interval_end_time)
+        {
+            /* The end of test interval has been reached */
+            context->statistics.interval_end_time = now;
+            if (arg_frame_debug_enabled)
+            {
+                exit_requested = true;
+            }
+            else if (test_stop_requested)
+            {
+                exit_requested = true;
+            }
+
+            /* Publish and then reset statistics for the next test interval */
+            rc = sem_wait (&test_statistics_free);
+            CHECK_ASSERT (rc == 0);
+            context->statistics.final_statistics = exit_requested;
+            test_statistics = context->statistics;
+            rc = sem_post (&test_statistics_populated);
+            CHECK_ASSERT (rc == 0);
+            reset_frame_test_statistics (&context->statistics);
+            context->statistics.interval_start_time = context->statistics.interval_end_time;
+            context->test_interval_end_time += (arg_test_interval_secs * NSECS_PER_SEC);
+        }
+    }
+
+    return NULL;
+}
+
+
+/**
+ * @brief Write a CSV file which contains a record of the frames sent/received during a test.
+ * @details This is used to debug a single test interval.
+ * @param[in] frame_debug_csv_filename Name of CSV file to create
+ * @param[in] frame_recording The frames which were sent/received during the test
+ */
+static void write_frame_debug_csv_file (const char *const frame_debug_csv_filename, const frame_records_t *const frame_recording)
+{
+    /* Create CSV file and write headers */
+    FILE *const csv_file = fopen (frame_debug_csv_filename, "w");
+    if (csv_file == NULL)
+    {
+        console_printf ("Failed to create %s\n", frame_debug_csv_filename);
+        exit (EXIT_FAILURE);
+    }
+    fprintf (csv_file, "frame type,relative test time (secs),missed,source switch port,destination switch port,len,test sequence number\n");
+
+    /* Write one row per recorded frame */
+    for (uint32_t frame_index = 0; frame_index < frame_recording->num_frame_records; frame_index++)
+    {
+        const frame_record_t *const frame_record = &frame_recording->frame_records[frame_index];
+
+        fprintf (csv_file, "%s,%.6f,%s",
+                frame_record_types[frame_record->frame_type],
+                frame_record->relative_test_time / 1E9,
+                frame_record->frame_missed ? "Frame missed" : "");
+        if (frame_record->frame_type != FRAME_RECORD_RX_OTHER)
+        {
+            fprintf (csv_file, ",%" PRIu32 ",%" PRIu32,
+                    test_ports[frame_record->source_port_index].switch_port_number,
+                    test_ports[frame_record->destination_port_index].switch_port_number);
+        }
+        else
+        {
+            fprintf (csv_file, ",,");
+        }
+        fprintf (csv_file, ",%" PRIu32, frame_record->byte_len);
+        if (frame_record->frame_type != FRAME_RECORD_RX_OTHER)
+        {
+            fprintf (csv_file, ",%" PRIu32, frame_record->test_sequence_number);
+        }
+        else
+        {
+            fprintf (csv_file, ",");
+        }
+        fprintf (csv_file, "\n");
+    }
+
+    fclose (csv_file);
+}
+
+
+/*
+ * @brief Write the frame test statistics from the most recent test interval.
+ * @details This is written as:
+ *          - The console with a overall summary of which combinations of source/destination ports have missed frames.
+ *          - A CSV file which has the per-port count of frames.
+ * @param[in/out] results_summary Used to maintain a summary of which test intervals have had test failures.
+ * @param[in] statistics The statistics crom the most recent interval
+ */
+static void write_frame_test_statistics (results_summary_t *const results_summary,
+                                         const frame_test_statistics_t *const statistics)
+{
+    uint32_t source_tested_port_index;
+    uint32_t destination_tested_port_index;
+    char time_str[80];
+    struct tm broken_down_time;
+    struct timeval tod;
+    frame_record_type_t frame_type;
+
+    /* Display time when these statistics are reported */
+    gettimeofday (&tod, NULL);
+    const time_t tod_sec = tod.tv_sec;
+    const int64_t tod_msec = tod.tv_usec / 1000;
+    localtime_r (&tod_sec, &broken_down_time);
+    strftime (time_str, sizeof (time_str), "%H:%M:%S", &broken_down_time);
+    size_t str_len = strlen (time_str);
+    snprintf (&time_str[str_len], sizeof (time_str) - str_len, ".%03" PRIi64, tod_msec);
+
+    console_printf ("\n%s\n", time_str);
+
+    /* Print header for counts */
+    const int count_field_width = 13;
+    for (frame_type = 0; frame_type < FRAME_RECORD_ARRAY_SIZE; frame_type++)
+    {
+        console_printf ("%*s  ", count_field_width, frame_record_types[frame_type]);
+    }
+    console_printf ("%*s  %*s\n", count_field_width, "missed frames", count_field_width, "tx rate (Hz)");
+
+    /* Display the count of the different frame types during the test interval.
+     * Even when no missing frames the count of the transmit and receive frames may be different due to frames
+     * still in flight at the end of the test interval. */
+    for (frame_type = 0; frame_type < FRAME_RECORD_ARRAY_SIZE; frame_type++)
+    {
+        console_printf ("%*" PRIu32 "  ", count_field_width, statistics->frame_counts[frame_type]);
+    }
+
+    /* Report the total number of missing frames during the test interval */
+    console_printf ("%*" PRIu32 "  ", count_field_width, statistics->total_missing_frames);
+
+    /* Report the average frame rate achieved over the statistics interval */
+    const double statistics_interval_secs = (double) (statistics->interval_end_time - statistics->interval_start_time) / 1E9;
+    console_printf ("%*.1f\n", count_field_width,
+            (double) statistics->frame_counts[FRAME_RECORD_TX_TEST_FRAME] / statistics_interval_secs);
+
+    /* Display summary of missed frames over combination of source / destination ports */
+    console_printf ("\nSummary of missed frames : '.' none missed 'S' some missed 'A' all missed\n");
+    console_printf ("Source  Destination ports --->\n");
+    for (uint32_t header_row = 0; header_row < 2; header_row++)
+    {
+        console_printf ("%s", (header_row == 0) ? "  port  " : "        ");
+        for (destination_tested_port_index = 0;
+             destination_tested_port_index < num_tested_port_indices;
+             destination_tested_port_index++)
+        {
+            char port_num_text[3];
+
+            snprintf (port_num_text, sizeof (port_num_text), "%2" PRIu32,
+                    test_ports[tested_port_indices[destination_tested_port_index]].switch_port_number);
+            console_printf ("%c", port_num_text[header_row]);
+        }
+        console_printf ("\n");
+    }
+
+    for (source_tested_port_index = 0; source_tested_port_index < num_tested_port_indices; source_tested_port_index++)
+    {
+        const uint32_t source_port_index = tested_port_indices[source_tested_port_index];
+
+        console_printf ("    %2" PRIu32 "  ", test_ports[source_port_index].switch_port_number);
+        for (destination_tested_port_index = 0;
+             destination_tested_port_index < num_tested_port_indices;
+             destination_tested_port_index++)
+        {
+            const uint32_t destination_port_index = tested_port_indices[destination_tested_port_index];
+            const port_frame_statistics_t *const port_statistics =
+                    &statistics->port_frame_statistics[source_port_index][destination_port_index];
+            char port_status;
+
+            if (source_port_index == destination_port_index)
+            {
+                port_status = ' ';
+            }
+            else if (port_statistics->num_missing_rx_frames == 0)
+            {
+                port_status = '.';
+            }
+            else if (port_statistics->num_valid_rx_frames > 0)
+            {
+                port_status = 'S';
+            }
+            else
+            {
+                port_status = 'A';
+            }
+            console_printf ("%c", port_status);
+        }
+        console_printf ("\n");
+    }
+
+    /* Any missed frames counts as a test failure */
+    if (statistics->total_missing_frames > 0)
+    {
+        results_summary->num_test_intervals_with_failures++;
+        snprintf (results_summary->time_of_last_failure, sizeof (results_summary->time_of_last_failure), "%s", time_str);
+    }
+
+    /* Create per-port counts CSV file on first call, and write column headers */
+    if (results_summary->per_port_counts_csv_file == NULL)
+    {
+        results_summary->per_port_counts_csv_file = fopen (results_summary->per_port_counts_csv_filename, "w");
+        if (results_summary->per_port_counts_csv_file == NULL)
+        {
+            console_printf ("Failed to create %s\n", results_summary->per_port_counts_csv_filename);
+            exit (EXIT_FAILURE);
+        }
+        fprintf (results_summary->per_port_counts_csv_file,
+                "Time,Source switch port,Destination switch port,Num tx frames,Num valid rx frames,Num missing rx frames\n");
+    }
+
+    /* Write one row containing the number of frames per combination of source and destination switch ports tested */
+    for (source_tested_port_index = 0; source_tested_port_index < num_tested_port_indices; source_tested_port_index++)
+    {
+        for (destination_tested_port_index = 0;
+             destination_tested_port_index < num_tested_port_indices;
+             destination_tested_port_index++)
+        {
+            if (source_tested_port_index != destination_tested_port_index)
+            {
+                const uint32_t source_port_index = tested_port_indices[source_tested_port_index];
+                const uint32_t destination_port_index = tested_port_indices[destination_tested_port_index];
+                const port_frame_statistics_t *const port_statistics =
+                        &statistics->port_frame_statistics[source_port_index][destination_port_index];
+
+                fprintf (results_summary->per_port_counts_csv_file,
+                        " %s,%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 "\n",
+                        time_str,
+                        test_ports[source_port_index].switch_port_number,
+                        test_ports[destination_port_index].switch_port_number,
+                        port_statistics->num_tx_frames,
+                        port_statistics->num_valid_rx_frames,
+                        port_statistics->num_missing_rx_frames);
+            }
+        }
+    }
+
+    /* Display overall summary of test failures */
+    console_printf ("Total test intervals with failures = %" PRIu32, results_summary->num_test_intervals_with_failures);
+    if (results_summary->num_test_intervals_with_failures)
+    {
+        console_printf (" : last failure %s\n", (statistics->total_missing_frames > 0) ? "NOW" : results_summary->time_of_last_failure);
+    }
+    else
+    {
+        console_printf ("\n");
+    }
 }
 
 
@@ -875,6 +1912,7 @@ int main (int argc, char *argv[])
 {
     int rc;
 
+    /* Read the command line arguments */
     read_command_line_arguments (argc, argv);
 
     /* Add protection against fork() being called */
@@ -884,8 +1922,114 @@ int main (int argc, char *argv[])
     /* To allow generation of random Packet Sequence numbers */
     srand48 (getpid() * time(NULL));
 
+    /* Initialise the semaphores used to control access to the test interval statistics */
+    rc = sem_init (&test_statistics_free, 0, 1);
+    CHECK_ASSERT (rc == 0);
+    rc = sem_init (&test_statistics_populated, 0, 0);
+    CHECK_ASSERT (rc == 0);
+
+    /* Set filenames which contain the output files containing the date/time and OS used  */
+    results_summary_t results_summary = {{0}};
+    const time_t tod_now = time (NULL);
+    struct tm broken_down_time;
+    char date_time_str[80];
+    char frame_debug_csv_filename[128];
+    char console_filename[128];
+
+    localtime_r (&tod_now, &broken_down_time);
+    strftime (date_time_str, sizeof (date_time_str), "%Y%m%dT%H%M%S", &broken_down_time);
+    snprintf (frame_debug_csv_filename, sizeof (frame_debug_csv_filename), "%s_frames_debug_%s.csv", date_time_str, OS_NAME);
+    snprintf (console_filename, sizeof (console_filename), "%s_console_%s.txt", date_time_str, OS_NAME);
+    snprintf (results_summary.per_port_counts_csv_filename, sizeof (results_summary.per_port_counts_csv_filename),
+            "%s_per_port_counts_%s.csv", date_time_str, OS_NAME);
+
+    console_file = fopen (console_filename, "wt");
+    if (console_file == NULL)
+    {
+        fprintf (stderr, "Failed to create %s\n", console_filename);
+        exit (EXIT_FAILURE);
+    }
+
+    /* Report the command line arguments used */
+    console_printf ("Writing per-port counts to %s\n", results_summary.per_port_counts_csv_filename);
+    console_printf ("Using RDMA interfaces %s port %" PRIu8 " <-> %s %" PRIu8 "\n",
+            arg_rdma_device_names[HOST_PORT_END_A], arg_rdma_ports[HOST_PORT_END_A],
+            arg_rdma_device_names[HOST_PORT_END_B], arg_rdma_ports[HOST_PORT_END_B]);
+    console_printf ("Test interval = %" PRIi64 " (secs)\n", arg_test_interval_secs);
+    console_printf ("Frame debug enabled = %s\n", arg_frame_debug_enabled ? "Yes" : "No");
+    if (arg_max_frame_rate_hz > 0)
+    {
+        console_printf ("Frame transmit max rate = %" PRIi64 " Hz\n", arg_max_frame_rate_hz);
+    }
+    else
+    {
+        console_printf ("Frame transmit max rate = None\n");
+    }
+
+    /* Create the transmit_receive_thread */
     frame_tx_rx_thread_context_t *const tx_rx_thread_context = calloc (1, sizeof (*tx_rx_thread_context));
-    open_host_endpoints (tx_rx_thread_context);
+    pthread_t tx_rx_thread_handle;
+
+    rc = pthread_create (&tx_rx_thread_handle, NULL, transmit_receive_thread, tx_rx_thread_context);
+    CHECK_ASSERT (rc == 0);
+
+    /* Report that the test has started */
+    if (arg_frame_debug_enabled)
+    {
+        console_printf ("Running for a single test interval to collect debug information\n");
+    }
+    else
+    {
+#ifdef _WIN32
+        signal (SIGINT, stop_test_handler);
+#else
+        struct sigaction action;
+
+        memset (&action, 0, sizeof (action));
+        action.sa_handler = stop_test_handler;
+        action.sa_flags = SA_RESTART;
+        rc = sigaction (SIGINT, &action, NULL);
+        if (rc != 0)
+        {
+            console_printf ("sigaction() failed rc=%d\n", rc);
+            exit (EXIT_FAILURE);
+        }
+#endif
+        console_printf ("Press Ctrl-C to stop test at end of next test interval\n");
+    }
+
+    /* Report the statistics for each test interval, stopping when get the final statistics */
+    bool exit_requested = false;
+    while (!exit_requested)
+    {
+        /* Wait for the statistics upon completion of a test interval */
+        rc = sem_wait (&test_statistics_populated);
+        CHECK_ASSERT (rc == 0);
+
+        /* Report the statistics */
+        write_frame_test_statistics (&results_summary, &test_statistics);
+        exit_requested = test_statistics.final_statistics;
+
+        /* Indicate the main thread has completed using the test_statistics */
+        rc = sem_post (&test_statistics_free);
+        CHECK_ASSERT (rc == 0);
+    }
+
+    /* Wait for the transmit_receive_thread to exit */
+    rc = pthread_join (tx_rx_thread_handle, NULL);
+    CHECK_ASSERT (rc == 0);
+
+    console_printf ("Max pending rx frames = %" PRIu32 " out of %" PRIu32 "\n",
+            tx_rx_thread_context->statistics.max_pending_rx_frames, tx_rx_thread_context->pending_rx_sequence_numbers_length);
+
+    /* Write the debug frame recording information if enabled */
+    if (arg_frame_debug_enabled)
+    {
+        write_frame_debug_csv_file (frame_debug_csv_filename, &tx_rx_thread_context->frame_recording);
+    }
+
+    fclose (results_summary.per_port_counts_csv_file);
+    fclose (console_file);
 
     return EXIT_SUCCESS;
 }
