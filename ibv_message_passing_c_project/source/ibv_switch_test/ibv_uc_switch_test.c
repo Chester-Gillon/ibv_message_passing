@@ -233,9 +233,8 @@ static uint8_t arg_rdma_ports[HOST_PORT_END_ARRAY_SIZE];
 static bool arg_frame_debug_enabled = false;
 
 
-/* The number of frames which can be posted for transmit. Only one is signalled for completion to limit the overhead
- * of polling for completion. Set to a low value since the software can limit the transmit rate to avoid overloading the
- * switch under test, and don't want a large burst of frames transmitted by the RDMA hardware. */
+/* The number of frames which can be posted for transmit. Set to a low value since the software can limit the transmit rate to
+ * avoid overloading the switch under test, and don't want a large burst of frames transmitted by the RDMA hardware. */
 #define NUM_PENDING_TX_FRAMES 10
 
 
@@ -329,11 +328,10 @@ typedef struct
     struct ibv_wc wcs[CQ_LENGTH];
     /* Index into test_messages.tx_messages for the next message to transmitted */
     uint32_t next_tx_index;
-    /* Set when the work-request posted for next_tx_index zero has signalled for completion, and this stops
-     * index zero being re-used until the completion has been seen. Prevents overwriting a transmit message
-     * buffer which is waiting to completion transmission, but limits having to poll for completion to
-     * 1 out of NUM_PENDING_TX_FRAMES transmitted frames. */
-    bool tx_completion_pending;
+    /* The number of free transmit buffers which are available for transmission. Decremented when a work-request is posted
+     * and incremented when completion is seen. Since transmission sequences through different Queue-Pairs (with one QP
+     * for each combination of source/destination port) each transmit work-request has to be signalled to track completion. */
+    uint32_t num_free_tx_buffers;
     /* Index into next_rx_index.rx_messages for the next message buffer receive work-request to be posted.
      * At initialisation receive work-requests are posted for all message buffers, and as each buffer
      * work-request is polled as completed, the work-request for the buffer is re-posted to try and keep
@@ -1032,8 +1030,7 @@ static void open_host_endpoints (frame_tx_rx_thread_context_t *const context)
         endpoint->pd = ibv_alloc_pd (endpoint->rdma_device);
         CHECK_ASSERT (endpoint->pd != NULL);
 
-        /* Allocation completion queue, sized for transmit and receive.
-         * While only transmit message is signalled for completion, allows space in case the transmit completes with an error. */
+        /* Allocation completion queue, sized for transmit and receive. */
         endpoint->cq = ibv_create_cq (endpoint->rdma_device, CQ_LENGTH, NULL, NULL, 0);
         CHECK_ASSERT (endpoint->cq != NULL);
 
@@ -1052,7 +1049,7 @@ static void open_host_endpoints (frame_tx_rx_thread_context_t *const context)
 
         /* Initialise the message buffer indices used for the endpoint */
         endpoint->next_tx_index = 0;
-        endpoint->tx_completion_pending = false;
+        endpoint->num_free_tx_buffers = NUM_PENDING_TX_FRAMES;
         endpoint->next_rx_index = 0;
 
         for (source_port_index = 0; source_port_index < NUM_DEFINED_PORTS; source_port_index++)
@@ -1074,7 +1071,7 @@ static void open_host_endpoints (frame_tx_rx_thread_context_t *const context)
                             .max_send_sge = 1
                         },
                         .qp_type = IBV_QPT_UC,
-                        .sq_sig_all = 0 /* Since only one of out every NUM_PENDING_TX_FRAMES is signalled for completion */
+                        .sq_sig_all = 1 /* All transmit work-requests have to signalled */
                     };
 
                     endpoint->qps[source_port_index][destination_port_index] = ibv_create_qp (endpoint->pd, &qp_init_attr);
@@ -1482,8 +1479,8 @@ static void poll_for_tx_or_rx_completions (frame_tx_rx_thread_context_t *const c
 
             case TX_WR_ID:
                 /* Just check a transmit completion was pending, and indicate no longer pending */
-                CHECK_ASSERT (endpoint->tx_completion_pending);
-                endpoint->tx_completion_pending = false;
+                CHECK_ASSERT (endpoint->num_free_tx_buffers < NUM_PENDING_TX_FRAMES);
+                endpoint->num_free_tx_buffers++;
                 break;
 
             default:
@@ -1541,14 +1538,10 @@ static void transmit_next_test_frame (frame_tx_rx_thread_context_t *const contex
     };
     struct ibv_send_wr *bad_wr;
 
-    if (tx_endpoint->next_tx_index == 0)
-    {
-        send_wr.send_flags |= IBV_SEND_SIGNALED;
-        tx_endpoint->tx_completion_pending = true;
-    }
-
+    CHECK_ASSERT (tx_endpoint->num_free_tx_buffers > 0);
     rc = ibv_post_send (tx_qp, &send_wr, &bad_wr);
     CHECK_ASSERT (rc == 0);
+    tx_endpoint->num_free_tx_buffers--;
 
     /* When debug is enabled identify the transmit frame and record it */
     frame_record_t *recorded_frame = NULL;
@@ -1643,8 +1636,7 @@ static void *transmit_receive_thread (void *arg)
         /* Poll for completion, which processes received test frames */
         poll_for_tx_or_rx_completions (context);
 
-        if ((context->host_ports[context->host_tx_port].next_tx_index == 0) &&
-                  context->host_ports[context->host_tx_port].tx_completion_pending)
+        if (context->host_ports[context->host_tx_port].num_free_tx_buffers == 0)
         {
             /* All transmit buffers in use, waiting for completion to be signalled before the next transmit can occur */
         }
