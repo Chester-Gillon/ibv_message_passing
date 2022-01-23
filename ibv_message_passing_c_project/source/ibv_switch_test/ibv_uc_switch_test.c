@@ -46,6 +46,14 @@ typedef enum
 } host_port_end_t;
 
 
+/* Look up table which gives the description of each host_port_end_t */
+static const char *const host_port_ends[HOST_PORT_END_ARRAY_SIZE] =
+{
+    [HOST_PORT_END_A] = "A",
+    [HOST_PORT_END_B] = "B"
+};
+
+
 /** Defines the unique identity used for one switch port under test.
  *  The VLAN is used by the injection switch.
  *
@@ -1070,8 +1078,7 @@ static void open_host_endpoints (frame_tx_rx_thread_context_t *const context)
                             .max_send_wr = NUM_PENDING_TX_FRAMES,
                             .max_send_sge = 1
                         },
-                        .qp_type = IBV_QPT_UC,
-                        .sq_sig_all = 1 /* All transmit work-requests have to signalled */
+                        .qp_type = IBV_QPT_UC
                     };
 
                     endpoint->qps[source_port_index][destination_port_index] = ibv_create_qp (endpoint->pd, &qp_init_attr);
@@ -1082,7 +1089,7 @@ static void open_host_endpoints (frame_tx_rx_thread_context_t *const context)
                     qp_attr.qp_state = IBV_QPS_INIT;
                     qp_attr.pkey_index = 0;
                     qp_attr.port_num = endpoint->rdma_port_num;
-                    qp_attr.qp_access_flags = IBV_ACCESS_LOCAL_WRITE;
+                    qp_attr.qp_access_flags = 0;
                     rc = ibv_modify_qp (endpoint->qps[source_port_index][destination_port_index], &qp_attr,
                             IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT | IBV_QP_ACCESS_FLAGS);
                     CHECK_ASSERT (rc == 0);
@@ -1122,7 +1129,7 @@ static void open_host_endpoints (frame_tx_rx_thread_context_t *const context)
                     qp_attr.ah_attr.grh.sgid_index = send_endpoint->gid_indices[source_port_index];
                     qp_attr.ah_attr.port_num = send_endpoint->rdma_port_num;
                     qp_attr.path_mtu = IBV_MTU_2048;
-                    qp_attr.dest_qp_num = recv_endpoint->qps[source_port_index][destination_port_index]->qp_num;
+                    qp_attr.dest_qp_num = recv_endpoint->qps[destination_port_index][source_port_index]->qp_num;
                     qp_attr.rq_psn = psn;
                     rc = ibv_modify_qp (send_endpoint->qps[source_port_index][destination_port_index], &qp_attr,
                             IBV_QP_STATE | IBV_QP_AV | IBV_QP_PATH_MTU | IBV_QP_DEST_QPN | IBV_QP_RQ_PSN);
@@ -1330,6 +1337,8 @@ static void identify_frame (const frame_tx_rx_thread_context_t *const context,
                             const struct ibv_wc *const wc, const uc_test_message_t *const message,
                             frame_record_t *const frame_record)
 {
+    const host_port_end_t tx_end = (rx_end == HOST_PORT_END_A) ? HOST_PORT_END_B : HOST_PORT_END_A;
+
     if (wc != NULL)
     {
         /* Use the len from the received frame */
@@ -1355,11 +1364,10 @@ static void identify_frame (const frame_tx_rx_thread_context_t *const context,
          * port indices, as a way of checking the message and was received on the expected Queue-Pair and thus VLAN. */
         if (is_test_frame && (wc != NULL))
         {
-            const host_port_end_t tx_end = (rx_end == HOST_PORT_END_A) ? HOST_PORT_END_B : HOST_PORT_END_A;
             const host_port_endpoint_t *const tx_endpoint = &context->host_ports[tx_end];
-            const host_port_endpoint_t *const rx_endpoint = &context->host_ports[tx_end];
-            const struct ibv_qp *const tx_qp = tx_endpoint->qps[message->source_port_index][message->destination_qp_num];
-            const struct ibv_qp *const rx_qp = rx_endpoint->qps[message->source_port_index][message->destination_qp_num];
+            const host_port_endpoint_t *const rx_endpoint = &context->host_ports[rx_end];
+            const struct ibv_qp *const tx_qp = tx_endpoint->qps[message->source_port_index][message->destination_port_index];
+            const struct ibv_qp *const rx_qp = rx_endpoint->qps[message->source_port_index][message->destination_port_index];
 
             is_test_frame = (tx_qp != NULL) && (message->source_qp_num == tx_qp->qp_num) &&
                     (rx_qp != NULL) && (message->destination_qp_num == rx_qp->qp_num);
@@ -1370,6 +1378,9 @@ static void identify_frame (const frame_tx_rx_thread_context_t *const context,
      * subsequent checks against the pending receive frames */
     if (is_test_frame)
     {
+        frame_record->source_port_index = message->source_port_index;
+        frame_record->destination_port_index = message->destination_port_index;
+        frame_record->tx_end = tx_end;
         frame_record->test_sequence_number = message->test_sequence_number;
         frame_record->frame_type = (wc != NULL) ? FRAME_RECORD_RX_TEST_FRAME : FRAME_RECORD_TX_TEST_FRAME;
     }
@@ -1408,7 +1419,7 @@ static void handle_pending_rx_frame (frame_tx_rx_thread_context_t *const context
         }
         else
         {
-            /* The sequence number is not the next expected pending, which means a preceeding frame has been missed */
+            /* The sequence number is not the next expected pending, which means a preceding frame has been missed */
             port_stats->num_missing_rx_frames++;
             context->statistics.total_missing_frames++;
             if (pending->tx_frame_records[pending->rx_index] != NULL)
@@ -1534,7 +1545,7 @@ static void transmit_next_test_frame (frame_tx_rx_thread_context_t *const contex
         .sg_list = &sg_entry,
         .num_sge = 1,
         .opcode = IBV_WR_SEND,
-        .send_flags = 0
+        .send_flags = IBV_SEND_SIGNALED
     };
     struct ibv_send_wr *bad_wr;
 
@@ -1697,16 +1708,17 @@ static void write_frame_debug_csv_file (const char *const frame_debug_csv_filena
         console_printf ("Failed to create %s\n", frame_debug_csv_filename);
         exit (EXIT_FAILURE);
     }
-    fprintf (csv_file, "frame type,relative test time (secs),missed,source switch port,destination switch port,len,test sequence number\n");
+    fprintf (csv_file, "frame type,relative test time (secs),Tx end,missed,source switch port,destination switch port,len,test sequence number\n");
 
     /* Write one row per recorded frame */
     for (uint32_t frame_index = 0; frame_index < frame_recording->num_frame_records; frame_index++)
     {
         const frame_record_t *const frame_record = &frame_recording->frame_records[frame_index];
 
-        fprintf (csv_file, "%s,%.6f,%s",
+        fprintf (csv_file, "%s,%.6f,%s,%s",
                 frame_record_types[frame_record->frame_type],
                 frame_record->relative_test_time / 1E9,
+                host_port_ends[frame_record->tx_end],
                 frame_record->frame_missed ? "Frame missed" : "");
         if (frame_record->frame_type != FRAME_RECORD_RX_OTHER)
         {
