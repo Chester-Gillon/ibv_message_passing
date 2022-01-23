@@ -169,6 +169,7 @@ typedef enum
     /* A test frame in the format which is transmitted, and which was received by the test on the
      * Queue-Pair the expected destination port. This frame contains an expected pending sequence number. */
     FRAME_RECORD_RX_TEST_FRAME,
+    FRAME_RECORD_RX_TEST_FRAME_OUT_OF_ORDER,
     /* As per FRAME_RECORD_RX_TEST_FRAME except the received sequence number was not expected.
      * This may happen if frames get delayed such that there is no record of the pending sequence number. */
     FRAME_RECORD_RX_UNEXPECTED_FRAME,
@@ -183,10 +184,11 @@ typedef enum
 /* Look up table which gives the description of each frame_record_type_t */
 static const char *const frame_record_types[FRAME_RECORD_ARRAY_SIZE] =
 {
-    [FRAME_RECORD_TX_TEST_FRAME      ] = "Tx Test",
-    [FRAME_RECORD_RX_TEST_FRAME      ] = "Rx Test",
-    [FRAME_RECORD_RX_UNEXPECTED_FRAME] = "Rx Unexpected",
-    [FRAME_RECORD_RX_OTHER           ] = "Rx Other"
+    [FRAME_RECORD_TX_TEST_FRAME             ] = "Tx Test",
+    [FRAME_RECORD_RX_TEST_FRAME             ] = "Rx Test",
+    [FRAME_RECORD_RX_TEST_FRAME_OUT_OF_ORDER] = "Rx Test (OOO)",
+    [FRAME_RECORD_RX_UNEXPECTED_FRAME       ] = "Rx Unexpected",
+    [FRAME_RECORD_RX_OTHER                  ] = "Rx Other"
 };
 
 
@@ -241,9 +243,11 @@ static uint8_t arg_rdma_ports[HOST_PORT_END_ARRAY_SIZE];
 static bool arg_frame_debug_enabled = false;
 
 
-/* The number of frames which can be posted for transmit. Set to a low value since the software can limit the transmit rate to
- * avoid overloading the switch under test, and don't want a large burst of frames transmitted by the RDMA hardware. */
-#define NUM_PENDING_TX_FRAMES 10
+/* The number of frames which can be posted for transmit per post host endpoint.
+ * Set to a low value since the software can limit the transmit rate to avoid overloading the switch under test, and don't want
+ * a large burst of frames transmitted by the RDMA hardware.
+ * @todo Was initially 10 but dropping to 2 seemed to reduce the occurrence of FRAME_RECORD_RX_TEST_FRAME_OUT_OF_ORDER */
+#define NUM_PENDING_TX_FRAMES 2 /*10*/
 
 
 /* Used to store pending receive frames for one source / destination port combination.
@@ -1412,19 +1416,55 @@ static void handle_pending_rx_frame (frame_tx_rx_thread_context_t *const context
     {
         if (frame_record->test_sequence_number == pending->pending_rx_sequence_numbers[pending->rx_index])
         {
-            /* This is an expected pending receive frame */
+            /* This is an expected oldest pending receive frame */
             port_stats->num_valid_rx_frames++;
             frame_record->frame_type = FRAME_RECORD_RX_TEST_FRAME;
             pending_match_found = true;
         }
         else
         {
-            /* The sequence number is not the next expected pending, which means a preceding frame has been missed */
-            port_stats->num_missing_rx_frames++;
-            context->statistics.total_missing_frames++;
-            if (pending->tx_frame_records[pending->rx_index] != NULL)
+            for (uint32_t ooo_offset = 1; (!pending_match_found) && (ooo_offset < pending->num_pending_rx_frames); ooo_offset++)
             {
-                pending->tx_frame_records[pending->rx_index]->frame_missed = true;
+                const uint32_t out_of_order_index =
+                        (pending->rx_index + ooo_offset) % context->pending_rx_sequence_numbers_length;
+
+                if (frame_record->test_sequence_number == pending->pending_rx_sequence_numbers[out_of_order_index])
+                {
+                    port_stats->num_valid_rx_frames++;
+                    frame_record->frame_type = FRAME_RECORD_RX_TEST_FRAME_OUT_OF_ORDER;
+                    pending_match_found = true;
+
+                    /* Shuffle the previous pending sequence numbers up, so the oldest index can be freed.
+                     * @todo This can leave old pending sequence numbers in the list, if only a few fames get missed. */
+                    uint32_t current_offset = ooo_offset;
+                    uint32_t previous_offset = current_offset - 1;
+
+                    do
+                    {
+                        const uint32_t current_index =
+                                (pending->rx_index + current_offset) % context->pending_rx_sequence_numbers_length;
+                        const uint32_t previous_index =
+                                (pending->rx_index + previous_offset) % context->pending_rx_sequence_numbers_length;
+
+                        pending->pending_rx_sequence_numbers[current_index] =
+                                pending->pending_rx_sequence_numbers[previous_index];
+                        pending->tx_frame_records[current_index] = pending->tx_frame_records[previous_index];
+
+                        current_offset--;
+                        previous_offset--;
+                    } while (current_offset != 0);
+                }
+            }
+
+            if (!pending_match_found)
+            {
+                /* The sequence number is not any of the expected pending, so mark the oldest pending as missed */
+                port_stats->num_missing_rx_frames++;
+                context->statistics.total_missing_frames++;
+                if (pending->tx_frame_records[pending->rx_index] != NULL)
+                {
+                    pending->tx_frame_records[pending->rx_index]->frame_missed = true;
+                }
             }
         }
 
