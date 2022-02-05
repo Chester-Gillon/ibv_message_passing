@@ -1164,6 +1164,46 @@ static void open_host_endpoints (frame_tx_rx_thread_context_t *const context)
 }
 
 
+/**
+ * @brief Close the host RDMA endpoints, freeing the resources
+ * @param[in/out] context The thread context close the endpoints for.
+ */
+static void close_host_endpoints (frame_tx_rx_thread_context_t *const context)
+{
+    int rc;
+
+    for (host_port_end_t port_end = 0; port_end < HOST_PORT_END_ARRAY_SIZE; port_end++)
+    {
+        host_port_endpoint_t *const endpoint = &context->host_ports[port_end];
+
+        /* Destroy the Queue-Pairs */
+        for (uint32_t source_port_index = 0; source_port_index < NUM_DEFINED_PORTS; source_port_index++)
+        {
+            for (uint32_t destination_port_index = 0; destination_port_index < NUM_DEFINED_PORTS; destination_port_index++)
+            {
+                if (source_port_index != destination_port_index)
+                {
+                    rc = ibv_destroy_qp (endpoint->qps[source_port_index][destination_port_index]);
+                    CHECK_ASSERT (rc == 0);
+                }
+            }
+        }
+
+        /* Destroy shared resources which were used by all Queue-Pairs on the endpoint */
+        rc = ibv_destroy_srq (endpoint->srq);
+        CHECK_ASSERT (rc == 0);
+        rc = ibv_dereg_mr (endpoint->mr);
+        CHECK_ASSERT (rc == 0);
+        rc = ibv_destroy_cq (endpoint->cq);
+        CHECK_ASSERT (rc == 0);
+        rc = ibv_dealloc_pd (endpoint->pd);
+        CHECK_ASSERT (rc == 0);
+        rc = ibv_close_device (endpoint->rdma_device);
+        CHECK_ASSERT (rc == 0);
+    }
+}
+
+
 /*
  * @brief Reset the statistics which are accumulated over one test interval
  * @param[in/out] statistics The statistics to reset
@@ -1728,6 +1768,8 @@ static void *transmit_receive_thread (void *arg)
             context->test_interval_end_time += (arg_test_interval_secs * NSECS_PER_SEC);
         }
     }
+
+    close_host_endpoints (context);
 
     return NULL;
 }
