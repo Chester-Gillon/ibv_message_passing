@@ -611,7 +611,7 @@ int main (int argc, char *argv[])
     saved_errno = errno;
     if ((qp == NULL) && (saved_errno == EPERM))
     {
-        fprintf (stderr, "No permission to create raw packet - cap_net_admin,cap_net_raw capabilities are needed\n");
+        fprintf (stderr, "No permission to create raw packet - cap_net_raw capability is needed\n");
         exit (EXIT_FAILURE);
     }
     CHECK_ASSERT (qp != NULL);
