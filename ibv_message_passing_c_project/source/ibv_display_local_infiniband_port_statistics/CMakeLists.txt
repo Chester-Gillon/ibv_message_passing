@@ -1,7 +1,7 @@
 # Build the ibv_display_local_infiniband_port_statistics program
 
 project (ibv_display_local_infiniband_port_statistics C)
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 2.9)
 
 # This is required to include ib_types.h
 include_directories ("/usr/include/infiniband")

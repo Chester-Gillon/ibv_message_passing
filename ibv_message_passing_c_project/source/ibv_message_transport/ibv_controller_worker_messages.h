@@ -39,23 +39,26 @@ typedef enum
 } controller_worker_msg_ids;
 
 /** Contents of the CW_WORKER_READY message sent from a worker to the controller */
+typedef char worker_ready_msg_worker_executable_pathname_array[PATH_MAX];
 typedef struct
 {
     /** The number of valid characters in worker_executable_pathname */
     uint32_t worker_executable_pathname_len;
     /** The absolute pathname of the worker executable */
-    char worker_executable_pathname[PATH_MAX];
+    worker_ready_msg_worker_executable_pathname_array worker_executable_pathname;
 } worker_ready_msg;
 
 /** Contents of the CW_REQUEST_SHUTDOWN message sent from the controller to each worker */
+typedef uint32_t request_shutdown_msg_num_requests_per_worker_array[NUM_WORKERS];
 typedef struct
 {
     /** The total number of work requests which have been processed by each worker */
-    uint32_t num_requests_per_worker[NUM_WORKERS];
+    request_shutdown_msg_num_requests_per_worker_array num_requests_per_worker;
 } request_shutdown_msg;
 
 /** Contents of the CW_SUM_INTEGERS message sent from the controller to a worker */
 #define MAX_INTEGERS_TO_SUM 2048
+typedef uint32_t sum_integers_msg_integers_to_sum_array[MAX_INTEGERS_TO_SUM];
 typedef struct
 {
     /** Used to identify the work request, to be returned in the CW_SUM_RESULT message */
@@ -63,7 +66,7 @@ typedef struct
     /** How many values in the integers_to_sum array[] to sum */
     uint32_t num_integers_to_sum;
     /** Variable length array of integers for the worker to sum */
-    uint32_t integers_to_sum[MAX_INTEGERS_TO_SUM];
+    sum_integers_msg_integers_to_sum_array integers_to_sum;
 } sum_integers_msg;
 
 /** Contents of the CW_SUM_RESULT message sent from a worker to the controller */

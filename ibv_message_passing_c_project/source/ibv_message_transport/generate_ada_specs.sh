@@ -15,7 +15,7 @@ WORKSPACE_PATH=$(readlink -f ${SCRIPT_PATH}/../../..)
 
 ADA_SPECS_DIR=${WORKSPACE_PATH}/ibv_message_passing_ada_project/source/ibv_message_transport
 
-GNAT_GPLUSPLUS=/opt/GNAT/2019/bin/g++
+GNAT_GPLUSPLUS=/opt/GNAT/2021/bin/g++
 
 [ -d ${ADA_SPECS_DIR} ] || mkdir ${ADA_SPECS_DIR}
 cd ${ADA_SPECS_DIR}
@@ -28,7 +28,3 @@ cd ${ADA_SPECS_DIR}
 #   subtype nullptr_t is ;  -- /usr/gnat/lib/gcc/x86_64-pc-linux-gnu/6.3.1/include/stddef.h:436
 ${GNAT_GPLUSPLUS} -fdump-ada-spec -std=c++03 ${SCRIPT_PATH}/ibv_message_bw_interface_ada.h
 ${GNAT_GPLUSPLUS} -fdump-ada-spec -std=c++03 ${SCRIPT_PATH}/ibv_controller_worker_messages_ada.h
-
-# -fdump-ada-spec inserts a pragma to select Ada 2005, but GNAT Community Edition 2018 no longer recognises switches or pragmas
-# to select Ada2005 or earlier. Therefore, change to Ada 2012 to prevent warnings about an unrecognised pragma.
-sed -i 's/pragma Ada_2005;/pragma Ada_2012;/g' *.ads

@@ -1,7 +1,7 @@
 # Top level CMake file
 
 project (ibv_message_passing C CXX)
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 2.9)
 
 include (CheckStructHasMember)
 

@@ -1,7 +1,7 @@
 # Build the programs which measure Infiniband message latency between PCs
 
 project (ibv_message_latency C)
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 2.9)
 
 include_directories ("${CMAKE_SOURCE_DIR}/ibv_message_transport")
 

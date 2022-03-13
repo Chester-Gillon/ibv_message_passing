@@ -1,7 +1,7 @@
 # Build the ibv_message_bw program
 
 project (ibv_message_bw C)
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 2.9)
 
 include_directories ("${CMAKE_SOURCE_DIR}/ibv_message_transport")
 

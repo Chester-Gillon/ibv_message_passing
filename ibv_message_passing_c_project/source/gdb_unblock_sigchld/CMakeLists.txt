@@ -1,7 +1,7 @@
 # Build the gdb_unblock_sigchld program
 
 project (gdb_unblock_sigchld C)
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 2.9)
 
 add_executable (gdb_unblock_sigchld "gdb_unblock_sigchld.c")
 

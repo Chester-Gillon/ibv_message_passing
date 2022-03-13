@@ -1,7 +1,7 @@
 # Build the ibv_functional_loopback_test program
 
 project (ibv_functional_loopback_test C)
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 2.9)
 
 # This is required to include ib_types.h
 include_directories ("/usr/include/infiniband")

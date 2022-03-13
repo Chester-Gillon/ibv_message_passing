@@ -1,7 +1,7 @@
 # Build the test_multithreaded_mempolicy program
 
 project (test_multithreaded_mempolicy C)
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 2.9)
 
 add_executable (test_multithreaded_mempolicy "test_multithreaded_mempolicy_main.c")
 

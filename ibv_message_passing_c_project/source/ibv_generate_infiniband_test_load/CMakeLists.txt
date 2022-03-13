@@ -1,7 +1,7 @@
 # Build the ibv_generate_infiniband_test_load program
 
 project (ibv_generate_infiniband_test_load C)
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 2.9)
 
 add_executable (ibv_generate_infiniband_test_load "ibv_generate_infiniband_test_load.c")
 target_link_libraries (ibv_generate_infiniband_test_load numa ibverbs rt)
