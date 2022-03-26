@@ -136,6 +136,11 @@ static void add_counters_in_directory (const char *const counters_dir, counter_s
 
 /**
  * @brief Find all statistics counters for the local Infiniband devices
+ * @details The hw_counters directory contains RDMA protocol counts:
+ *          - With a ConnectX-2 VPI under Ubuntu 18.04 hw_counters appears to be per-device.
+ *            This dual-port card enumerates a one device with ports 1 and 2.
+ *          - With a ConnectX-4 Lx under AlmaLinux hw_counters is per-port.
+ *            This dual-port card enumerates as two devices, each with port 1.
  */
 static void find_statistic_counters (void)
 {
@@ -171,6 +176,9 @@ static void find_statistic_counters (void)
             for (counter.port_number = 1; counter.port_number <= device_attributes.phys_port_cnt; counter.port_number++)
             {
                 snprintf (counters_dir, sizeof (counters_dir), "%s/ports/%" PRIu8 "/counters",
+                        device->ibdev_path, counter.port_number);
+                add_counters_in_directory (counters_dir, &counter);
+                snprintf (counters_dir, sizeof (counters_dir), "%s/ports/%" PRIu8 "/hw_counters",
                         device->ibdev_path, counter.port_number);
                 add_counters_in_directory (counters_dir, &counter);
             }
