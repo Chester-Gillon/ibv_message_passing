@@ -29,8 +29,8 @@ do
    vlan_id=$((1000 + port_num))
 
    # Allocate the VLAN for the switch port
-   vconfig add ${eth_dev} ${vlan_id}
    vlan_dev=${eth_dev}.${vlan_id}
+   ip link add link ${eth_dev} name ${vlan_dev} type vlan id ${vlan_id}
 
    # Allocate the MAC address used for the switch port
    ip link set ${vlan_dev} address 02:00:`printf "%02X" $((1 + mac_offset))`:00:00:`printf "%02X" ${port_num}`
