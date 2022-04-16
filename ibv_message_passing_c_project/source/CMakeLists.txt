@@ -4,6 +4,7 @@ project (ibv_message_passing C CXX)
 cmake_minimum_required (VERSION 2.9)
 
 include (CheckStructHasMember)
+include (CheckSymbolExists)
 
 # Set platform build flags
 if ("${PLATFORM_TYPE}" STREQUAL "debug")
@@ -51,11 +52,15 @@ endif()
 #       Therefore test for the capabilities field instead which is an integer.
 CHECK_STRUCT_HAS_MEMBER ("struct perf_event_mmap_page" capabilities linux/perf_event.h HAVE_PERF_CAP_USER_RDPMC)
 CHECK_STRUCT_HAS_MEMBER ("struct perf_event_mmap_page" pmc_width linux/perf_event.h HAVE_PERF_PMC_WIDTH)
+CHECK_SYMBOL_EXISTS ("ibv_modify_qp_rate_limit" infiniband/verbs.h HAVE_IBV_MODIFY_QP_RATE_LIMIT)
 if (${HAVE_PERF_CAP_USER_RDPMC})
     add_definitions(-DHAVE_PERF_CAP_USER_RDPMC)
 endif()
 if (${HAVE_PERF_PMC_WIDTH})
     add_definitions(-DHAVE_PERF_PMC_WIDTH)
+endif()
+if (${HAVE_IBV_MODIFY_QP_RATE_LIMIT})
+    add_definitions(-DHAVE_IBV_MODIFY_QP_RATE_LIMIT)
 endif()
 
 # -fmessage-length=0 is to allow Eclipse traceback for error messages

@@ -152,6 +152,11 @@ static uint32_t arg_qp_rate_limit_kbps = 0;
 static bool arg_qp_rate_limit_kbps_set = false;
 
 
+/* Command line argument which specifies ibv_modify_qp_rate_limit() is used to set the rate limit,
+ * to also control the burst size. */
+static bool arg_qp_limit_burst_rate = false;
+
+
 /**
  * Defines the layout of one maximum length Ethernet frame, with a single EtherCAT datagram, for the test.
  * EtherCAT has it own EtherType which can be used to filter the received frames to only those frames.
@@ -245,7 +250,7 @@ static void check_assert (const bool assertion, const char *format, ...)
  */
 static void display_usage (const char *const program_name)
 {
-    printf ("Usage %s: -i <rdma_device_name> -n <rdma_port_num> [-t <duration_secs>] [-p <port_list>] [-r <rate_hz>] [-l <rate_kpbs>]\n", program_name);
+    printf ("Usage %s: -i <rdma_device_name> -n <rdma_port_num> [-t <duration_secs>] [-p <port_list>] [-r <rate_hz>] [-l <rate_kpbs>] [-b]\n", program_name);
     printf ("\n");
     printf ("  -i specifies the name of the RDMA device to send frames on\n");
     printf ("  -n specifies the name of the RDMA port number to send frames on\n");
@@ -259,6 +264,8 @@ static void display_usage (const char *const program_name)
     printf ("     Using a value <= 0 means the frame transmission rate is not limited in,\n");
     printf ("     software even when testing a small number of ports.\n");
     printf ("  -l Specifies the rate limit in Kb/s to set in the Queue-Pair.\n");
+    printf ("  -b If specified causes ibv_modify_qp_rate_limit to set the rate limit,\n");
+    printf ("     to also be able to set the burst size\n");
 
     exit (EXIT_FAILURE);
 }
@@ -391,7 +398,7 @@ static void parse_tested_port_list (const char *const port_list_in)
 static void read_command_line_arguments (const int argc, char *argv[])
 {
     const char *const program_name = argv[0];
-    const char *const optstring = "i:n:t:p:r:l:";
+    const char *const optstring = "i:n:t:p:r:l:b";
     bool rdma_device_specified = false;
     bool rdma_port_specified = false;
     int option;
@@ -450,6 +457,10 @@ static void read_command_line_arguments (const int argc, char *argv[])
             arg_qp_rate_limit_kbps_set = true;
             break;
 
+        case 'b':
+            arg_qp_limit_burst_rate = true;
+            break;
+
         case '?':
         default:
             display_usage (program_name);
@@ -470,6 +481,19 @@ static void read_command_line_arguments (const int argc, char *argv[])
     {
         printf ("Error: A minimum of %d ports must be tested\n\n", MIN_TESTED_PORTS);
         display_usage (program_name);
+    }
+
+    if (arg_qp_limit_burst_rate)
+    {
+        if (!arg_qp_rate_limit_kbps_set)
+        {
+            printf ("Error: <rate_kpbs> must be specified when limiting the burst rate\n");
+            display_usage (program_name);
+        }
+#ifndef HAVE_IBV_MODIFY_QP_RATE_LIMIT
+        printf ("Error: program hasn't been compiled with support for limiting the burst rate\n");
+        display_usage (program_name);
+#endif
     }
 
     if (optind < argc)
@@ -589,7 +613,7 @@ int main (int argc, char *argv[])
         /* Warn if a Queue-Pair rate limit was specified in the command line arguments, but the device doesn't support it */
         if (!ibv_is_qpt_supported (device_attributes.packet_pacing_caps.supported_qpts, IBV_QPT_RAW_PACKET))
         {
-            printf ("Warning: QP rate limit requested, but not supported for a IBV_QPT_RAW_PACKET");
+            printf ("Warning: QP rate limit requested, but not supported for a IBV_QPT_RAW_PACKET\n");
         }
         else if ((arg_qp_rate_limit_kbps < device_attributes.packet_pacing_caps.qp_rate_limit_min) ||
                  (arg_qp_rate_limit_kbps > device_attributes.packet_pacing_caps.qp_rate_limit_max))
@@ -666,13 +690,31 @@ int main (int argc, char *argv[])
     memset (&qp_attr, 0, sizeof(qp_attr));
     qp_attr.qp_state = IBV_QPS_RTS;
     attr_mask = IBV_QP_STATE;
-    if (arg_qp_rate_limit_kbps_set)
+    if (arg_qp_rate_limit_kbps_set && (!arg_qp_limit_burst_rate))
     {
         qp_attr.rate_limit = arg_qp_rate_limit_kbps;
         attr_mask |= IBV_QP_RATE_LIMIT;
     }
     rc = ibv_modify_qp (qp, &qp_attr, attr_mask);
     CHECK_ASSERT (rc == 0);
+
+#ifdef HAVE_IBV_MODIFY_QP_RATE_LIMIT
+    if (arg_qp_limit_burst_rate)
+    {
+        struct ibv_qp_rate_limit_attr rate_limit_attr =
+        {
+            .rate_limit = arg_qp_rate_limit_kbps,
+            .max_burst_sz = sizeof (ethercat_frame_t),
+            .typical_pkt_sz = sizeof (ethercat_frame_t)
+        };
+        rc = ibv_modify_qp_rate_limit (qp, &rate_limit_attr);
+        if (rc != 0)
+        {
+            fprintf (stderr, "ibv_modify_qp_rate_limit() failed with rc=%d\n", rc);
+            exit (EXIT_FAILURE);
+        }
+    }
+#endif
 
     struct ibv_sge sg_entry;
     struct ibv_send_wr wr;
