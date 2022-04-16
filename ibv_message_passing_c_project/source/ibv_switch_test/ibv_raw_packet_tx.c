@@ -742,9 +742,11 @@ int main (int argc, char *argv[])
     const int64_t tx_interval = NSECS_PER_SEC / arg_max_frame_rate_hz;
     int64_t tx_time_of_next_frame = test_start_time;
     int64_t now;
+    uint64_t total_frames_queued = 0;
     uint64_t total_frames_sent = 0;
     bool test_time_expired = false;
     bool test_complete = false;
+    bool queueing_complete = false;
 
     /* Only poll for completion every half queue */
     uint32_t num_pending_completion = 0u;
@@ -765,8 +767,9 @@ int main (int argc, char *argv[])
 
             CHECK_ASSERT (num_completed == 1);
             CHECK_ASSERT (wc.status == IBV_WC_SUCCESS);
+            total_frames_sent += num_pending_completion;
             num_pending_completion = 0;
-            if (test_time_expired)
+            if (test_time_expired && (total_frames_sent == total_frames_queued))
             {
                 test_complete = true;
             }
@@ -776,30 +779,27 @@ int main (int argc, char *argv[])
         now = get_monotonic_time ();
         bool send_next_frame = false;
         test_time_expired = now >= test_stop_time;
-        if (test_complete || (test_time_expired && (num_pending_completion == completion_ack_interval)))
+        if (!queueing_complete)
         {
-            /* When the test time has expired and have reached the completion ack internal stop trying
-             * to send more frames. Will exit the test loop once all queued frames have completed transmission. */
-            send_next_frame = false;
-        }
-        else if (tx_rate_limited)
-        {
-            if (now > tx_time_of_next_frame)
+            if (tx_rate_limited)
+            {
+                if (now > tx_time_of_next_frame)
+                {
+                    send_next_frame = true;
+                    tx_time_of_next_frame += tx_interval;
+                }
+            }
+            else
             {
                 send_next_frame = true;
-                tx_time_of_next_frame += tx_interval;
             }
-        }
-        else
-        {
-            send_next_frame = true;
         }
 
         if (send_next_frame)
         {
             /* Send the next test frame */
             sg_entry.addr = (uint64_t) &tx_frames[tx_buffer_index];
-            wr.send_flags = (num_pending_completion == 0) ? IBV_SEND_SIGNALED : 0;
+            wr.send_flags = (num_pending_completion == (completion_ack_interval - 1)) ? IBV_SEND_SIGNALED : 0;
             create_test_frame (&tx_frames[tx_buffer_index],
                     tested_port_indices[destination_tested_port_index],
                     tested_port_indices[(destination_tested_port_index + source_port_offset) % num_tested_port_indices],
@@ -808,7 +808,11 @@ int main (int argc, char *argv[])
             CHECK_ASSERT (rc == 0);
             tx_buffer_index = (tx_buffer_index + 1) % SQ_NUM_DESC;
             num_pending_completion++;
-            total_frames_sent++;
+            total_frames_queued++;
+            if (test_time_expired && (num_pending_completion == completion_ack_interval))
+            {
+                queueing_complete = true;
+            }
 
             /* Advance to the next frame which will be transmitted */
             next_tx_sequence_number++;
