@@ -141,10 +141,15 @@ static uint8_t arg_rdma_port_num;
 static int64_t arg_test_interval_secs = 10;
 
 
-/* Command line argument which specifies the maximum rate at which transmit frames can be sent.
- * If <= 0 then no maximum rate is applied, i.e. transmits as quickly as possible. */
+/* Command line argument which specifies the maximum rate at which transmit frames can be sent, by the software.
+ * If <= 0 then no maximum rate is applied by the software, i.e. transmits as quickly as possible. */
 static int64_t arg_max_frame_rate_hz = -1;
 static bool arg_max_frame_rate_hz_set = false;
+
+
+/* Command line argument which specifies the rate limit set on the Queue-Pair */
+static uint32_t arg_qp_rate_limit_kbps = 0;
+static bool arg_qp_rate_limit_kbps_set = false;
 
 
 /**
@@ -240,7 +245,7 @@ static void check_assert (const bool assertion, const char *format, ...)
  */
 static void display_usage (const char *const program_name)
 {
-    printf ("Usage %s: -i <rdma_device_name> -n <rdma_port_num> [-t <duration_secs>] [-p <port_list>] [-r <rate_hz>]\n", program_name);
+    printf ("Usage %s: -i <rdma_device_name> -n <rdma_port_num> [-t <duration_secs>] [-p <port_list>] [-r <rate_hz>] [-l <rate_kpbs>]\n", program_name);
     printf ("\n");
     printf ("  -i specifies the name of the RDMA device to send frames on\n");
     printf ("  -n specifies the name of the RDMA port number to send frames on\n");
@@ -251,8 +256,9 @@ static void display_usage (const char *const program_name)
     printf ("     range delimited by a dash. E.g. 1,4-6 specifies ports 1,4,5,6.\n");
     printf ("     If not specified defaults to all %u defined ports\n", NUM_DEFINED_PORTS);
     printf ("  -r Specifies the maximum rate at which frames are transmitted.\n");
-    printf ("     Using a value <= 0 means the frame transmission rate is not limited,\n");
-    printf ("     even when testing a small number of ports.\n");
+    printf ("     Using a value <= 0 means the frame transmission rate is not limited in,\n");
+    printf ("     software even when testing a small number of ports.\n");
+    printf ("  -l Specifies the rate limit in Kb/s to set in the Queue-Pair.\n");
 
     exit (EXIT_FAILURE);
 }
@@ -385,7 +391,7 @@ static void parse_tested_port_list (const char *const port_list_in)
 static void read_command_line_arguments (const int argc, char *argv[])
 {
     const char *const program_name = argv[0];
-    const char *const optstring = "i:n:t:p:r:";
+    const char *const optstring = "i:n:t:p:r:l:";
     bool rdma_device_specified = false;
     bool rdma_port_specified = false;
     int option;
@@ -433,6 +439,15 @@ static void read_command_line_arguments (const int argc, char *argv[])
                 exit (EXIT_FAILURE);
             }
             arg_max_frame_rate_hz_set = true;
+            break;
+
+        case 'l':
+            if (sscanf (optarg, "%" SCNu32 "%c", &arg_qp_rate_limit_kbps, &junk) != 1)
+            {
+                printf ("Error: Invalid <rate_kpbs> %s\n", optarg);
+                exit (EXIT_FAILURE);
+            }
+            arg_qp_rate_limit_kbps_set = true;
             break;
 
         case '?':
@@ -559,14 +574,31 @@ int main (int argc, char *argv[])
         exit (EXIT_FAILURE);
     }
 
-    struct ibv_device_attr device_attributes;
-    rc = ibv_query_device (rdma_device, &device_attributes);
+    struct ibv_device_attr_ex device_attributes;
+    rc = ibv_query_device_ex (rdma_device, NULL, &device_attributes);
     CHECK_ASSERT (rc == 0);
-    if ((arg_rdma_port_num < 1) || (arg_rdma_port_num > device_attributes.phys_port_cnt))
+    if ((arg_rdma_port_num < 1) || (arg_rdma_port_num > device_attributes.orig_attr.phys_port_cnt))
     {
         fprintf (stderr, "RDMA port number %u outside of valid range 1..%u for device %s\n",
-                arg_rdma_port_num, device_attributes.phys_port_cnt, arg_rdma_device_name);
+                arg_rdma_port_num, device_attributes.orig_attr.phys_port_cnt, arg_rdma_device_name);
         exit (EXIT_FAILURE);
+    }
+
+    if (arg_qp_rate_limit_kbps_set)
+    {
+        /* Warn if a Queue-Pair rate limit was specified in the command line arguments, but the device doesn't support it */
+        if (!ibv_is_qpt_supported (device_attributes.packet_pacing_caps.supported_qpts, IBV_QPT_RAW_PACKET))
+        {
+            printf ("Warning: QP rate limit requested, but not supported for a IBV_QPT_RAW_PACKET");
+        }
+        else if ((arg_qp_rate_limit_kbps < device_attributes.packet_pacing_caps.qp_rate_limit_min) ||
+                 (arg_qp_rate_limit_kbps > device_attributes.packet_pacing_caps.qp_rate_limit_max))
+        {
+            printf ("Warning: QP rate limit of %" PRIu32 "Kbps outside of supported range of %" PRIu32 "-%" PRIu32 "\n",
+                    arg_qp_rate_limit_kbps,
+                    device_attributes.packet_pacing_caps.qp_rate_limit_min,
+                    device_attributes.packet_pacing_caps.qp_rate_limit_max);
+        }
     }
 
     /* Allocate protection domain */
@@ -617,6 +649,7 @@ int main (int argc, char *argv[])
     CHECK_ASSERT (qp != NULL);
 
     struct ibv_qp_attr qp_attr;
+    int attr_mask;
 
     /* Transition Queue-Pair through the required states to be able to transmit */
     memset (&qp_attr, 0, sizeof(qp_attr));
@@ -632,7 +665,13 @@ int main (int argc, char *argv[])
 
     memset (&qp_attr, 0, sizeof(qp_attr));
     qp_attr.qp_state = IBV_QPS_RTS;
-    rc = ibv_modify_qp (qp, &qp_attr, IBV_QP_STATE);
+    attr_mask = IBV_QP_STATE;
+    if (arg_qp_rate_limit_kbps_set)
+    {
+        qp_attr.rate_limit = arg_qp_rate_limit_kbps;
+        attr_mask |= IBV_QP_RATE_LIMIT;
+    }
+    rc = ibv_modify_qp (qp, &qp_attr, attr_mask);
     CHECK_ASSERT (rc == 0);
 
     struct ibv_sge sg_entry;
@@ -662,12 +701,14 @@ int main (int argc, char *argv[])
     int64_t tx_time_of_next_frame = test_start_time;
     int64_t now;
     uint64_t total_frames_sent = 0;
+    bool test_time_expired = false;
+    bool test_complete = false;
 
     /* Only poll for completion every half queue */
     uint32_t num_pending_completion = 0u;
     const uint32_t completion_ack_interval = SQ_NUM_DESC / 2;
 
-    do
+    while (!test_complete)
     {
         /* Poll for completion. This shouldn't have to wait as only done every half queue */
         if (num_pending_completion == completion_ack_interval)
@@ -683,12 +724,23 @@ int main (int argc, char *argv[])
             CHECK_ASSERT (num_completed == 1);
             CHECK_ASSERT (wc.status == IBV_WC_SUCCESS);
             num_pending_completion = 0;
+            if (test_time_expired)
+            {
+                test_complete = true;
+            }
         }
 
-        /* Determine when to send the next frame */
+        /* Determine when to send the next frame, or stop the test */
         now = get_monotonic_time ();
         bool send_next_frame = false;
-        if (tx_rate_limited)
+        test_time_expired = now >= test_stop_time;
+        if (test_complete || (test_time_expired && (num_pending_completion == completion_ack_interval)))
+        {
+            /* When the test time has expired and have reached the completion ack internal stop trying
+             * to send more frames. Will exit the test loop once all queued frames have completed transmission. */
+            send_next_frame = false;
+        }
+        else if (tx_rate_limited)
         {
             if (now > tx_time_of_next_frame)
             {
@@ -728,7 +780,7 @@ int main (int argc, char *argv[])
                 }
             }
         }
-    } while (now < test_stop_time);
+    }
 
     /* Report the number of frames transmitted, and the average rate */
     const int64_t elapsed_duration_ns = get_monotonic_time () - test_start_time;
