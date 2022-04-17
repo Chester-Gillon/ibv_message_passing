@@ -607,6 +607,7 @@ int main (int argc, char *argv[])
                 arg_rdma_port_num, device_attributes.orig_attr.phys_port_cnt, arg_rdma_device_name);
         exit (EXIT_FAILURE);
     }
+    printf ("HCA core clock %" PRIu64 " KHz\n", device_attributes.hca_core_clock);
 
     if (arg_qp_rate_limit_kbps_set)
     {
@@ -701,6 +702,7 @@ int main (int argc, char *argv[])
 #ifdef HAVE_IBV_MODIFY_QP_RATE_LIMIT
     if (arg_qp_limit_burst_rate)
     {
+        /* Only the mlx5 provider has ibv_modify_qp_rate_limit() */
         struct ibv_qp_rate_limit_attr rate_limit_attr =
         {
             .rate_limit = arg_qp_rate_limit_kbps,
@@ -736,7 +738,14 @@ int main (int argc, char *argv[])
     wr.next = NULL;
     wr.opcode = IBV_WR_SEND;
 
+    struct ibv_values_ex rt_values =
+    {
+        .comp_mask = IBV_VALUES_MASK_RAW_CLOCK
+    };
     const bool tx_rate_limited = arg_max_frame_rate_hz > 0;
+    rc = ibv_query_rt_values_ex (rdma_device, &rt_values);
+    CHECK_ASSERT (rc == 0);
+    const uint64_t hca_start_ticks = rt_values.raw_clock.tv_nsec;
     const int64_t test_start_time = get_monotonic_time ();
     const int64_t test_stop_time = test_start_time + (arg_test_interval_secs * NSECS_PER_SEC);
     const int64_t tx_interval = NSECS_PER_SEC / arg_max_frame_rate_hz;
@@ -830,11 +839,31 @@ int main (int argc, char *argv[])
 
     /* Report the number of frames transmitted, and the average rate */
     const int64_t elapsed_duration_ns = get_monotonic_time () - test_start_time;
+    rc = ibv_query_rt_values_ex (rdma_device, &rt_values);
+    CHECK_ASSERT (rc == 0);
+    const uint64_t hca_end_ticks = rt_values.raw_clock.tv_nsec;
     const double elapsed_duration_secs = (double) elapsed_duration_ns / 1E9;
     const double frame_rate = (double) total_frames_sent / elapsed_duration_secs;
 
-    printf ("Send %" PRIu64 " frames over %.6f secs, average %.1f Hz\n",
+    printf ("Send %" PRIu64 " frames over %.6f secs (CLOCK_MONOTONIC), average %.1f Hz\n",
             total_frames_sent, elapsed_duration_secs, frame_rate);
+
+    /* Display the elapsed time as measured by the HCA core clock.
+     * While struct ibv_values_ex defines the raw_clock field of type struct timespec, the mlx5_query_rt_values()
+     * function in providers/mlx5/verbs.c:
+     * - Sets the tv_sec field as zero
+     * - Sets the tv_nsec field as the cycles output from mlx5_read_clock()
+     *
+     * The mlx5_read_clock() cycles output is a uint64_t populated from two uint32_t lo and hi reads from
+     * ctx->hca_core_clock. ctx->hca_core_clock is mapped to a page in /dev/infiniband/uverbs0
+     *
+     * Presumably the 64-bit cycles count wrap according to completion_timestamp_mask in struct ibv_device_attr_ex.
+     *
+     * Only the mlx4 and mlx5 providers have ibv_query_rt_values_ex()
+     */
+    const double hca_core_clock_hz = ((double) device_attributes.hca_core_clock) * 1E3;
+    const uint64_t elapsed_hca_ticks = (hca_end_ticks - hca_start_ticks) & device_attributes.completion_timestamp_mask;
+    printf ("HCA elapsed time = %.6f secs\n", ((double) elapsed_hca_ticks) / hca_core_clock_hz);
 
     rc = ibv_destroy_qp (qp);
     CHECK_ASSERT (rc == 0);
