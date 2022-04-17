@@ -754,40 +754,37 @@ int main (int argc, char *argv[])
     uint64_t total_frames_sent = 0;
     bool test_time_expired = false;
     bool test_complete = false;
-    bool queueing_complete = false;
 
     /* Only poll for completion every half queue */
     uint32_t num_pending_completion = 0u;
-    const uint32_t completion_ack_interval = SQ_NUM_DESC / 2;
 
     while (!test_complete)
     {
-        /* Poll for completion. This shouldn't have to wait as only done every half queue */
-        if (num_pending_completion == completion_ack_interval)
+        /* Poll for completion. This will wait if all transfers are queued */
+        do
         {
             int num_completed;
 
-            do
-            {
-                num_completed = ibv_poll_cq (cq, 1, &wc);
+            num_completed = ibv_poll_cq (cq, 1, &wc);
+            CHECK_ASSERT (num_completed >= 0);
 
-            } while (num_completed == 0);
-
-            CHECK_ASSERT (num_completed == 1);
-            CHECK_ASSERT (wc.status == IBV_WC_SUCCESS);
-            total_frames_sent += num_pending_completion;
-            num_pending_completion = 0;
-            if (test_time_expired && (total_frames_sent == total_frames_queued))
+            if (num_completed == 1)
             {
-                test_complete = true;
+                CHECK_ASSERT (wc.status == IBV_WC_SUCCESS);
+                num_pending_completion--;
+                total_frames_sent++;
+                if (test_time_expired && (total_frames_sent == total_frames_queued))
+                {
+                    test_complete = true;
+                }
             }
-        }
+        } while (num_pending_completion == SQ_NUM_DESC);
 
         /* Determine when to send the next frame, or stop the test */
         now = get_monotonic_time ();
         bool send_next_frame = false;
         test_time_expired = now >= test_stop_time;
-        if (!queueing_complete)
+        if (!test_time_expired)
         {
             if (tx_rate_limited)
             {
@@ -807,7 +804,7 @@ int main (int argc, char *argv[])
         {
             /* Send the next test frame */
             sg_entry.addr = (uint64_t) &tx_frames[tx_buffer_index];
-            wr.send_flags = (num_pending_completion == (completion_ack_interval - 1)) ? IBV_SEND_SIGNALED : 0;
+            wr.send_flags = IBV_SEND_SIGNALED;
             create_test_frame (&tx_frames[tx_buffer_index],
                     tested_port_indices[destination_tested_port_index],
                     tested_port_indices[(destination_tested_port_index + source_port_offset) % num_tested_port_indices],
@@ -817,10 +814,6 @@ int main (int argc, char *argv[])
             tx_buffer_index = (tx_buffer_index + 1) % SQ_NUM_DESC;
             num_pending_completion++;
             total_frames_queued++;
-            if (test_time_expired && (num_pending_completion == completion_ack_interval))
-            {
-                queueing_complete = true;
-            }
 
             /* Advance to the next frame which will be transmitted */
             next_tx_sequence_number++;
