@@ -3,8 +3,10 @@
 project (ibv_switch_test C)
 cmake_minimum_required (VERSION 2.9)
 
-add_executable (ibv_raw_packet_tx "ibv_raw_packet_tx.c")
-target_link_libraries (ibv_raw_packet_tx ibverbs)
+if (${HAVE_IBV_WR_START})
+    add_executable (ibv_raw_packet_tx "ibv_raw_packet_tx.c")
+    target_link_libraries (ibv_raw_packet_tx ibverbs)
+endif()
 
 add_executable (ibv_uc_flooded_packets "ibv_uc_flooded_packets.c")
 
