@@ -690,7 +690,8 @@ int main (int argc, char *argv[])
 
     /* Create Queue-Pair to send raw packets */
     struct ibv_qp *qp;
-    struct ibv_qp_init_attr qp_init_attr =
+    struct ibv_qp_ex *qpx;
+    struct ibv_qp_init_attr_ex qp_init_attr =
     {
         .send_cq = ibv_cq_ex_to_cq (cq),
         .recv_cq = ibv_cq_ex_to_cq (cq),
@@ -705,12 +706,15 @@ int main (int argc, char *argv[])
             .max_recv_wr = 0
         },
 
-        .qp_type = IBV_QPT_RAW_PACKET
+        .qp_type = IBV_QPT_RAW_PACKET,
+        .pd = pd,
+        .comp_mask = IBV_QP_INIT_ATTR_PD | IBV_QP_INIT_ATTR_SEND_OPS_FLAGS,
+        .send_ops_flags = IBV_QP_EX_WITH_SEND
     };
 
     /* Create the Queue-Pair */
     errno = 0;
-    qp = ibv_create_qp (pd, &qp_init_attr);
+    qp = ibv_create_qp_ex (rdma_device, &qp_init_attr);
     saved_errno = errno;
     if ((qp == NULL) && (saved_errno == EPERM))
     {
@@ -718,6 +722,7 @@ int main (int argc, char *argv[])
         exit (EXIT_FAILURE);
     }
     CHECK_ASSERT (qp != NULL);
+    qpx = ibv_qp_to_qp_ex (qp);
 
     struct ibv_qp_attr qp_attr;
     int attr_mask;
@@ -764,24 +769,10 @@ int main (int argc, char *argv[])
     }
 #endif
 
-    struct ibv_sge sg_entry;
-    struct ibv_send_wr wr;
-    struct ibv_send_wr *bad_wr;
     uint32_t next_tx_sequence_number = 1;
     uint32_t destination_tested_port_index = 0;
     uint32_t source_port_offset = 1;
     uint32_t tx_buffer_index = 0;
-
-    /* Initialise work request - flags and addr updated as packets are sent */
-    sg_entry.lkey = mr->lkey;
-    sg_entry.length = sizeof (ethercat_frame_t);
-    sg_entry.addr = 0;
-
-    memset (&wr, 0, sizeof (wr));
-    wr.num_sge = 1;
-    wr.sg_list = &sg_entry;
-    wr.next = NULL;
-    wr.opcode = IBV_WR_SEND;
 
     struct ibv_poll_cq_attr poll_cq_attr =
     {
@@ -858,14 +849,17 @@ int main (int argc, char *argv[])
         if (send_next_frame)
         {
             /* Send the next test frame */
-            sg_entry.addr = (uint64_t) &tx_frames[tx_buffer_index];
-            wr.send_flags = IBV_SEND_SIGNALED;
             create_test_frame (&tx_frames[tx_buffer_index],
                     tested_port_indices[destination_tested_port_index],
                     tested_port_indices[(destination_tested_port_index + source_port_offset) % num_tested_port_indices],
                     next_tx_sequence_number);
-            rc = ibv_post_send (qp, &wr, &bad_wr);
+            ibv_wr_start (qpx);
+            qpx->wr_flags = IBV_SEND_SIGNALED;
+            ibv_wr_send (qpx);
+            ibv_wr_set_sge (qpx, mr->lkey, (uint64_t) &tx_frames[tx_buffer_index], sizeof (ethercat_frame_t));
+            rc = ibv_wr_complete (qpx);
             CHECK_ASSERT (rc == 0);
+
             tx_buffer_index = (tx_buffer_index + 1) % SQ_NUM_DESC;
             num_pending_completion++;
             total_frames_queued++;
@@ -896,6 +890,15 @@ int main (int argc, char *argv[])
 
     printf ("Send %" PRIu64 " frames over %.6f secs (CLOCK_MONOTONIC), average %.1f Hz\n",
             total_frames_sent, elapsed_duration_secs, frame_rate);
+
+    const size_t untagged_packet_total_octets = 7 + /* Preamble */
+                                                1 + /* Start frame delimiter */
+                                                (sizeof (ethercat_frame_t) - sizeof (uint32_t)) + /* VLAN tag stripped */
+                                                4 + /* Frame check sequence */
+                                                12; /* Interpacket gap */
+    const size_t bits_per_octet = 8;
+    const double average_untagged_bit_rate = ((double) (untagged_packet_total_octets * bits_per_octet)) * frame_rate;
+    printf ("Average bit rate for untagged frames = %.1f Mbps\n", average_untagged_bit_rate / 1E6);
 
     const double hca_core_clock_hz = ((double) device_attributes.hca_core_clock) * 1E3;
     if (ibv_query_rt_values_ex_rc == 0)
