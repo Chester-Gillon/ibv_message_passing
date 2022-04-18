@@ -631,9 +631,21 @@ int main (int argc, char *argv[])
     pd = ibv_alloc_pd (rdma_device);
     CHECK_ASSERT (pd != NULL);
 
-    /* Create completion queue */
-    struct ibv_cq *cq;
-    cq = ibv_create_cq (rdma_device, SQ_NUM_DESC, NULL, NULL, 0);
+    /* Create completion queue, to be able to obtain completion timestamp */
+    struct ibv_cq_ex *cq;
+    struct ibv_cq_init_attr_ex cq_attr =
+    {
+        .cqe = SQ_NUM_DESC,
+        .cq_context = NULL, /* Not used */
+        .channel = NULL, /* Completion events not used */
+        .comp_vector = 0,
+        .wc_flags = IBV_WC_EX_WITH_COMPLETION_TIMESTAMP,
+        .flags = IBV_CREATE_CQ_ATTR_SINGLE_THREADED, /* No need for locks as a single-threaded program */
+        .parent_domain = NULL /* @todo What benefits of providing a parent domain?
+                                       Only needed for a custom memory allocator or can the provider
+                                       use it to share some resources? */
+    };
+    cq = ibv_create_cq_ex (rdma_device, &cq_attr);
     CHECK_ASSERT (cq != NULL);
 
     /* Allocate array, and memory region, to populate the frames which are queued for transmission */
@@ -646,8 +658,8 @@ int main (int argc, char *argv[])
     struct ibv_qp *qp;
     struct ibv_qp_init_attr qp_init_attr =
     {
-        .send_cq = cq,
-        .recv_cq = cq,
+        .send_cq = ibv_cq_ex_to_cq (cq),
+        .recv_cq = ibv_cq_ex_to_cq (cq),
 
         .cap =
         {
@@ -721,7 +733,6 @@ int main (int argc, char *argv[])
     struct ibv_sge sg_entry;
     struct ibv_send_wr wr;
     struct ibv_send_wr *bad_wr;
-    struct ibv_wc wc;
     uint32_t next_tx_sequence_number = 1;
     uint32_t destination_tested_port_index = 0;
     uint32_t source_port_offset = 1;
@@ -737,6 +748,11 @@ int main (int argc, char *argv[])
     wr.sg_list = &sg_entry;
     wr.next = NULL;
     wr.opcode = IBV_WR_SEND;
+
+    struct ibv_poll_cq_attr poll_cq_attr =
+    {
+        .comp_mask = 0
+    };
 
     struct ibv_values_ex rt_values =
     {
@@ -763,21 +779,21 @@ int main (int argc, char *argv[])
         /* Poll for completion. This will wait if all transfers are queued */
         do
         {
-            int num_completed;
-
-            num_completed = ibv_poll_cq (cq, 1, &wc);
-            CHECK_ASSERT (num_completed >= 0);
-
-            if (num_completed == 1)
+            rc = ibv_start_poll (cq, &poll_cq_attr);
+            while (rc != ENOENT)
             {
-                CHECK_ASSERT (wc.status == IBV_WC_SUCCESS);
+                CHECK_ASSERT (rc == 0);
+                CHECK_ASSERT (cq->status == IBV_WC_SUCCESS);
                 num_pending_completion--;
                 total_frames_sent++;
                 if (test_time_expired && (total_frames_sent == total_frames_queued))
                 {
                     test_complete = true;
                 }
+
+                rc = ibv_next_poll (cq);
             }
+            ibv_end_poll (cq);
         } while (num_pending_completion == SQ_NUM_DESC);
 
         /* Determine when to send the next frame, or stop the test */
@@ -876,7 +892,7 @@ int main (int argc, char *argv[])
     rc = ibv_dereg_mr (mr);
     CHECK_ASSERT (rc == 0);
 
-    rc = ibv_destroy_cq (cq);
+    rc = ibv_destroy_cq (ibv_cq_ex_to_cq (cq));
     CHECK_ASSERT (rc == 0);
 
     rc = ibv_dealloc_pd (pd);
