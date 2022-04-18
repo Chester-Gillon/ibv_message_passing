@@ -9,6 +9,7 @@ include (CheckSymbolExists)
 # If a local rdma-core build directory has been specified, use that instead of the system installed version.
 # This causes CMake to set a rpath in the executables to the absolute path of the libraries in the local rdma-core
 # build, so running the executable loads the correct libraries (including providers which are dynamically loaded).
+# @todo the linker path doesn't get passed into the Ada link which can cause linker errors for the Ada executables.
 if (DEFINED LOCAL_RDMA_CORE_ROOT)
    if ((NOT EXISTS "${LOCAL_RDMA_CORE_ROOT}/build/include") OR (NOT EXISTS "${LOCAL_RDMA_CORE_ROOT}/build/lib"))
       message(FATAL_ERROR "${LOCAL_RDMA_CORE_ROOT} is not a valid rdma-core build root")
@@ -57,10 +58,12 @@ if (AARCH64_SYSROOT)
    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath-link=${AARCH64_SYSROOT}/openssl/usr/lib")
 endif()
 
-# Set conditional compilation flags 
+# Set conditional compilation flags.
+# Uses any specific project wide include directories set above for the search, to match that used by the compiler.
 # @todo cap_user_rdpmc is a bit-field and CheckStructHasMember fails to find bit-fields since the C source
 #       used to check the field tries to take the sizeof the field which is illegal for a bit field.
 #       Therefore test for the capabilities field instead which is an integer.
+get_directory_property(CMAKE_REQUIRED_INCLUDES INCLUDE_DIRECTORIES)
 CHECK_STRUCT_HAS_MEMBER ("struct perf_event_mmap_page" capabilities linux/perf_event.h HAVE_PERF_CAP_USER_RDPMC)
 CHECK_STRUCT_HAS_MEMBER ("struct perf_event_mmap_page" pmc_width linux/perf_event.h HAVE_PERF_PMC_WIDTH)
 CHECK_SYMBOL_EXISTS ("ibv_modify_qp_rate_limit" infiniband/verbs.h HAVE_IBV_MODIFY_QP_RATE_LIMIT)
