@@ -8,6 +8,13 @@ WORKSPACE_PATH=$(readlink -f ${SCRIPT_PATH}/..)
 
 GCC_PATH=/opt/GNAT/2021/bin
 
+# Optional argument is the root of rdma-core build directory to build against instead of the system installed version.
+# Allows testing of rdma-core changes without having to modify the system installed version
+if [ -n "$1" ]
+then
+   LOCAL_RDMA_CORE_SELECT="-DLOCAL_RDMA_CORE_ROOT=$1"
+fi
+
 # Create the native platforms
 platforms="debug release coverage"
 for platform in ${platforms}
@@ -16,7 +23,7 @@ do
    rm -rf ${build_dir}
    mkdir -p ${build_dir}
    pushd ${build_dir}
-   cmake -G "Unix Makefiles" -DPLATFORM_TYPE=${platform} ${SCRIPT_PATH}/source -DCMAKE_C_COMPILER=${GCC_PATH}/gcc -DCMAKE_CXX_COMPILER=${GCC_PATH}/g++
+   cmake -G "Unix Makefiles" -DPLATFORM_TYPE=${platform} ${SCRIPT_PATH}/source -DCMAKE_C_COMPILER=${GCC_PATH}/gcc -DCMAKE_CXX_COMPILER=${GCC_PATH}/g++ ${LOCAL_RDMA_CORE_SELECT}
    popd
 done
 

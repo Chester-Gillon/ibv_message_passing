@@ -6,6 +6,17 @@ cmake_minimum_required (VERSION 2.9)
 include (CheckStructHasMember)
 include (CheckSymbolExists)
 
+# If a local rdma-core build directory has been specified, use that instead of the system installed version.
+# This causes CMake to set a rpath in the executables to the absolute path of the libraries in the local rdma-core
+# build, so running the executable loads the correct libraries (including providers which are dynamically loaded).
+if (DEFINED LOCAL_RDMA_CORE_ROOT)
+   if ((NOT EXISTS "${LOCAL_RDMA_CORE_ROOT}/build/include") OR (NOT EXISTS "${LOCAL_RDMA_CORE_ROOT}/build/lib"))
+      message(FATAL_ERROR "${LOCAL_RDMA_CORE_ROOT} is not a valid rdma-core build root")
+   endif ()
+   include_directories(BEFORE "${LOCAL_RDMA_CORE_ROOT}/build/include")
+   link_directories(BEFORE "${LOCAL_RDMA_CORE_ROOT}/build/lib")
+endif()
+
 # Set platform build flags
 if ("${PLATFORM_TYPE}" STREQUAL "debug")
    set (PLATFORM_CFLAGS "-g")
