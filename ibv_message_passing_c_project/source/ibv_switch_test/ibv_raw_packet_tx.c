@@ -38,6 +38,7 @@
 
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <sys/mman.h>
 
 #include <infiniband/verbs.h>
 
@@ -157,6 +158,11 @@ static bool arg_qp_rate_limit_kbps_set = false;
 static bool arg_qp_limit_burst_rate = false;
 
 
+/* Command line arguments which specifies an optional CSV file created with completion timestamps */
+static char arg_timestamps_csv_filename[PATH_MAX];
+static bool arg_timestamps_csv_filename_set;
+
+
 /**
  * Defines the layout of one maximum length Ethernet frame, with a single EtherCAT datagram, for the test.
  * EtherCAT has it own EtherType which can be used to filter the received frames to only those frames.
@@ -250,7 +256,7 @@ static void check_assert (const bool assertion, const char *format, ...)
  */
 static void display_usage (const char *const program_name)
 {
-    printf ("Usage %s: -i <rdma_device_name> -n <rdma_port_num> [-t <duration_secs>] [-p <port_list>] [-r <rate_hz>] [-l <rate_kpbs>] [-b]\n", program_name);
+    printf ("Usage %s: -i <rdma_device_name> -n <rdma_port_num> [-t <duration_secs>] [-p <port_list>] [-r <rate_hz>] [-l <rate_kpbs>] [-b] [-c <csv_file>]\n", program_name);
     printf ("\n");
     printf ("  -i specifies the name of the RDMA device to send frames on\n");
     printf ("  -n specifies the name of the RDMA port number to send frames on\n");
@@ -266,6 +272,7 @@ static void display_usage (const char *const program_name)
     printf ("  -l Specifies the rate limit in Kb/s to set in the Queue-Pair.\n");
     printf ("  -b If specified causes ibv_modify_qp_rate_limit to set the rate limit,\n");
     printf ("     to also be able to set the burst size\n");
+    printf ("  -c Create a CSV file containing completion timestamps using the HCA raw clock\n");
 
     exit (EXIT_FAILURE);
 }
@@ -398,7 +405,7 @@ static void parse_tested_port_list (const char *const port_list_in)
 static void read_command_line_arguments (const int argc, char *argv[])
 {
     const char *const program_name = argv[0];
-    const char *const optstring = "i:n:t:p:r:l:b";
+    const char *const optstring = "i:n:t:p:r:l:bc:";
     bool rdma_device_specified = false;
     bool rdma_port_specified = false;
     int option;
@@ -459,6 +466,11 @@ static void read_command_line_arguments (const int argc, char *argv[])
 
         case 'b':
             arg_qp_limit_burst_rate = true;
+            break;
+
+        case 'c':
+            snprintf (arg_timestamps_csv_filename, sizeof (arg_timestamps_csv_filename), "%s", optarg);
+            arg_timestamps_csv_filename_set = true;
             break;
 
         case '?':
@@ -577,6 +589,13 @@ int main (int argc, char *argv[])
 
     read_command_line_arguments (argc, argv);
 
+    /* Try and avoid page faults while running */
+    rc = mlockall (MCL_CURRENT | MCL_FUTURE);
+    if (rc != 0)
+    {
+        printf ("mlockall() failed\n");
+    }
+
     /* Find all RDMA devices */
     device_list = ibv_get_device_list (&num_ibv_devices);
     check_assert (num_ibv_devices > 0, "No RDMA devices found");
@@ -624,6 +643,17 @@ int main (int argc, char *argv[])
                     device_attributes.packet_pacing_caps.qp_rate_limit_min,
                     device_attributes.packet_pacing_caps.qp_rate_limit_max);
         }
+    }
+
+    /* Allocate an array to store completion timestamps, if enabled by command line options */
+    uint64_t *completion_timestamps = NULL;
+    uint32_t max_completion_timestamps = 0;
+    uint32_t num_completion_timestamps = 0;
+    if (arg_timestamps_csv_filename_set)
+    {
+        max_completion_timestamps = 1000000;
+        completion_timestamps = calloc (max_completion_timestamps, sizeof (uint64_t));
+        check_assert (completion_timestamps != NULL, "Failed to allocate completion_timestamps[]");
     }
 
     /* Allocate protection domain */
@@ -780,7 +810,7 @@ int main (int argc, char *argv[])
 
     while (!test_complete)
     {
-        /* Poll for completion. This will wait if all transfers are queued */
+        /* Poll for completion, optionally recording  . This will wait if all transfers are queued */
         do
         {
             rc = ibv_start_poll (cq, &poll_cq_attr);
@@ -788,12 +818,13 @@ int main (int argc, char *argv[])
             {
                 CHECK_ASSERT (rc == 0);
                 CHECK_ASSERT (cq->status == IBV_WC_SUCCESS);
+                if (num_completion_timestamps < max_completion_timestamps)
+                {
+                    completion_timestamps[num_completion_timestamps] = ibv_wc_read_completion_ts (cq);
+                    num_completion_timestamps++;
+                }
                 num_pending_completion--;
                 total_frames_sent++;
-                if (test_time_expired && (total_frames_sent == total_frames_queued))
-                {
-                    test_complete = true;
-                }
 
                 rc = ibv_next_poll (cq);
             }
@@ -804,7 +835,11 @@ int main (int argc, char *argv[])
         now = get_monotonic_time ();
         bool send_next_frame = false;
         test_time_expired = now >= test_stop_time;
-        if (!test_time_expired)
+        if (test_time_expired)
+        {
+            test_complete = total_frames_sent == total_frames_queued;
+        }
+        else
         {
             if (tx_rate_limited)
             {
@@ -862,6 +897,7 @@ int main (int argc, char *argv[])
     printf ("Send %" PRIu64 " frames over %.6f secs (CLOCK_MONOTONIC), average %.1f Hz\n",
             total_frames_sent, elapsed_duration_secs, frame_rate);
 
+    const double hca_core_clock_hz = ((double) device_attributes.hca_core_clock) * 1E3;
     if (ibv_query_rt_values_ex_rc == 0)
     {
         /* Display the elapsed time as measured by the HCA core clock.
@@ -877,7 +913,6 @@ int main (int argc, char *argv[])
          *
          * Only the mlx4 and mlx5 providers have ibv_query_rt_values_ex()
          */
-        const double hca_core_clock_hz = ((double) device_attributes.hca_core_clock) * 1E3;
         const uint64_t elapsed_hca_ticks = (hca_end_ticks - hca_start_ticks) & device_attributes.completion_timestamp_mask;
         printf ("HCA elapsed time = %.6f secs\n", ((double) elapsed_hca_ticks) / hca_core_clock_hz);
     }
@@ -901,6 +936,27 @@ int main (int argc, char *argv[])
 
     rc = ibv_dealloc_pd (pd);
     CHECK_ASSERT (rc == 0);
+
+    if (arg_timestamps_csv_filename_set)
+    {
+        /* Create a CSV file which contains the completion timestamps.
+         * The sequence number is reported if want to match against the Address field in the transmitted packets. */
+        FILE *csv_file = fopen (arg_timestamps_csv_filename, "w");
+
+        check_assert (csv_file != NULL, "Failed to create %s", arg_timestamps_csv_filename);
+        fprintf (csv_file, "Raw HCA completion timestamp (ticks),Sequence num,HCA timestamp delta (ticks),Delta (secs)\n");
+        for (uint32_t timestamp_index = 0; timestamp_index < num_completion_timestamps; timestamp_index++)
+        {
+            fprintf (csv_file, "%" PRIu64 ",%"PRIu32, completion_timestamps[timestamp_index], timestamp_index + 1);
+            if (timestamp_index > 0)
+            {
+                const uint64_t delta_ticks = completion_timestamps[timestamp_index] - completion_timestamps[timestamp_index - 1];
+                fprintf (csv_file, ",%" PRIu64 ",%.9f", delta_ticks, ((double) delta_ticks) / hca_core_clock_hz);
+            }
+            fprintf (csv_file, "\n");
+        }
+        fclose (csv_file);
+    }
 
     return EXIT_SUCCESS;
 }
