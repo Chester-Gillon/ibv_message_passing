@@ -640,10 +640,14 @@ int main (int argc, char *argv[])
         .channel = NULL, /* Completion events not used */
         .comp_vector = 0,
         .wc_flags = IBV_WC_EX_WITH_COMPLETION_TIMESTAMP,
-        .flags = IBV_CREATE_CQ_ATTR_SINGLE_THREADED, /* No need for locks as a single-threaded program */
-        .parent_domain = NULL /* @todo What benefits of providing a parent domain?
-                                       Only needed for a custom memory allocator or can the provider
-                                       use it to share some resources? */
+        .flags = IBV_CREATE_CQ_ATTR_SINGLE_THREADED /* No need for locks as a single-threaded program */
+
+        /* parent_domain left out since:
+         * 1. Not sure of the providing a parent domain.
+         *    Only needed for a custom memory allocator or can the provider use it to share some resources?
+         * 2. The field is not present in the libibverbs 17.1 from Ubuntu 18.04.6 LTS nor
+         *    libibverbs 28.0 from Ubuntu 20.04.4 LTS
+         */
     };
     cq = ibv_create_cq_ex (rdma_device, &cq_attr);
     CHECK_ASSERT (cq != NULL);
