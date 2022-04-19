@@ -762,6 +762,15 @@ int main (int argc, char *argv[])
             .typical_pkt_sz = sizeof (ethercat_frame_t)
         };
         rc = ibv_modify_qp_rate_limit (qp, &rate_limit_attr);
+        if (rc == EINVAL)
+        {
+            /* With a ConnectX-4 Lx setting the typical_pkt_sz isn't supported.
+             * Try again with only setting the rate_limit and max_burst_sz. */
+            rate_limit_attr.rate_limit = arg_qp_rate_limit_kbps,
+            rate_limit_attr.max_burst_sz = sizeof (ethercat_frame_t),
+            rate_limit_attr.typical_pkt_sz = 0;
+            rc = ibv_modify_qp_rate_limit (qp, &rate_limit_attr);
+        }
         if (rc != 0)
         {
             fprintf (stderr, "ibv_modify_qp_rate_limit() failed with rc=%d\n", rc);
