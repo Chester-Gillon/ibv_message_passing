@@ -688,7 +688,8 @@ int main (int argc, char *argv[])
     mr = ibv_reg_mr (pd, tx_frames, sizeof (ethercat_frame_t) * SQ_NUM_DESC, IBV_ACCESS_LOCAL_WRITE);
     CHECK_ASSERT (mr != NULL);
 
-    /* Create Queue-Pair to send raw packets */
+    /* Create Queue-Pair to send raw packets.
+     * The mlx4 provider fails with ENOTSUP when attempting to use IBV_QP_INIT_ATTR_SEND_OPS_FLAGS */
     struct ibv_qp *qp;
     struct ibv_qp_ex *qpx;
     struct ibv_qp_init_attr_ex qp_init_attr =
