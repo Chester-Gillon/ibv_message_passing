@@ -39,6 +39,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/mman.h>
+#include <sys/capability.h>
 
 #include <infiniband/verbs.h>
 
@@ -594,6 +595,15 @@ int main (int argc, char *argv[])
     if (rc != 0)
     {
         printf ("mlockall() failed\n");
+    }
+
+    /* Test that the effective permission allows use of raw queues */
+    cap_t capabilities = cap_get_proc ();
+    cap_flag_value_t capability_flag;
+    rc = cap_get_flag (capabilities, CAP_NET_RAW, CAP_EFFECTIVE, &capability_flag);
+    if (capability_flag != CAP_SET)
+    {
+        printf ("Warning: Process doesn't have CAP_NET_RAW effective permission, no permission to create raw packet\n");
     }
 
     /* Find all RDMA devices */
