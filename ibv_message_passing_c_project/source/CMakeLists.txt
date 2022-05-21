@@ -33,6 +33,10 @@ elseif ("${PLATFORM_TYPE}" STREQUAL "aarch64_debug")
    set (PLATFORM_CFLAGS "-Werror=poison-system-directories -g")
 elseif ("${PLATFORM_TYPE}" STREQUAL "aarch64_release")
    set (PLATFORM_CFLAGS "-Werror=poison-system-directories -O3 -g -flto -fuse-linker-plugin")
+elseif ("${PLATFORM_TYPE}" STREQUAL "win32")
+   # As not debugging the cross-compiled code only a single platform with optimisation settings.
+   # Selects static libraries to avoid the generated windows executables having dependencies on mingw dlls.
+   set (PLATFORM_CFLAGS "-O3 -g -static -static-libstdc++")
 else()
    message ("Unknown platform")
 endif()

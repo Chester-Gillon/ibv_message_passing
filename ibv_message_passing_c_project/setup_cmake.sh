@@ -47,3 +47,21 @@ then
       popd
    done
 fi
+
+# If the mingw32 compiler is available, create a cross-compiled platform for it.
+# Specifying CMAKE_SYSTEM_NAME="Windows" prevents the CMake test of the compiler reporting an error due to the compiler
+# not supporting the -rdynamic command line option.
+MINGW_PREFIX=i686-w64-mingw32-
+if [ -n "`which ${MINGW_PREFIX}gcc`" ]
+then
+   platforms="win32"
+   for platform in ${platforms}
+   do
+      build_dir=${SCRIPT_PATH}/bin/${platform}
+      rm -rf ${build_dir}
+      mkdir -p ${build_dir}
+      pushd ${build_dir}
+      cmake -G "Unix Makefiles" -DPLATFORM_TYPE=${platform} ${SCRIPT_PATH}/source -DCMAKE_C_COMPILER=${MINGW_PREFIX}gcc -DCMAKE_CXX_COMPILER=${MINGW_PREFIX}g++ -DCMAKE_SYSTEM_NAME="Windows"
+      popd
+   done
+fi
