@@ -40,7 +40,7 @@ do
         # the HTML report generation to fail with an error that the binder source file isn't found.
         gcc ${SOURCE_PATHNAME} -c --coverage
         gnatbind -x coverage_for_ada_task
-        gnatlink -g coverage_for_ada_task --coverage
+        gnatlink -g coverage_for_ada_task --coverage -M
 
         # Run the test program, which simply writes the coverage information
         ./coverage_for_ada_task
