@@ -55,6 +55,10 @@ do
         # GNAT installation and doesn't use the lcov package which contains the lcov and genhtml perl scripts used above.
         gcov -a -c -b coverage_for_ada_task
 
+        # Dump the coverage file contents for diagonstics
+        gcov-dump -l coverage_for_ada_task.gcno > coverage_for_ada_task.gcno.dump
+        gcov-dump -l coverage_for_ada_task.gcda > coverage_for_ada_task.gcda.dump
+
         popd > /dev/null
     fi
 done
