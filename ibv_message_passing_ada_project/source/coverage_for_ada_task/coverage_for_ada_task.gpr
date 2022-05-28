@@ -1,0 +1,15 @@
+with "../../shared.gpr";
+project Coverage_For_Ada_Task is
+
+   for Source_Dirs use (".");
+   for Object_Dir use "../../obj/" & Shared.mode & "/coverage_for_ada_task";
+   for Main use ("coverage_for_ada_task.adb");
+
+   package Compiler renames Shared.Compiler;
+   package Builder renames Shared.Builder;
+   package Linker renames Shared.Linker;
+
+   package Ide is
+   end Ide;
+
+end Coverage_For_Ada_Task;

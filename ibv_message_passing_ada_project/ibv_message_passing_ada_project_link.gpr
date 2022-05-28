@@ -4,5 +4,6 @@ aggregate project Ibv_Message_Passing_Ada_Project_Link is
                           "source/ibv_controller_process/ibv_controller_process.gpr",
                           "source/ibv_message_overlay_gdb_test/ibv_message_overlay_gdb_test.gpr",
                           "source/get_rdate/get_rdate.gpr",
-                          "source/shared_file_io/shared_file_io.gpr");
+                          "source/shared_file_io/shared_file_io.gpr",
+                          "source/coverage_for_ada_task/coverage_for_ada_task.gpr");
 end Ibv_Message_Passing_Ada_Project_Link;
