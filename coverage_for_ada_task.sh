@@ -38,7 +38,7 @@ do
         # Compile the test program for coverage. 
         # The -g for gnatlink stops the binder generated source file from being deleted, which overwise causes
         # the HTML report generation to fail with an error that the binder source file isn't found.
-        gcc ${SOURCE_PATHNAME} -c --coverage
+        gcc ${SOURCE_PATHNAME} -c --coverage -save-temps
         gnatbind -x coverage_for_ada_task
         gnatlink -g coverage_for_ada_task --coverage -M
 
@@ -50,6 +50,10 @@ do
 
         # Generate HTML report
         genhtml -o coverage_results lcov.trace --branch-coverage
+
+        # Use gcov to generate report just for the main source file, which uses the executable which is part of the
+        # GNAT installation and doesn't use the lcov package which contains the lcov and genhtml perl scripts used above.
+        gcov -a -c -b coverage_for_ada_task
 
         popd > /dev/null
     fi
