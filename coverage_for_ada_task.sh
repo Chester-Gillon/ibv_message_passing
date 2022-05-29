@@ -8,6 +8,23 @@
 SCRIPT=$(readlink -f $0)
 SCRIPT_PATH=`dirname ${SCRIPT}`
 
+# Parse command line arguments
+COVERAGE_ARGS=""
+while [ -n "${1}" ]
+do
+    case ${1}
+    in
+        --optional-coverage)
+            COVERAGE_ARGS=${1}
+        ;;
+        *)
+            echo "Unknown argument ${1}"
+            exit 1
+        ;;
+    esac
+    shift
+done
+
 # Create a directory to store the executables and coverage results created by this script.
 # This is done since are testing different versions of GNAT rather than using CMake which is setup for a single version.
 RESULTS_ROOT=${SCRIPT_PATH}/ibv_message_passing_ada_project/obj/coverage_for_ada_task
@@ -43,7 +60,7 @@ do
         gnatlink -g coverage_for_ada_task --coverage -M
 
         # Run the test program, which simply writes the coverage information
-        ./coverage_for_ada_task
+        ./coverage_for_ada_task ${COVERAGE_ARGS}
 
         # Collect the coverage results
         lcov -d . -c -o lcov.trace --rc lcov_branch_coverage=1 
