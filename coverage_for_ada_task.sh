@@ -12,6 +12,7 @@ SCRIPT_PATH=`dirname ${SCRIPT}`
 COVERAGE_ARGS=""
 CLEAR_ARTIFICIAL_EXE=""
 RTS_SELECTION=""
+NO_EXCEPTION_BRANCH=""
 while [ -n "${1}" ]
 do
     case ${1}
@@ -29,6 +30,10 @@ do
         ;;
         --rts-sjlj)
             RTS_SELECTION="--RTS=sjlj"
+        ;;
+        --no-exception-branch)
+            # The ability to exclude branches for exceptions requires lcov 1.15 or later, which adds the configuration parameter
+            NO_EXCEPTION_BRANCH="--rc geninfo_no_exception_branch=1"
         ;;
         *)
             echo "Unknown argument ${1}"
@@ -83,7 +88,7 @@ do
         ./coverage_for_ada_task ${COVERAGE_ARGS}
 
         # Collect the coverage results
-        lcov -d . -c -o lcov.trace --rc lcov_branch_coverage=1 
+        lcov -d . -c -o lcov.trace --rc lcov_branch_coverage=1 ${NO_EXCEPTION_BRANCH} 
 
         # Generate HTML report
         genhtml -o coverage_results lcov.trace --branch-coverage
