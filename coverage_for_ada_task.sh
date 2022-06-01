@@ -11,6 +11,7 @@ SCRIPT_PATH=`dirname ${SCRIPT}`
 # Parse command line arguments
 COVERAGE_ARGS=""
 CLEAR_ARTIFICIAL_EXE=""
+RTS_SELECTION=""
 while [ -n "${1}" ]
 do
     case ${1}
@@ -25,6 +26,9 @@ do
                 echo "${CLEAR_ARTIFICIAL_EXE} executable not found"
                 exit 1
             fi
+        ;;
+        --rts-sjlj)
+            RTS_SELECTION="--RTS=sjlj"
         ;;
         *)
             echo "Unknown argument ${1}"
@@ -64,9 +68,9 @@ do
         # Compile the test program for coverage. 
         # The -g for gnatlink stops the binder generated source file from being deleted, which overwise causes
         # the HTML report generation to fail with an error that the binder source file isn't found.
-        gcc ${SOURCE_PATHNAME} -c --coverage -save-temps
-        gnatbind -x coverage_for_ada_task
-        gnatlink -g coverage_for_ada_task --coverage -M
+        gcc ${SOURCE_PATHNAME} -c --coverage -save-temps ${RTS_SELECTION}
+        gnatbind -x coverage_for_ada_task ${RTS_SELECTION}
+        gnatlink -g coverage_for_ada_task --coverage -M ${RTS_SELECTION}
 
         # When enabled by the command line options clear the artificial flags for functions in the gcno files to test
         # if that allows coverage to be reported for Ada tasks.
