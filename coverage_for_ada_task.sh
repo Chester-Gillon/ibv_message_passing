@@ -85,7 +85,12 @@ do
         fi
 
         # Run the test program, which simply writes the coverage information
-        ./coverage_for_ada_task ${COVERAGE_ARGS}
+        ./coverage_for_ada_task
+        if [ -n ${COVERAGE_ARGS} ]
+        then
+            # Run a second time with addtional branch coverage
+            ./coverage_for_ada_task ${COVERAGE_ARGS}
+        fi
 
         # Collect the coverage results
         lcov -d . -c -o lcov.trace --rc lcov_branch_coverage=1 ${NO_EXCEPTION_BRANCH} 
