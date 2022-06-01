@@ -10,12 +10,21 @@ SCRIPT_PATH=`dirname ${SCRIPT}`
 
 # Parse command line arguments
 COVERAGE_ARGS=""
+CLEAR_ARTIFICIAL_EXE=""
 while [ -n "${1}" ]
 do
     case ${1}
     in
         --optional-coverage)
             COVERAGE_ARGS=${1}
+        ;;
+        --clear-artificial)
+            CLEAR_ARTIFICIAL_EXE=${SCRIPT_PATH}/ibv_message_passing_c_project/bin/debug/clear_gcno_artificial_function_flags/clear_gcno_artificial_function_flags
+            if [ ! -x ${CLEAR_ARTIFICIAL_EXE} ]
+            then
+                echo "${CLEAR_ARTIFICIAL_EXE} executable not found"
+                exit 1
+            fi
         ;;
         *)
             echo "Unknown argument ${1}"
@@ -58,6 +67,13 @@ do
         gcc ${SOURCE_PATHNAME} -c --coverage -save-temps
         gnatbind -x coverage_for_ada_task
         gnatlink -g coverage_for_ada_task --coverage -M
+
+        # When enabled by the command line options clear the artificial flags for functions in the gcno files to test
+        # if that allows coverage to be reported for Ada tasks.
+        if [ -n "${CLEAR_ARTIFICIAL_EXE}" ]
+        then
+            find . -name '*.gcno' -print0 | xargs -0 -n1 ${CLEAR_ARTIFICIAL_EXE}
+        fi
 
         # Run the test program, which simply writes the coverage information
         ./coverage_for_ada_task ${COVERAGE_ARGS}
