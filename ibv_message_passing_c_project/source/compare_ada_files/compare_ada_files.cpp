@@ -88,6 +88,22 @@ static const char *const file_comparison_names[FILE_COMPARISON_ARRAY_SIZE] =
     [FILE_COMPARISON_LEXICAL_EQUAL] = "Lexical equal"
 };
 
+/* Ada identifiers after which to insert a new line in the lexical contents, when the identifier is followed immediately
+ * by another identifier. Done to try and get some meaningful line breaks in the lexical contents when manually comparing
+ * the results of the comparison. */
+static const char *const identifiers_for_line_breaks[] =
+{
+    "is", /* start of procedure, function, package, case */
+    "begin",
+    "declare",
+    "loop",
+    "then",
+    "record",
+    "do"
+};
+static const size_t num_identifiers_for_line_breaks =
+        sizeof (identifiers_for_line_breaks) / sizeof (identifiers_for_line_breaks[0]);
+
 
 /* Used to hold the contents of an Ada source file to be compared */
 typedef struct
@@ -96,12 +112,35 @@ typedef struct
     size_t file_length;
     /* The raw byte contents of the file. */
     char *file_contents;
-    /* The lexical length of the file, after removing comments and whitespace */
-    size_t lexical_length;
-    /* The lexical contents of the file. Characters outside of string or character literals are converted to lower case
-     * to allow for Ada being case-insensitive for identifiers. */
+    /* The lexical contents of the file, processed such that:
+     * a. Comments are removed.
+     * b. Identifiers are converted to lower case to allow for Ada being case-insensitive for identifiers.
+     * c. White space is removed except for a single characters between identifiers.
+     * d. May contain a carriage return to break into lines at a "convenient" place when dumping the lexical text to
+     *    a file for external comparison. */
     char *lexical_contents;
+    /* The number of characters in the lexical_contents array. */
+    size_t lexical_length;
+    /* The size of the allocated lexical_contents array, used to dynamically grow the array */
+    size_t lexical_allocated_size;
+    /* When true the lexical contents parser is currently in a comment */
+    bool in_comment;
+    /* When true the lexical contents parser is currently in a character literal (string) */
+    bool in_character_literal;
+    /* When true the lexical contents parser is currently in a numeric literal */
+    bool in_numeric_literal;
+    /* When true the lexical contents parser is currently in an identifier */
+    bool in_identifier;
+    /* When true the previous lexical contents was an identifier */
+    bool previous_lexical_contents_identifier;
+    /* When previous_lexical_contents_identifier is true, gives the start index and length of the previous identifier
+     * in the lexical contents */
+    size_t previous_identifier_start_index;
+    size_t previous_identifier_length;
+    /* When true the previous lexical contents was a numeric literal */
+    bool previous_lexical_contents_numeric_literal;
 } compared_file_contents_t;
+
 
 /**
  * @brief Callback function for nftw()
@@ -188,12 +227,84 @@ static int tree_walk_callback (const char *fpath, const struct stat *sb, int fla
 }
 
 
+/**
+ * @brief Append one character to the lexical contents for a file, growing the array as required.
+ * @param[in/out] contents The file lexical contents to append to.
+ * @param[in] ch The character to append.
+ */
+static void append_lexical_char (compared_file_contents_t *const contents, const char ch)
+{
+    if (contents->lexical_length == contents->lexical_allocated_size)
+    {
+        const size_t grow_size = 4096;
+        contents->lexical_allocated_size += grow_size;
+        contents->lexical_contents = (char *) realloc (contents->lexical_contents, contents->lexical_allocated_size);
+        if (contents->lexical_contents == NULL)
+        {
+            printf ("Error: memory allocation failed in append_lexical_char()\n");
+            exit (EXIT_FAILURE);
+        }
+    }
+
+    contents->lexical_contents[contents->lexical_length] = ch;
+    contents->lexical_length++;
+}
+
+
+/**
+ * @brief Called when detect a new identifier or numeric literal to insert a white space character as a separator.
+ * @details This is so that preserve whitespace which is lexically significant.
+ *          It should also ensure that the resulting lexical_contents still compiles.
+ * @param[in/out] contents The current lexical contents, to append a separating whitespace character when required.
+ */
+static void seperate_identifiers_or_numeric_literals (compared_file_contents_t *const contents)
+{
+    /* If the previous lexical contents was an identifier insert a white space character to separate the identifiers. */
+    if (contents->previous_lexical_contents_identifier)
+    {
+        bool at_line_break = false;
+        for (size_t identifier_index = 0;
+             (!at_line_break) && (identifier_index < num_identifiers_for_line_breaks);
+             identifier_index++)
+        {
+            const char *const compared_identifier = identifiers_for_line_breaks[identifier_index];
+
+            if ((contents->previous_identifier_length == strlen (compared_identifier)) &&
+                (strncmp (&contents->lexical_contents[contents->previous_identifier_start_index],
+                          compared_identifier, contents->previous_identifier_length) == 0))
+            {
+                at_line_break = true;
+            }
+        }
+        append_lexical_char (contents, at_line_break ? '\n' : ' ');
+        contents->previous_lexical_contents_identifier = false;
+    }
+    else if (contents->previous_lexical_contents_numeric_literal)
+    {
+        append_lexical_char (contents, ' ');
+        contents->previous_lexical_contents_numeric_literal = false;
+    }
+}
+
+
+/**
+ * @brief Parse the lexical contents of an input source file.
+ * @param[in/out] contents On entry contains the raw file_contents[] to parse.
+ *                         On exit the lexical_contents[] array has been populated with the lexical contents to compare.
+ */
 static void parse_lexical_file_contents (compared_file_contents_t *const contents)
 {
-    bool in_comment = false;
-    bool in_character_literal = false;
-    bool in_identifier = false;
+    /* Initialise the state of the parser */
+    contents->in_comment = false;
+    contents->in_character_literal = false;
+    contents->in_identifier = false;
+    contents->previous_identifier_start_index = 0;
+    contents->previous_identifier_length = 0;
+    contents->previous_lexical_contents_identifier = false;
+    contents->in_numeric_literal = false;
+    contents->previous_lexical_contents_numeric_literal = false;
 
+    /* Process all the characters in the raw input file */
     size_t file_index = 0;
     while (file_index < contents->file_length)
     {
@@ -201,78 +312,85 @@ static void parse_lexical_file_contents (compared_file_contents_t *const content
         size_t num_chars_consumed = 1;
         const size_t num_remaining_chars = contents->file_length - file_index;
 
-        if (in_comment)
+        if (contents->in_comment)
         {
             /* Comment finishes at end of line */
             if (*ch == '\n')
             {
-                in_comment = false;
+                contents->in_comment = false;
             }
         }
-        else if (in_character_literal)
+        else if (contents->in_character_literal)
         {
             if ((num_remaining_chars >= 2) && (ch[0] == '\"') && (ch[1] == '\"'))
             {
                 /* Found an embedded quote in the character literal */
-                contents->lexical_contents[contents->lexical_length++] = *ch++;
-                contents->lexical_contents[contents->lexical_length++] = *ch++;
+                append_lexical_char (contents, *ch++);
+                append_lexical_char (contents, *ch++);
                 num_chars_consumed++;
             }
             else if (contents->file_contents[file_index] == '\"')
             {
                 /* Found the end of the character literal */
-                contents->lexical_contents[contents->lexical_length++] = *ch;
-                in_character_literal = false;
+                append_lexical_char (contents, *ch);
+                contents->in_character_literal = false;
             }
             else
             {
                 /* One character inside a character literal */
-                contents->lexical_contents[contents->lexical_length++] = *ch;
+                append_lexical_char (contents, *ch);
             }
         }
-        else if (in_identifier)
+        else if (contents->in_identifier)
         {
             if (isalnum (*ch) || (*ch == '_'))
             {
                 /* One character inside an identifier, store as lower case */
-                contents->lexical_contents[contents->lexical_length++] = tolower (*ch);
+                append_lexical_char (contents, tolower (*ch));
+                contents->previous_identifier_length++;
             }
             else
             {
-                in_identifier = false;
-                if (isspace (*ch))
-                {
-                    /* The identifier has been terminated by a whitespace character.
-                     * Add a single space to the lexical contents to break up identifiers */
-                    /* @todo this doesn't produce the same lexical content in the case of spaces between punctuation.
-                     *       E.g:
-                     *          rx_buffer := ibv_message_bw_interface_h.poll_rx_paths (communication_context);
-                     *       v.s:
-                     *          rx_buffer:=ibv_message_bw_interface_h.poll_rx_paths(communication_context);
-                     *
-                     *       To fix this only need to insert spaces between identifiers
-                     */
-                    contents->lexical_contents[contents->lexical_length++] = ' ';
-                }
-                else
-                {
-                    /* The identifier was been terminated by something other than whitespace.
-                     * Don't consume the character which is re-evaluated by the next loop iteration. */
-                    num_chars_consumed = 0;
-                }
+                /* The identifier has been terminated.
+                 * Don't consume the character which is re-evaluated by the next loop iteration.
+                 * Flag that the previous lexical contents was an identifier, to allow a space to be inserted to
+                 * separate two adjacent identifiers / numeric literals. */
+                contents->in_identifier = false;
+                contents->previous_lexical_contents_identifier = true;
+                num_chars_consumed = 0;
+            }
+        }
+        else if (contents->in_numeric_literal)
+        {
+            if (isxdigit (*ch) || (*ch == '_') || (*ch == '#') || (*ch == '.'))
+            {
+                /* One character inside an identifier, store as lower case in case a hex digit */
+                append_lexical_char (contents, tolower (*ch));
+            }
+            else
+            {
+                /* The numeric literal has been terminated.
+                 * Don't consume the character which is re-evaluated by the next loop iteration.
+                 * Flag that the previous lexical contents was a numeric literal, to allow a space to be inserted to
+                 * separate two adjacent identifiers / numeric literals. */
+                contents->in_numeric_literal = false;
+                contents->previous_lexical_contents_numeric_literal = true;
+                num_chars_consumed = 0;
             }
         }
         else if ((num_remaining_chars >= 2) && (ch[0] == '-') && (ch[1] == '-'))
         {
             /* Found start of comment, which isn't part of the lexical contents */
-            in_comment = true;
+            contents->in_comment = true;
             num_chars_consumed++;
         }
         else if (*ch == '\"')
         {
             /* Found start of character literal, which forms part of the lexical contents */
-            in_character_literal = true;
-            contents->lexical_contents[contents->lexical_length++] = *ch;
+            contents->in_character_literal = true;
+            contents->previous_lexical_contents_identifier = false;
+            contents->previous_lexical_contents_numeric_literal = false;
+            append_lexical_char (contents, *ch);
         }
         else if ((num_remaining_chars >= 3) && (ch[0] == '\'') && (ch[2] == '\''))
         {
@@ -280,21 +398,35 @@ static void parse_lexical_file_contents (compared_file_contents_t *const content
              * @todo This simplistic test gets the wrong answer in the case of:
              *          test : Character := Character'(' ');
              *
-             *       Since the character literal is consider as open-bracket rather than space.
+             *       Since the character literal is considered as open-bracket rather than space.
              *       The GNAT Bench syntax high-lighter seems to make the same mistake.
              *       To properly detect character literals would need to detect when ' is used for attributes.
              *  */
-            contents->lexical_contents[contents->lexical_length++] = *ch++;
-            contents->lexical_contents[contents->lexical_length++] = *ch++;
+            contents->previous_lexical_contents_identifier = false;
+            contents->previous_lexical_contents_numeric_literal = false;
+            append_lexical_char (contents, *ch++);
+            append_lexical_char (contents, *ch++);
             num_chars_consumed++;
-            contents->lexical_contents[contents->lexical_length++] = *ch++;
+            append_lexical_char (contents, *ch++);
             num_chars_consumed++;
         }
         else if (isalpha (*ch))
         {
+            seperate_identifiers_or_numeric_literals (contents);
+
             /* Store as lower case the first letter which starts an identifier */
-            in_identifier = true;
-            contents->lexical_contents[contents->lexical_length++] = tolower (*ch);
+            contents->in_identifier = true;
+            contents->previous_identifier_start_index = contents->lexical_length;
+            contents->previous_identifier_length = 1;
+            append_lexical_char (contents, tolower (*ch));
+        }
+        else if (isdigit (*ch))
+        {
+            seperate_identifiers_or_numeric_literals (contents);
+
+            /* Store as the first character of a numeric literal */
+            contents->in_numeric_literal = true;
+            append_lexical_char (contents, tolower (*ch));
         }
         else if (isspace (*ch))
         {
@@ -304,7 +436,14 @@ static void parse_lexical_file_contents (compared_file_contents_t *const content
         {
             /* Assume punctuation character, which is stored as part of the lexical contents compared.
              * This doesn't attempt to detect characters which are syntax errors. */
-            contents->lexical_contents[contents->lexical_length++] = *ch++;
+            contents->previous_lexical_contents_identifier = false;
+            contents->previous_lexical_contents_numeric_literal = false;
+            append_lexical_char (contents, *ch);
+            if (*ch == ';')
+            {
+                /* Force a newline as assumed to be end of one statement */
+                append_lexical_char (contents, '\n');
+            }
         }
 
         file_index += num_chars_consumed;
@@ -312,6 +451,12 @@ static void parse_lexical_file_contents (compared_file_contents_t *const content
 }
 
 
+/**
+ * @brief Read the contents of a file for comparison.
+ * @param[out] contents The file which has been read, containing both the raw contents and the lexical contents.
+ * @param[in] root_directory The root directory in which the file resides.
+ * @param[in] source_name The source file name to read, which is relative to the root_directory.
+ */
 static void read_file_for_comparison (compared_file_contents_t *const contents,
                                       const char *const root_directory, const char *const source_name)
 {
@@ -352,9 +497,7 @@ static void read_file_for_comparison (compared_file_contents_t *const contents,
 
     contents->file_length = (size_t) file_size;
     contents->file_contents = (char *) malloc (contents->file_length);
-    contents->lexical_length = 0;
-    contents->lexical_contents = (char *) malloc (contents->file_length);
-    if ((contents->file_contents == NULL) || (contents->lexical_contents == NULL))
+    if (contents->file_contents == NULL)
     {
         printf ("Error: Failed to allocate memory to read %s\n", pathname);
         exit (EXIT_FAILURE);
@@ -367,12 +510,22 @@ static void read_file_for_comparison (compared_file_contents_t *const contents,
         exit (EXIT_FAILURE);
     }
 
+    contents->lexical_length = 0;
+    contents->lexical_allocated_size = 0;
+    contents->lexical_contents = NULL;
     parse_lexical_file_contents (contents);
 
     (void) fclose (source_file);
 }
 
 
+/**
+ * @brief Compare a source file in two trees
+ * @param[in] left_tree_root The root of the left source tree for the comparison
+ * @param[in] right_tree_root The root of the right source tree for the comparison
+ * @param[in] source_name The source file name to compare, present in both the left and right source trees
+ * @return The result of comparing the two files.
+ */
 static file_comparison_t compare_source_files (const char *const left_tree_root, const char *const right_tree_root,
                                                const char *const source_name)
 {
@@ -400,6 +553,8 @@ static file_comparison_t compare_source_files (const char *const left_tree_root,
             file_comparison = FILE_COMPARISON_DIFFERENT;
         }
     }
+
+    printf ("%.*s", (int) left_contents.lexical_length, left_contents.lexical_contents); //@todo initial test of parsing
 
     free (left_contents.file_contents);
     free (right_contents.lexical_contents);
