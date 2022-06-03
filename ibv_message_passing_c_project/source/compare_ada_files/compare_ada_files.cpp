@@ -13,10 +13,29 @@
 
 #include <limits.h>
 #include <ftw.h>
+#include <sys/types.h>
+#include <dirent.h>
+
+/* Create a realpath replacement macro for when compiling under mingw32
+ * Taken from https://stackoverflow.com/questions/45124869/cross-platform-alternative-to-this-realpath-definition
+ */
+#ifdef WIN32
+    #define realpath(N,R) _fullpath((R),(N),_MAX_PATH)
+#endif
 
 
 /* Used to contain the relative paths of all source files from one directory root to be compared */
 typedef std::set<std::string> source_file_list_t;
+
+
+/* Command line arguments for the left and right trees to compare.
+ * May run with only one tree specified, since that does allow the reporting of the lexical contents of the
+ * source files in one of trees. */
+static char arg_left_source_tree_root[PATH_MAX];
+static char arg_right_source_tree_root[PATH_MAX];
+
+/* Command line argument which specifies the directory to write results to */
+static char arg_results_dir[PATH_MAX];
 
 
 /* Maximum number of open file descriptors used by ntfw().
@@ -71,7 +90,7 @@ typedef enum
     /* The file is lexically equal between the left and right source tree, meaning differences in either:
      * a. Comments
      * b. Whitespace
-     * c. Casing
+     * c. Identifier casing
      * d. Wrapping of statements across source lines
      */
     FILE_COMPARISON_LEXICAL_EQUAL,
@@ -79,6 +98,7 @@ typedef enum
     FILE_COMPARISON_ARRAY_SIZE
 } file_comparison_t;
 
+/* Names of file comparison types for display in the summary CSV file or on the console */
 static const char *const file_comparison_names[FILE_COMPARISON_ARRAY_SIZE] =
 {
     [FILE_COMPARISON_LEFT_ONLY    ] = "Left only",
@@ -86,6 +106,16 @@ static const char *const file_comparison_names[FILE_COMPARISON_ARRAY_SIZE] =
     [FILE_COMPARISON_BINARY_EQUAL ] = "Binary equal",
     [FILE_COMPARISON_DIFFERENT    ] = "Different",
     [FILE_COMPARISON_LEXICAL_EQUAL] = "Lexical equal"
+};
+
+/* Names of file comparison types used in path components */
+static const char *const file_comparison_prefixes[FILE_COMPARISON_ARRAY_SIZE] =
+{
+    [FILE_COMPARISON_LEFT_ONLY    ] = "left_only",
+    [FILE_COMPARISON_RIGHT_ONLY   ] = "right_only",
+    [FILE_COMPARISON_BINARY_EQUAL ] = "binary_equal",
+    [FILE_COMPARISON_DIFFERENT    ] = "different",
+    [FILE_COMPARISON_LEXICAL_EQUAL] = "lexical_equal"
 };
 
 /* Ada identifiers after which to insert a new line in the lexical contents, when the identifier is followed immediately
@@ -140,6 +170,161 @@ typedef struct
     /* When true the previous lexical contents was a numeric literal */
     bool previous_lexical_contents_numeric_literal;
 } compared_file_contents_t;
+
+
+/* Used to create one results file */
+typedef struct
+{
+    char path[PATH_MAX];
+    FILE *file;
+} results_file_t;
+
+/* Used to write the results file, allowing a result file to be opened the first time it is required */
+typedef struct
+{
+    /* A CSV file summarising each source file compared */
+    results_file_t summary_csv;
+    /* Text files for each comparison type, with one path file per line for each source file which matches the
+     * comparison result. Intended to be used for the svn --targets option. */
+    results_file_t file_lists[FILE_COMPARISON_ARRAY_SIZE];
+} results_files_t;
+
+
+/**
+ * @brief Print the program command line usage, and then exit the process
+ */
+static void print_usage (const char *const program_name)
+{
+    printf ("Usage:\n");
+    printf ("  %s <options>\n", program_name);
+    printf ("\n");
+    printf ("  --left-dir <dir>\n");
+    printf ("      Gives the left source directory tree for comparison\n");
+    printf ("  --right-dir <dir>\n");
+    printf ("      Gives the right source directory tree for comparison\n");
+    printf ("  --results-dir <dir>\n");
+    printf ("      If specified gives the directory to write results of the comparison to.\n");
+    printf ("      If not present only a summary count of the comparison is reported.\n");
+    exit (EXIT_FAILURE);
+}
+
+
+/**
+ * @brief Check that a directory exists, also canonicalising it, aborting the program if doesn't exist.
+ * @param[in] dir_in The directory passed on the command line.
+ * @param[out] dir_out Where to store the canonicalised directory name.
+ */
+static void check_directory_exists (const char *const dir_in, char dir_out[PATH_MAX])
+{
+    int rc;
+    struct stat dir_stat;
+    const char *const realpath_status = realpath (dir_in, dir_out);
+
+    if (realpath_status == NULL)
+    {
+        printf ("Error: Unable to resolve %s\n", dir_in);
+        exit (EXIT_FAILURE);
+    }
+
+    rc = stat (dir_out, &dir_stat);
+    if ((rc != 0) || ((dir_stat.st_mode & S_IFDIR) == 0))
+    {
+        printf ("Error: %s is not an existing directory\n", dir_out);
+        exit (EXIT_FAILURE);
+    }
+}
+
+
+/**
+ * @brief Parse the command line arguments, exiting the process if not valid
+ * @param[in] argc, argv The arguments passed to main
+ */
+static void parse_command_line_arguments (const int argc, char *argv[])
+{
+
+    int optindex = 1;
+    while (optindex < argc)
+    {
+        if (strcmp (argv[optindex], "--left-dir") == 0)
+        {
+            optindex++;
+            if (optindex < argc)
+            {
+                check_directory_exists (argv[optindex], arg_left_source_tree_root);
+            }
+            else
+            {
+                printf ("Error: No argument for option --left-dir\n");
+                exit (EXIT_FAILURE);
+            }
+        }
+        else if (strcmp (argv[optindex], "--right-dir") == 0)
+        {
+            optindex++;
+            if (optindex < argc)
+            {
+                check_directory_exists (argv[optindex], arg_right_source_tree_root);
+            }
+            else
+            {
+                printf ("Error: No argument for option --right-dir\n");
+                exit (EXIT_FAILURE);
+            }
+        }
+        else if (strcmp (argv[optindex], "--results-dir") == 0)
+        {
+            optindex++;
+            if (optindex < argc)
+            {
+                check_directory_exists (argv[optindex], arg_results_dir);
+            }
+            else
+            {
+                printf ("Error: No argument for option --results-dir\n");
+                exit (EXIT_FAILURE);
+            }
+        }
+        else
+        {
+            printf ("Unknown argument %s\n", argv[optindex]);
+            print_usage (argv[0]);
+        }
+
+        optindex++;
+    }
+
+    /* Validate arguments */
+    if ((strlen (arg_left_source_tree_root) == 0) && (strlen (arg_right_source_tree_root) == 0))
+    {
+        printf ("At least one of --left-dir or --right-dir options must be specified\n");
+        exit (EXIT_FAILURE);
+    }
+
+    if (strlen (arg_results_dir) > 0)
+    {
+        struct dirent *entry;
+        DIR *dir = opendir (arg_results_dir);
+        if (dir == NULL)
+        {
+            printf ("Error: Unable to open directory %s\n", arg_results_dir);
+            exit (EXIT_FAILURE);
+        }
+
+        entry = readdir (dir);
+        while (entry != NULL)
+        {
+            if ((strcmp (entry->d_name, ".") != 0) && (strcmp (entry->d_name, "..") != 0))
+            {
+                printf ("Error: --results-dir %s must be an empty directory, to avoid confusion about results from previous runs\n",
+                        arg_results_dir);
+                exit (EXIT_FAILURE);
+            }
+            entry = readdir (dir);
+        }
+
+        (void) closedir (dir);
+    }
+}
 
 
 /**
@@ -554,8 +739,6 @@ static file_comparison_t compare_source_files (const char *const left_tree_root,
         }
     }
 
-    printf ("%.*s", (int) left_contents.lexical_length, left_contents.lexical_contents); //@todo initial test of parsing
-
     free (left_contents.file_contents);
     free (right_contents.lexical_contents);
 
@@ -563,25 +746,92 @@ static file_comparison_t compare_source_files (const char *const left_tree_root,
 }
 
 
+/**
+ * @brief When result files are enabled, append the summary of one source file comparison to the result files
+ * @params[in/out] results Contains the paths and streams for each results file, creating the file on first use.
+ * @param[in] file_comparison The result of the source file comparison (may only on the left or right trees).
+ * @param[in] reported_source_name The source filename within the directory trees which has been compared.
+ */
+static void append_file_comparison_summary (results_files_t *const results,
+                                            const file_comparison_t file_comparison, const char *const reported_source_name)
+{
+    if (strlen (arg_results_dir) > 0)
+    {
+        int rc;
+
+        /* Create the summary CSV file on first call, and write the headers */
+        if (results->summary_csv.file == NULL)
+        {
+            rc = snprintf (results->summary_csv.path, sizeof (results->summary_csv.path), "%s/comparison_summary.csv",
+                    arg_results_dir);
+            if (rc >= (int) sizeof (results->summary_csv.path))
+            {
+                /* This check on the return value from snprintf() prevents gcc from reporting -Wformat-truncation
+                 *
+                 * See https://stackoverflow.com/questions/51534284/how-to-circumvent-format-truncation-warning-in-gcc */
+                printf ("Error: Path overflow in %s\n", results->summary_csv.path);
+                exit (EXIT_FAILURE);
+            }
+            results->summary_csv.file = fopen (results->summary_csv.path, "w");
+            if (results->summary_csv.file == NULL)
+            {
+                printf ("Error: Unable to create %s\n", results->summary_csv.path);
+                exit (EXIT_FAILURE);
+            }
+
+            /* Report the command line arguments used */
+            fprintf (results->summary_csv.file, "Argument,Value\n");
+            fprintf (results->summary_csv.file, " --left-dir,%s\n", arg_left_source_tree_root);
+            fprintf (results->summary_csv.file, " --right-dir,%s\n", arg_right_source_tree_root);
+            fprintf (results->summary_csv.file, " --results-dir,%s\n", arg_results_dir);
+
+            /* Column headers for individual source file comparison results */
+            fprintf (results->summary_csv.file, "\nComparison,Source file\n");
+        }
+
+        /* The summary result for this file */
+        fprintf (results->summary_csv.file, "%s,%s\n", file_comparison_names[file_comparison], reported_source_name);
+
+        /* Write to the list of files which are of the same type of comparison, creating the file on first use */
+        results_file_t *const file_list = &results->file_lists[file_comparison];
+        if (file_list->file == NULL)
+        {
+            rc = snprintf (file_list->path, sizeof (file_list->path), "%s/%s_file_list.txt", arg_results_dir,
+                    file_comparison_prefixes[file_comparison]);
+            if (rc >= (int) sizeof (file_list->path))
+            {
+                printf ("Error: Path overflow in %s\n", file_list->path);
+                exit (EXIT_FAILURE);
+            }
+            file_list->file = fopen (file_list->path, "w");
+            if (file_list->file == NULL)
+            {
+                printf ("Error: Unable to create %s\n", file_list->path);
+                exit (EXIT_FAILURE);
+            }
+        }
+        fprintf (file_list->file, "%s\n", reported_source_name);
+    }
+}
+
+
 int main (int argc, char *argv[])
 {
-    if (argc != 4)
-    {
-        printf ("Usage: %s <left_source_tree_root> <right_source_tree_root> <result_dir>\n", argv[0]);
-        exit (EXIT_FAILURE);
-    }
-
-    const char *const left_source_tree_root = argv[1];
-    const char *const right_source_tree_root = argv[2];
-    const char *const result_dir = argv[3];
+    parse_command_line_arguments (argc, argv);
 
     /* Get the list of Ada source files in the left and right source trees */
-    current_tree = &left_tree;
-    current_source_tree_root_prefix_len = 0;
-    (void) nftw (left_source_tree_root, tree_walk_callback, MAX_NFTW_OPEN_DESCRIPTORS, FTW_PHYS);
-    current_tree = &right_tree;
-    current_source_tree_root_prefix_len = 0;
-    (void) nftw (right_source_tree_root, tree_walk_callback, MAX_NFTW_OPEN_DESCRIPTORS, FTW_PHYS);
+    if (strlen (arg_left_source_tree_root) > 0)
+    {
+        current_tree = &left_tree;
+        current_source_tree_root_prefix_len = 0;
+        (void) nftw (arg_left_source_tree_root, tree_walk_callback, MAX_NFTW_OPEN_DESCRIPTORS, FTW_PHYS);
+    }
+    if (strlen (arg_right_source_tree_root) > 0)
+    {
+        current_tree = &right_tree;
+        current_source_tree_root_prefix_len = 0;
+        (void) nftw (arg_right_source_tree_root, tree_walk_callback, MAX_NFTW_OPEN_DESCRIPTORS, FTW_PHYS);
+    }
 
     /* Iterate through the left and right source trees:
      * a. For source files in both source trees perform a comparison of the file contents.
@@ -595,6 +845,8 @@ int main (int argc, char *argv[])
     source_file_list_t::const_iterator right_it = right_tree.source_list.begin();
     const std::string *reported_source_name = NULL;
     file_comparison_t file_comparison;
+    uint32_t comparison_counts[FILE_COMPARISON_ARRAY_SIZE] = {0};
+    results_files_t results = {0};
     while ((left_it != left_tree.source_list.end()) || (right_it != right_tree.source_list.end()))
     {
         if (left_it == left_tree.source_list.end())
@@ -639,8 +891,15 @@ int main (int argc, char *argv[])
             }
         }
 
-        /* @todo initial test of walking the source trees */
-        printf ("%s,%s\n", file_comparison_names[file_comparison], reported_source_name->c_str());
+        comparison_counts[file_comparison]++;
+        append_file_comparison_summary (&results, file_comparison, reported_source_name->c_str());
+    }
+
+    /* Display a summary of the comparison to standard out */
+    printf ("Counts of different comparison types:\n");
+    for (int comparison_type = 0; comparison_type < FILE_COMPARISON_ARRAY_SIZE; comparison_type++)
+    {
+        printf ("  %13s : %u\n", file_comparison_names[comparison_type], comparison_counts[comparison_type]);
     }
 
     return EXIT_SUCCESS;
