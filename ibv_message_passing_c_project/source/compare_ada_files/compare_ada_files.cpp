@@ -5,6 +5,8 @@
  */
 
 #include <stdlib.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -12,8 +14,9 @@
 #include <string>
 
 #include <limits.h>
-#include <ftw.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <dirent.h>
 
 /* Create a realpath replacement macro for when compiling under mingw32
@@ -57,14 +60,6 @@ typedef struct
 /* The two directories trees to be compared */
 static source_tree_t left_tree;
 static source_tree_t right_tree;
-
-/* The source tree currently being populated by nftw() */
-static source_tree_t *current_tree = NULL;
-
-/* The length of the source tree root currently being populated by nftw().
- * Used so that current_source_list is only populated with the pathname components under the root,
- * so will be the same for both trees being compared. */
-static size_t current_source_tree_root_prefix_len;
 
 /* This list of extensions considered as Ada source files */
 static const char *const ada_source_file_extensions[] =
@@ -385,43 +380,83 @@ static void parse_command_line_arguments (const int argc, char *argv[])
 
 
 /**
- * @brief Callback function for nftw()
- * @details When passes an Ada source file inserts into current_source_list
- * @param[in] fpath The pathname in the directory tree
- * @oaram[in] sb Not used
- * @param[in] flagtype The type of path:
- *            a. Files are processed to check if an Ada source file
- *            b. Directories are ignored
- *            c. Errors accessing files cause the program to be aborted, to avoid reporting partial trees
+ * @brief Perform a recursive walk of the a source tree, finding the source files to be compared.
+ * @details This program was initially created using the nftw(), but after realising that not all ming32 cross-compilers
+ *          have the <ftw.h> interface was re-written using opendir() calls.
+ *          As this program is intended to be used for relatively shallow depth trees and where the trees won't be modified
+ *          while the program is running haven't implemented any limit on the maximum number of open directory handles or
+ *          checks for tree being changed during the directory walk.
+ * @param[in/out] current_tree Used to build the source file list within the tree
+ * @param[in] tree_root On the outer call gives the canonicalised source tree root to walk
+ * @param[in] source_dir The current source directory under the source tree root. Empty string on the outer call.
  */
-static int tree_walk_callback (const char *fpath, const struct stat *sb, int flagtype, struct FTW *ftwbuf)
+static void walk_source_tree (source_tree_t *const current_tree, const char *const tree_root, const char *const source_dir)
 {
-    const char *const filename = &fpath[ftwbuf->base];
+    const bool in_root_dir = tree_root != NULL;
+    int rc;
+    char current_path[PATH_MAX];
+    DIR *dir;
+    struct dirent *entry;
+    struct stat stat_buf;
 
-    /* On the first call at directory level zero work out how many characters to ignore from the start of fpath
-     * so that only store the pathname components of each source file relative to the root. */
-    if ((current_source_tree_root_prefix_len == 0) && (ftwbuf->level == 0))
+    /* Save the root directory on the initial call, including a trailing slash as the source_list is relative to this */
+    if (in_root_dir)
     {
-        current_source_tree_root_prefix_len = strlen (fpath);
-        if (current_source_tree_root_prefix_len > 0)
-        {
-            const char last_char = fpath[current_source_tree_root_prefix_len - 1];
-
-            if ((last_char != '/') && (last_char != '\\'))
-            {
-                /* Skip the assumed directory separator which will be present in subsequent calls */
-                current_source_tree_root_prefix_len++;
-            }
-        }
+        snprintf (current_tree->root_directory, sizeof (current_tree->root_directory), "%s/", tree_root);
     }
 
-    switch (flagtype)
+    /* Build the absolute path for the current directory */
+    const size_t root_directory_len = strlen (current_tree->root_directory);
+    rc = snprintf (current_path, sizeof (current_path), "%s%s", current_tree->root_directory, source_dir);
+    if (rc >= (int) sizeof (current_path))
     {
-    case FTW_F:
-    case FTW_SL:
-        /* If the file extension is that of an Ada source file, then store the filename in the source file list */
+        printf ("Error: Path overflow in %s\n", current_path);
+        exit (EXIT_FAILURE);
+    }
+
+    /* Determine the remaining number of available characters in the absolute path */
+    const size_t current_dir_len = strlen (current_path);
+    const size_t remaining_path_chars = sizeof (current_path) - current_dir_len;
+
+    /* Open the current directory and iterate over all entries */
+    dir = opendir (current_path);
+    if (dir == NULL)
+    {
+        printf ("Error: Failed to open directory %s\n", current_path);
+    }
+
+    entry = readdir (dir);
+    while (entry != NULL)
+    {
+        /* Append the directory entry to the current path, checking for overflow */
+        rc = snprintf (&current_path[current_dir_len], remaining_path_chars, "%s%s", in_root_dir ? "" : "/", entry->d_name);
+        if (rc >= (int) remaining_path_chars)
         {
-            const char *const extension = strrchr (filename, '.');
+            printf ("Error: Path overflow in %s\n", current_path);
+            exit (EXIT_FAILURE);
+        }
+
+        /* mingw doesn't have the d_type field in dirent, so have to use stat() to identify the directories */
+        rc = stat (current_path, &stat_buf);
+        if (rc != 0)
+        {
+            printf ("Error: stat() failed on %s\n", current_path);
+            exit (EXIT_FAILURE);
+        }
+
+        if ((strcmp (entry->d_name, ".") == 0) || (strcmp (entry->d_name, "..") == 0))
+        {
+            /* Ignore current entry directory entries */
+        }
+        else if ((stat_buf.st_mode & S_IFDIR) != 0)
+        {
+            /* Recurse into a sub-directory */
+            walk_source_tree (current_tree, NULL, &current_path[root_directory_len]);
+        }
+        else
+        {
+            /* If the file extension is that of an Ada source file, then store the filename in the source file list */
+            const char *const extension = strrchr (entry->d_name, '.');
 
             if (extension != NULL)
             {
@@ -429,43 +464,17 @@ static int tree_walk_callback (const char *fpath, const struct stat *sb, int fla
                 {
                     if (strcasecmp (extension, ada_source_file_extensions[extension_index]) == 0)
                     {
-                        if (current_tree->root_directory[0] == '\0')
-                        {
-                            /* Save the canonicalised root directory */
-                            snprintf (current_tree->root_directory, sizeof (current_tree->root_directory), fpath);
-                            current_tree->root_directory[current_source_tree_root_prefix_len] = '\0';
-                        }
-                        current_tree->source_list.insert (&fpath[current_source_tree_root_prefix_len]);
+                        current_tree->source_list.insert (&current_path[root_directory_len]);
                         break;
                     }
                 }
             }
         }
-        break;
 
-    case FTW_D:
-    case FTW_DP:
-        /* Nothing to do for a directory */
-        break;
-
-    case FTW_DNR:
-        printf ("Error: %s is a directory which can't be read\n", fpath);
-        exit (EXIT_FAILURE);
-        break;
-
-    case FTW_NS:
-        printf ("Error: stat() call failed on %s\n", fpath);
-        exit (EXIT_FAILURE);
-        break;
-
-    case FTW_SLN:
-        printf ("Error: %s is a symbolic link pointing to a nonexistent file\n", fpath);
-        exit (EXIT_FAILURE);
-        break;
+        entry = readdir (dir);
     }
 
-    /* Continue the tree walk */
-    return 0;
+    closedir (dir);
 }
 
 
@@ -1055,15 +1064,11 @@ int main (int argc, char *argv[])
     /* Get the list of Ada source files in the left and right source trees */
     if (strlen (arg_left_source_tree_root) > 0)
     {
-        current_tree = &left_tree;
-        current_source_tree_root_prefix_len = 0;
-        (void) nftw (arg_left_source_tree_root, tree_walk_callback, MAX_NFTW_OPEN_DESCRIPTORS, FTW_PHYS);
+        walk_source_tree (&left_tree, arg_left_source_tree_root, "");
     }
     if (strlen (arg_right_source_tree_root) > 0)
     {
-        current_tree = &right_tree;
-        current_source_tree_root_prefix_len = 0;
-        (void) nftw (arg_right_source_tree_root, tree_walk_callback, MAX_NFTW_OPEN_DESCRIPTORS, FTW_PHYS);
+        walk_source_tree (&right_tree, arg_right_source_tree_root, "");
     }
 
     /* Iterate through the left and right source trees:
