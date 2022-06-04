@@ -118,6 +118,9 @@ static const char *const file_comparison_prefixes[FILE_COMPARISON_ARRAY_SIZE] =
     [FILE_COMPARISON_LEXICAL_EQUAL] = "lexical_equal"
 };
 
+/* Command line argument which specifies for which compared files the lexical contents are written */
+static bool arg_write_lexical[FILE_COMPARISON_ARRAY_SIZE];
+
 /* Ada identifiers after which to insert a new line in the lexical contents, when the identifier is followed immediately
  * by another identifier. Done to try and get some meaningful line breaks in the lexical contents when manually comparing
  * the results of the comparison. */
@@ -198,13 +201,30 @@ static void print_usage (const char *const program_name)
     printf ("Usage:\n");
     printf ("  %s <options>\n", program_name);
     printf ("\n");
-    printf ("  --left-dir <dir>\n");
-    printf ("      Gives the left source directory tree for comparison\n");
-    printf ("  --right-dir <dir>\n");
-    printf ("      Gives the right source directory tree for comparison\n");
-    printf ("  --results-dir <dir>\n");
-    printf ("      If specified gives the directory to write results of the comparison to.\n");
-    printf ("      If not present only a summary count of the comparison is reported.\n");
+    printf ("--left-dir <dir>\n");
+    printf ("   Gives the left source directory tree for comparison\n");
+    printf ("\n");
+    printf ("--right-dir <dir>\n");
+    printf ("   Gives the right source directory tree for comparison\n");
+    printf ("\n");
+    printf ("--results-dir <dir>\n");
+    printf ("   If specified gives the directory to write results of the comparison to.\n");
+    printf ("   If not present only a summary count of the comparison is reported.\n");
+    printf ("\n");
+    printf ("--write-lexical <comparison-types>\n");
+    printf ("   Defines for which types of comparison results the lexical contents for each\n");
+    printf ("   compared source file are written to a tree under the results directory.\n");
+    printf ("   <comparison-types> is a comma separated list of the following:\n");
+    printf ("    ");
+    for (int comparison_type = 0; comparison_type < FILE_COMPARISON_ARRAY_SIZE; comparison_type++)
+    {
+        printf (" %s", file_comparison_prefixes[comparison_type]);
+    }
+    printf ("\n");
+    printf ("   Writing the lexical contents for different tools is to aid using an external\n");
+    printf ("   tool to view the differences. Writing the lexical contents for other types of\n");
+    printf ("   comparison results is to support checking how the lexical contents is\n");
+    printf ("   generated.\n");
     exit (EXIT_FAILURE);
 }
 
@@ -241,7 +261,6 @@ static void check_directory_exists (const char *const dir_in, char dir_out[PATH_
  */
 static void parse_command_line_arguments (const int argc, char *argv[])
 {
-
     int optindex = 1;
     while (optindex < argc)
     {
@@ -283,6 +302,44 @@ static void parse_command_line_arguments (const int argc, char *argv[])
                 printf ("Error: No argument for option --results-dir\n");
                 exit (EXIT_FAILURE);
             }
+        }
+        else if (strcmp (argv[optindex], "--write-lexical") == 0)
+        {
+            optindex++;
+            if (optindex >= argc)
+            {
+                printf ("Error: No argument for option --write-lexical\n");
+                exit (EXIT_FAILURE);
+            }
+
+            /* Split the argument into comma separated tokens which are the names of comparison types to enable
+             * the writing of lexical contents for. */
+            const char *const delim = ",";
+            char *saveptr = NULL;
+            char *const option_copy = strdup (argv[optindex]);
+            char *comparison_text = strtok_r (option_copy, delim, &saveptr);
+            bool found;
+
+            while (comparison_text != NULL)
+            {
+                found = false;
+                for (int comparison_type = 0; (!found) && (comparison_type < FILE_COMPARISON_ARRAY_SIZE); comparison_type++)
+                {
+                    if (strcmp (comparison_text, file_comparison_prefixes[comparison_type]) == 0)
+                    {
+                        found = true;
+                        arg_write_lexical[comparison_type] = true;
+                    }
+                }
+                if (!found)
+                {
+                    printf ("Invalid comparison type \"%s\" in --write-lexical\n", comparison_text);
+                    exit (EXIT_FAILURE);
+                }
+                comparison_text = strtok_r (NULL, delim, &saveptr);
+            }
+
+            free (option_copy);
         }
         else
         {
@@ -705,6 +762,123 @@ static void read_file_for_comparison (compared_file_contents_t *const contents,
 
 
 /**
+ * @brief Create a directory if doesn't already exist.
+ * @details This can only create the lowest level directory. The caller is responsible for calling this function one
+ *          directory level at a time.
+ * @param[in] dir The directory to create.
+ */
+static void create_directory_if_doesnt_exist (const char *const dir)
+{
+    struct stat dir_stat;
+    int rc;
+
+    rc = stat (dir, &dir_stat);
+    if (rc == 0)
+    {
+        if ((dir_stat.st_mode & S_IFDIR) == 0)
+        {
+            printf ("Error: %s exists but is not a directory\n", dir);
+            exit (EXIT_FAILURE);
+        }
+    }
+    else
+    {
+#ifdef WIN32
+        rc = mkdir (dir);
+#else
+        rc = mkdir (dir, S_IRWXU | S_IRWXO | S_IRWXG);
+#endif
+        if (rc != 0)
+        {
+            printf ("Error: Unable to create directory %s\n", dir);
+            exit (EXIT_FAILURE);
+        }
+    }
+}
+
+
+/**
+ * @brief Write the lexical contents of a source file to a file, for inspection outside of this program
+ * @param[in] contents Contains the lexical contents to write to a file
+ * @param[in] file_comparison The type of file comparison, used to form the top-level directory name
+ * @param[in] tree_suffix If non-null a suffix to append to the top-level directory name.
+ *                        When have compared a file, used to distinguish between the left and right trees
+ * @param[in] source_name The source name to replicate for the lexical contents under the results directory,
+ *                        where the same directory structure is kept by creating sub-directories as required.
+ */
+static void write_lexical_contents_to_file (const compared_file_contents_t *const contents,
+                                            const file_comparison_t file_comparison, const char *const tree_suffix,
+                                            const char *const source_name)
+{
+    if ((strlen (arg_results_dir) > 0) && arg_write_lexical[file_comparison])
+    {
+        char path_to_create[PATH_MAX];
+        int rc;
+
+        /* Create the top-level directory for the lexical file contents, based upon the file_comparison */
+        rc = snprintf (path_to_create, sizeof (path_to_create), "%s/%s%s", arg_results_dir,
+                file_comparison_prefixes[file_comparison], (tree_suffix != NULL) ? tree_suffix : "");
+        if (rc >= (int) sizeof (path_to_create))
+        {
+            printf ("Error: Path overflow on %s\n", path_to_create);
+            exit (EXIT_FAILURE);
+        }
+        create_directory_if_doesnt_exist (path_to_create);
+
+        /* Append a path separator after the top-level directory */
+        size_t path_len = strlen (path_to_create);
+        if ((path_len + 1) == sizeof (path_to_create))
+        {
+            printf ("Error: Path overflow on %s\n", path_to_create);
+            exit (EXIT_FAILURE);
+        }
+        path_to_create[path_len++] = '/';
+        path_to_create[path_len] = '\0';
+
+        /* Append the source_name characters to the path to create, creating a directory when see a directory separator.
+         * This has the effect of creating any intermediate directories needed to write the lexical contents of the
+         * source file. */
+        const char *source_ch = source_name;
+        while (*source_ch != '\0')
+        {
+            if (*source_ch == '/')
+            {
+                create_directory_if_doesnt_exist (path_to_create);
+            }
+
+            if ((path_len + 1) == sizeof (path_to_create))
+            {
+                printf ("Error: Path overflow on %s\n", path_to_create);
+                exit (EXIT_FAILURE);
+            }
+            path_to_create[path_len++] = *source_ch++;
+            path_to_create[path_len] = '\0';
+        }
+
+        /* Write the lexical contents of the source file */
+        FILE *const lexical_file = fopen (path_to_create, "w");
+        if (lexical_file == NULL)
+        {
+            printf ("Error: Failed to create %s\n", path_to_create);
+            exit (EXIT_FAILURE);
+        }
+        const size_t num_written = fwrite (contents->lexical_contents, 1, contents->lexical_length, lexical_file);
+        if (num_written != contents->lexical_length)
+        {
+            printf ("Error: Failed to write %s\n", path_to_create);
+            exit (EXIT_FAILURE);
+        }
+        rc = fclose (lexical_file);
+        if (rc != 0)
+        {
+            printf ("Error: Failed to close %s\n", path_to_create);
+            exit (EXIT_FAILURE);
+        }
+    }
+}
+
+
+/**
  * @brief Compare a source file in two trees
  * @param[in] left_tree_root The root of the left source tree for the comparison
  * @param[in] right_tree_root The root of the right source tree for the comparison
@@ -718,9 +892,13 @@ static file_comparison_t compare_source_files (const char *const left_tree_root,
     compared_file_contents_t right_contents;
     file_comparison_t file_comparison;
 
+    /* Read the files to compare */
     read_file_for_comparison (&left_contents, left_tree_root, source_name);
     read_file_for_comparison (&right_contents, right_tree_root, source_name);
 
+    /* Compare the file contents:
+     * a. First see if binary equal.
+     * b. If not binary equal, then compare the lexical contents. */
     if ((left_contents.file_length == right_contents.file_length) &&
             (memcmp (left_contents.file_contents, right_contents.file_contents, left_contents.file_length) == 0))
     {
@@ -739,10 +917,37 @@ static file_comparison_t compare_source_files (const char *const left_tree_root,
         }
     }
 
+    /* Write the lexical contents, if enabled by the command line options, before freeing the file contents */
+    write_lexical_contents_to_file (&left_contents, file_comparison, "_left", source_name);
+    write_lexical_contents_to_file (&right_contents, file_comparison, "_right", source_name);
+
     free (left_contents.file_contents);
+    free (left_contents.lexical_contents);
+    free (right_contents.file_contents);
     free (right_contents.lexical_contents);
 
     return file_comparison;
+}
+
+
+/**
+ * @brief Called for a source file in a single tree, to read the lexical contents and write it for diagnostics
+ * @param[in] file_comparison FILE_COMPARISON_LEFT_ONLY or FILE_COMPARISON_RIGHT_ONLY
+ * @param[in] tree_root The source tree root to read the source file contents for
+ * @param[in] source_name The source file name to write the lexical contents for
+ */
+static void write_single_tree_lexical_file (const file_comparison_t file_comparison,
+                                            const char *const tree_root, const char *const source_name)
+{
+    if ((strlen (arg_results_dir) > 0) && arg_write_lexical[file_comparison])
+    {
+        compared_file_contents_t contents;
+
+        read_file_for_comparison (&contents, tree_root, source_name);
+        write_lexical_contents_to_file (&contents, file_comparison, NULL, source_name);
+        free (contents.file_contents);
+        free (contents.lexical_contents);
+    }
 }
 
 
@@ -811,6 +1016,25 @@ static void append_file_comparison_summary (results_files_t *const results,
             }
         }
         fprintf (file_list->file, "%s\n", reported_source_name);
+    }
+}
+
+
+/**
+ * @brief Close a results file, checking for any error
+ * @param[in/out] result The results file to close, if was opened
+ */
+static void close_results_file (results_file_t *const results)
+{
+    if (results->file != NULL)
+    {
+        int rc = fclose (results->file);
+
+        if (rc != 0)
+        {
+            printf ("Error closing %s\n", results->path);
+        }
+        results->file = NULL;
     }
 }
 
@@ -891,6 +1115,15 @@ int main (int argc, char *argv[])
             }
         }
 
+        if (file_comparison == FILE_COMPARISON_LEFT_ONLY)
+        {
+            write_single_tree_lexical_file (file_comparison, left_tree.root_directory, reported_source_name->c_str());
+        }
+        else if (file_comparison == FILE_COMPARISON_RIGHT_ONLY)
+        {
+            write_single_tree_lexical_file (file_comparison, right_tree.root_directory, reported_source_name->c_str());
+        }
+
         comparison_counts[file_comparison]++;
         append_file_comparison_summary (&results, file_comparison, reported_source_name->c_str());
     }
@@ -900,6 +1133,13 @@ int main (int argc, char *argv[])
     for (int comparison_type = 0; comparison_type < FILE_COMPARISON_ARRAY_SIZE; comparison_type++)
     {
         printf ("  %13s : %u\n", file_comparison_names[comparison_type], comparison_counts[comparison_type]);
+    }
+
+    /* Close any result files which have been written to */
+    close_results_file (&results.summary_csv);
+    for (int comparison_type = 0; comparison_type < FILE_COMPARISON_ARRAY_SIZE; comparison_type++)
+    {
+        close_results_file (&results.file_lists[comparison_type]);
     }
 
     return EXIT_SUCCESS;
