@@ -15,7 +15,14 @@ WORKSPACE_PATH=$(readlink -f ${SCRIPT_PATH}/../../..)
 
 ADA_SPECS_DIR=${WORKSPACE_PATH}/ibv_message_passing_ada_project/source/ibv_message_transport
 
+# Prefer GNAT Community edition 2021, but since that can't be run on CentOS 6 due to glibc dependencies fall back
+# to 2020 if the later version isn't installed.
+# @todo duplicates a test in setup_cmake.sh
 GNAT_GPLUSPLUS=/opt/GNAT/2021/bin/g++
+if [ ! -d ${GNAT_GPLUSPLUS} ]
+then
+    GNAT_GPLUSPLUS=/opt/GNAT/2020/bin/g++
+fi
 
 [ -d ${ADA_SPECS_DIR} ] || mkdir ${ADA_SPECS_DIR}
 cd ${ADA_SPECS_DIR}
