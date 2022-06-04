@@ -1,7 +1,6 @@
 # Build the ibv_display_local_infiniband_device_statistics program
 
 project (ibv_display_local_infiniband_device_statistics C)
-cmake_minimum_required (VERSION 2.9)
 
 add_executable (ibv_display_local_infiniband_device_statistics "ibv_display_local_infiniband_device_statistics.c")
 

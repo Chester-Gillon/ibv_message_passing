@@ -1,7 +1,6 @@
 # Build the read_ptp program
 
 project (read_ptp C)
-cmake_minimum_required (VERSION 2.9)
 
 include_directories ("${LINUXPTP_ROOT}") 
 

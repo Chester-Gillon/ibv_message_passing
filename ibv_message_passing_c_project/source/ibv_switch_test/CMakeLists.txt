@@ -1,7 +1,6 @@
 # Build the ibv_switch_test programs
 
 project (ibv_switch_test C)
-cmake_minimum_required (VERSION 2.9)
 
 if (${HAVE_IBV_WR_START})
     add_executable (ibv_raw_packet_tx "ibv_raw_packet_tx.c")

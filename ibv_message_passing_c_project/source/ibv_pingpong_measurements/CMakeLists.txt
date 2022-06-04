@@ -1,7 +1,6 @@
 # Build the ibv_pingpong_measurements program
 
 project (ibv_pingpong_measurements C)
-cmake_minimum_required (VERSION 2.9)
 
 if (AARCH64_SYSROOT)
    include_directories("${AARCH64_SYSROOT}/glib-2.0/usr/include/glib-2.0"

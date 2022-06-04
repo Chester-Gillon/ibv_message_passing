@@ -1,7 +1,6 @@
 # Build the programs which measure time synchronisation between PCs by transferring timestamps over Infiniband
 
 project (ibv_time_sync_measurement C)
-cmake_minimum_required (VERSION 2.9)
 
 include_directories ("${CMAKE_SOURCE_DIR}/ibv_message_transport")
 

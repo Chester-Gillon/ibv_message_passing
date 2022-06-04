@@ -1,7 +1,6 @@
 # Build the ibv_spawn_workers_and_controller program
 
 project (ibv_spawn_workers_and_controller C)
-cmake_minimum_required (VERSION 2.9)
 
 include_directories ("${CMAKE_SOURCE_DIR}/ibv_message_transport")
 

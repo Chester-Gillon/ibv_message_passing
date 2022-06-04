@@ -1,7 +1,6 @@
 # Build the ibv_display_infiniband_counters program
 
 project (ibv_display_infiniband_counters C)
-cmake_minimum_required (VERSION 2.9)
 
 # This is required to include ib_types.h
 include_directories ("/usr/include/infiniband")

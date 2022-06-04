@@ -1,7 +1,6 @@
 # Build the ibv_c_structure_size program
 
 project (ibv_c_structure_size C)
-cmake_minimum_required (VERSION 2.9)
 
 include_directories ("${CMAKE_SOURCE_DIR}/ibv_message_transport")
 

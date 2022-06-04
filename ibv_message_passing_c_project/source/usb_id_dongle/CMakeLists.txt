@@ -1,7 +1,6 @@
 # Build the usb_id_dongle program
 
 project (usb_id_dongle C)
-cmake_minimum_required (VERSION 2.9)
 
 add_executable (read_usb_id_dongle "read_usb_id_dongle.c")
 if (AARCH64_SYSROOT)
