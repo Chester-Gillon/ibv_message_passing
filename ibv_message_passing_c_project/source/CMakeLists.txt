@@ -36,7 +36,8 @@ elseif ("${PLATFORM_TYPE}" STREQUAL "aarch64_release")
 elseif ("${PLATFORM_TYPE}" STREQUAL "win32")
    # As not debugging the cross-compiled code only a single platform with optimisation settings.
    # Selects static libraries to avoid the generated windows executables having dependencies on mingw dlls.
-   set (PLATFORM_CFLAGS "-O3 -g -static -static-libstdc++")
+   # Defining __USE_MINGW_ANSI_STDIO allows the %z size_t length modifier in printf() functions.
+   set (PLATFORM_CFLAGS "-O3 -g -static -static-libstdc++ -D__USE_MINGW_ANSI_STDIO=1")
 else()
    message ("Unknown platform")
 endif()
