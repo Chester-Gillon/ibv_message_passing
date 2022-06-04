@@ -989,6 +989,15 @@ static void append_file_comparison_summary (results_files_t *const results,
             fprintf (results->summary_csv.file, " --left-dir,%s\n", arg_left_source_tree_root);
             fprintf (results->summary_csv.file, " --right-dir,%s\n", arg_right_source_tree_root);
             fprintf (results->summary_csv.file, " --results-dir,%s\n", arg_results_dir);
+            fprintf (results->summary_csv.file, " --write-lexical");
+            for (int comparison_type = 0; comparison_type < FILE_COMPARISON_ARRAY_SIZE; comparison_type++)
+            {
+                if (arg_write_lexical[comparison_type])
+                {
+                    fprintf (results->summary_csv.file, ",%s", file_comparison_prefixes[comparison_type]);
+                }
+            }
+            fprintf (results->summary_csv.file, "\n");
 
             /* Column headers for individual source file comparison results */
             fprintf (results->summary_csv.file, "\nComparison,Source file\n");
