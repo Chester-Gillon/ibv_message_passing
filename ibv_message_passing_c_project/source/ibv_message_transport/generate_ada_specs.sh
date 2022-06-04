@@ -19,7 +19,7 @@ ADA_SPECS_DIR=${WORKSPACE_PATH}/ibv_message_passing_ada_project/source/ibv_messa
 # to 2020 if the later version isn't installed.
 # @todo duplicates a test in setup_cmake.sh
 GNAT_GPLUSPLUS=/opt/GNAT/2021/bin/g++
-if [ ! -d ${GNAT_GPLUSPLUS} ]
+if [ ! -x ${GNAT_GPLUSPLUS} ]
 then
     GNAT_GPLUSPLUS=/opt/GNAT/2020/bin/g++
 fi
