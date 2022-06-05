@@ -1,0 +1,411 @@
+0. Introduction
+~~~~~~~~~~~~~~~
+
+This describes the tests which were performed on the compare_ada_files.
+Used two sets of the ibv_message_passing project:
+a. A clean checkout from git, which only contains the 6 Ada source files under git.
+b. One which has been built and for which the coverage_for_ada.sh script has also been run. This generates additional
+   ada specs from C and the binder creates some Ada source files.
+
+
+1. Tests under Linux
+~~~~~~~~~~~~~~~~~~~~
+
+For this the compare_ada_files executable was built in the debug configuration with the native GNAT Community Edition
+gcc 10.3.1 compiler.
+
+
+1.1. Test of no differences
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The left tree was the clean checkout and the right tree the built working copy, neither with any changes.
+
+As expected the 6 source files were marked as binary equal, with some generated files only present in the built working copy:
+$ ibv_message_passing_c_project/bin/debug/compare_ada_files/compare_ada_files --left-dir ../ibv_message_passing_ada_compare/ --right-dir . --results-dir ibv_message_passing_c_project/bin/ada_compare --write-lexical different
+Counts of different comparison types:
+      Left only : 0
+     Right only : 31
+   Binary equal : 6
+      Different : 0
+  Lexical equal : 0
+
+The results directory contains binary_equal_file_list.txt, comparison_summary.csv and right_only_file_list.txt files with the
+expected contents.
+
+
+1.2. Test that unmodified files generate lexical content which is still valid Ada
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Start with unmodified source files and force generation of the lexical content using just the tree of the clean checkout:
+$ ibv_message_passing_c_project/bin/debug/compare_ada_files/compare_ada_files --left-dir ../ibv_message_passing_ada_compare/  --results-dir ibv_message_passing_c_project/bin/ada_compare --write-lexical left_only
+Counts of different comparison types:
+      Left only : 6
+     Right only : 0
+   Binary equal : 0
+      Different : 0
+  Lexical equal : 0
+
+Overwrite the original source files with their generated lexical contents:
+$ cp ibv_message_passing_c_project/bin/ada_compare/left_only/ibv_message_passing_ada_project/source/coverage_for_ada_task/coverage_for_ada_task.adb ibv_message_passing_ada_project/source/coverage_for_ada_task/
+$ cp ibv_message_passing_c_project/bin/ada_compare/left_only/ibv_message_passing_ada_project/source/get_rdate/get_rdate.adb ibv_message_passing_ada_project/source/get_rdate/
+$ cp ibv_message_passing_c_project/bin/ada_compare/left_only/ibv_message_passing_ada_project/source/ibv_ada_structure_size/ibv_ada_structure_size.adb ibv_message_passing_ada_project/source/ibv_ada_structure_size/
+$ cp ibv_message_passing_c_project/bin/ada_compare/left_only/ibv_message_passing_ada_project/source/ibv_controller_process/ibv_controller_process_main.adb ibv_message_passing_ada_project/source/ibv_controller_process/
+$ cp ibv_message_passing_c_project/bin/ada_compare/left_only/ibv_message_passing_ada_project/source/ibv_message_overlay_gdb_test/ibv_message_overlay_gdb_test.adb ibv_message_passing_ada_project/source/ibv_message_overlay_gdb_test/
+$ cp ibv_message_passing_c_project/bin/ada_compare/left_only/ibv_message_passing_ada_project/source/shared_file_io/shared_file_io.adb ibv_message_passing_ada_project/source/shared_file_io/
+
+Re-compiled the Ada source files which had been replaced with their generated lexical contents.
+All 6 six programs were compiled and linked without warnings or errors, showing the generated lexical contents was still 
+valid Ada.
+
+The coverage_for_ads.sh script was able to run, and the collected HTML coverage report for coverage_for_ada_task.adb
+was still usable - in that the line breaks inserted in the lexical contents sill allowed statements to be on different
+line to see the line coverage.
+
+
+1.3. Test that difference in comments just results in lexical differences
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the built working copy added a comment to one source file:
+--- a/ibv_message_passing_ada_project/source/coverage_for_ada_task/coverage_for_ada_task.adb
++++ b/ibv_message_passing_ada_project/source/coverage_for_ada_task/coverage_for_ada_task.adb
+@@ -40,6 +40,7 @@ procedure Coverage_For_Ada_Task is
+                Finished := True;
+             end Finish;
+          or
++            -- This statement doesn't get instrumented for coverage.
+             terminate;
+          end select;
+       end loop;
+
+Compared using:
+$ ibv_message_passing_c_project/bin/debug/compare_ada_files/compare_ada_files --left-dir ../ibv_message_passing_ada_compare/ --right-dir . --results-dir ibv_message_passing_c_project/bin/ada_compare --write-lexical different
+Counts of different comparison types:
+      Left only : 0
+     Right only : 31
+   Binary equal : 5
+      Different : 0
+  Lexical equal : 1
+
+As expeccted coverage_for_ada_task.adb was reported as lexical equal. 
+
+
+1.4. Test of difference in string constant
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the built working copy added a space to a string constant:
+--- a/ibv_message_passing_ada_project/source/ibv_controller_process/ibv_controller_process_main.adb
++++ b/ibv_message_passing_ada_project/source/ibv_controller_process/ibv_controller_process_main.adb
+@@ -47,7 +47,7 @@ procedure Ibv_Controller_Process_Main is
+          begin
+             case ibv_controller_worker_messages_h.controller_worker_msg_ids'Val(rx_buffer.header.message_id) is
+                when ibv_controller_worker_messages_h.CW_WORKER_READY =>
+-                    ada.Text_IO.Put_Line ("worker " & Interfaces.C.Unsigned'Image (rx_buffer.header.source_instance) & " : " &
++                    ada.Text_IO.Put_Line ("worker " & Interfaces.C.Unsigned'Image (rx_buffer.header.source_instance) & " :  " &
+                                             Interfaces.C.To_Ada (Item => msgs.worker_ready.worker_executable_pathname(0..max_name_index), Trim_Nul => false));
+ 
+                when others =>
+
+Compared using:
+$ ibv_message_passing_c_project/bin/debug/compare_ada_files/compare_ada_files --left-dir ../ibv_message_passing_ada_compare/ --right-dir . --results-dir ibv_message_passing_c_project/bin/ada_compare --write-lexical different
+Counts of different comparison types:
+      Left only : 0
+     Right only : 31
+   Binary equal : 5
+      Different : 1
+  Lexical equal : 0
+
+As expected ibv_controller_process_main.adb was reported as different due to a change in a string contant.
+
+
+1.5. Test of changes to whitespace / comments / identifier casing / statement line breaks
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the built working copy adjusted the whitespace / comments / identifier casing / statement line breaks in a way which should
+result in the same lexical contents:
+--- a/ibv_message_passing_ada_project/source/get_rdate/get_rdate.adb
++++ b/ibv_message_passing_ada_project/source/get_rdate/get_rdate.adb
+@@ -31,8 +31,24 @@ procedure Get_RDate is
+ 
+    Time_Since_Linux_Epoch : Interfaces.Unsigned_32;
+ begin
+-   if Ada.Command_Line.Argument_Count /= 1 then
+-      Ada.Text_IO.Put_Line ("Usage: " & Ada.Command_Line.Command_Name & "get_rdate <rdate_server>");
++   if--Comment which makes the code harder
++--to read followed by inconsitent line wrapping and CasIng
++aDa.COmmanD_Line.ARGument_CoUnt
++       /=
++         1
++   THEN
++      ADA.
++        Text_IO.
++          Put_Line (          "Usage: "
++                    & Ada
++                    .
++                      Command_Line
++                    .
++                      Command_Name
++                    &
++                      "get_rdate <rdate_server>"
++                   )
++      ;
+       return;
+    end if;
+
+Compared using:
+$ ibv_message_passing_c_project/bin/debug/compare_ada_files/compare_ada_files --left-dir ../ibv_message_passing_ada_compare/ --right-dir . --results-dir ibv_message_passing_c_project/bin/ada_compare --write-lexical different
+Counts of different comparison types:
+      Left only : 0
+     Right only : 31
+   Binary equal : 5
+      Different : 0
+  Lexical equal : 1
+
+As expected get_rdate.adb was reported as lexical equal
+
+
+1.6. Test of deleting a space which separates a numeric literal and identifier
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the built working copy deleted the space which separates the numeric literal "0" and the following identifier "then":
+--- a/ibv_message_passing_ada_project/source/ibv_controller_process/ibv_controller_process_main.adb
++++ b/ibv_message_passing_ada_project/source/ibv_controller_process/ibv_controller_process_main.adb
+@@ -37,7 +37,7 @@ procedure Ibv_Controller_Process_Main is
+       num_remaining_workers : natural;
+    begin
+       num_remaining_workers := ibv_controller_worker_messages_h.NUM_WORKERS;
+-      while num_remaining_workers > 0 loop
++      while num_remaining_workers > 0loop
+          rx_buffer := ibv_message_bw_interface_h.await_any_rx_message (communication_context);
+          declare
+             msgs : ibv_controller_worker_messages_h.worker_to_controller_msgs;
+
+This is a change which changes the lexical contents, and acutally creates an invalid Ada file.
+
+Compared using:
+$ ibv_message_passing_c_project/bin/debug/compare_ada_files/compare_ada_files --left-dir ../ibv_message_passing_ada_compare/ --right-dir . --results-dir ibv_message_passing_c_project/bin/ada_compare --write-lexical different
+Counts of different comparison types:
+      Left only : 0
+     Right only : 31
+   Binary equal : 5
+      Different : 1
+  Lexical equal : 0
+
+As expected the ibv_controller_process_main.adb file was reported as different, and also reported in the sub-directories
+for the different files:
+$ diff -r ibv_message_passing_c_project/bin/ada_compare/different_left ibv_message_passing_c_project/bin/ada_compare/different_right
+diff -r ibv_message_passing_c_project/bin/ada_compare/different_left/ibv_message_passing_ada_project/source/ibv_controller_process/ibv_controller_process_main.adb ibv_message_passing_c_project/bin/ada_compare/different_right/ibv_message_passing_ada_project/source/ibv_controller_process/ibv_controller_process_main.adb
+33c33
+< while num_remaining_workers>0 loop
+---
+> while num_remaining_workers>0loop
+
+
+1.7. Test of change to casing in hex numeric literal
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the built working copy changed a hex numeric literal to upper case:
+--- a/ibv_message_passing_ada_project/source/ibv_message_overlay_gdb_test/ibv_message_overlay_gdb_test.adb
++++ b/ibv_message_passing_ada_project/source/ibv_message_overlay_gdb_test/ibv_message_overlay_gdb_test.adb
+@@ -36,7 +36,7 @@ begin
+    begin
+       msgs.sum_integers.request_id := Interfaces.C.unsigned (10);
+       msgs.sum_integers.num_integers_to_sum := 30;
+-      msgs.sum_integers.integers_to_sum := (others => 16#deaddead#);
++      msgs.sum_integers.integers_to_sum := (others => 16#DEADDEAD#);
+      end;
+    free (tx_buffer);
+ end ibv_message_overlay_gdb_test;
+
+Compared using:
+$ ibv_message_passing_c_project/bin/debug/compare_ada_files/compare_ada_files --left-dir ../ibv_message_passing_ada_compare/ --right-dir . --results-dir ibv_message_passing_c_project/bin/ada_compare --write-lexical different
+Counts of different comparison types:
+      Left only : 0
+     Right only : 31
+   Binary equal : 5
+      Different : 0
+  Lexical equal : 1
+
+As expected the ibv_message_overlay_gdb_test.adb file was reported as lexical equal.
+
+
+2. Test under Windows
+~~~~~~~~~~~~~~~~~~~~~
+
+For this the compare_ada_files.exe executable was build in the win32 configuration under CentOS 6 with
+i686-w64-mingw32-gcc 4.9.2 and then copied to a Windows 10 PC for the test.
+
+Left dir was the built workspace copied from Linux, and has CR line endings
+Right dir was local git checkout and has CRLF line endings.
+
+Result shows that as expected the 6 source files as marked as "lexical equal" as a result of the different line endings.
+The results show the file handling in the Windows executable has:
+a. Generated the comparison_summary with the expected contents
+b. Generated the left_only_file_list.txt and lexical_equal_file_list.txt files with the expected contents
+c. The lexical_equal_left and lexical_equal_right sub-directories have been created containing the lexical contents
+   of the 6 Ada source files which are present in both the left and right trees compared.
+
+
+C:\Users\MR_HAL~1\AppData\Local\Temp>compare_ada_files.exe --left-dir ibv_message_passing --right-dir %userprofile%\ibv_message_passing --results-dir ada_compare --write-lexical different,lexical_equal
+Counts of different comparison types:
+      Left only : 53
+     Right only : 0
+   Binary equal : 0
+      Different : 0
+  Lexical equal : 6
+
+C:\Users\MR_HAL~1\AppData\Local\Temp>dir /s ada_compare
+ Volume in drive C has no label.
+ Volume Serial Number is D6FD-9E86
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09             6,386 comparison_summary.csv
+05/06/2022  15:09             4,985 left_only_file_list.txt
+05/06/2022  15:09               513 lexical_equal_file_list.txt
+05/06/2022  15:09    <DIR>          lexical_equal_left
+05/06/2022  15:09    <DIR>          lexical_equal_right
+               3 File(s)         11,884 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_left
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09    <DIR>          ibv_message_passing_ada_project
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_left\ibv_message_passing_ada_project
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09    <DIR>          source
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_left\ibv_message_passing_ada_project\source
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09    <DIR>          coverage_for_ada_task
+05/06/2022  15:09    <DIR>          get_rdate
+05/06/2022  15:09    <DIR>          ibv_ada_structure_size
+05/06/2022  15:09    <DIR>          ibv_controller_process
+05/06/2022  15:09    <DIR>          ibv_message_overlay_gdb_test
+05/06/2022  15:09    <DIR>          shared_file_io
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_left\ibv_message_passing_ada_project\source\coverage_for_ada_task
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09             1,112 coverage_for_ada_task.adb
+               1 File(s)          1,112 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_left\ibv_message_passing_ada_project\source\get_rdate
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09             1,670 get_rdate.adb
+               1 File(s)          1,670 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_left\ibv_message_passing_ada_project\source\ibv_ada_structure_size
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09             7,710 ibv_ada_structure_size.adb
+               1 File(s)          7,710 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_left\ibv_message_passing_ada_project\source\ibv_controller_process
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09             9,338 ibv_controller_process_main.adb
+               1 File(s)          9,338 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_left\ibv_message_passing_ada_project\source\ibv_message_overlay_gdb_test
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09               797 ibv_message_overlay_gdb_test.adb
+               1 File(s)            797 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_left\ibv_message_passing_ada_project\source\shared_file_io
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09             2,409 shared_file_io.adb
+               1 File(s)          2,409 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_right
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09    <DIR>          ibv_message_passing_ada_project
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_right\ibv_message_passing_ada_project
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09    <DIR>          source
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_right\ibv_message_passing_ada_project\source
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09    <DIR>          coverage_for_ada_task
+05/06/2022  15:09    <DIR>          get_rdate
+05/06/2022  15:09    <DIR>          ibv_ada_structure_size
+05/06/2022  15:09    <DIR>          ibv_controller_process
+05/06/2022  15:09    <DIR>          ibv_message_overlay_gdb_test
+05/06/2022  15:09    <DIR>          shared_file_io
+               0 File(s)              0 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_right\ibv_message_passing_ada_project\source\coverage_for_ada_task
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09             1,112 coverage_for_ada_task.adb
+               1 File(s)          1,112 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_right\ibv_message_passing_ada_project\source\get_rdate
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09             1,670 get_rdate.adb
+               1 File(s)          1,670 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_right\ibv_message_passing_ada_project\source\ibv_ada_structure_size
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09             7,710 ibv_ada_structure_size.adb
+               1 File(s)          7,710 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_right\ibv_message_passing_ada_project\source\ibv_controller_process
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09             9,338 ibv_controller_process_main.adb
+               1 File(s)          9,338 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_right\ibv_message_passing_ada_project\source\ibv_message_overlay_gdb_test
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09               797 ibv_message_overlay_gdb_test.adb
+               1 File(s)            797 bytes
+
+ Directory of C:\Users\MR_HAL~1\AppData\Local\Temp\ada_compare\lexical_equal_right\ibv_message_passing_ada_project\source\shared_file_io
+
+05/06/2022  15:09    <DIR>          .
+05/06/2022  15:09    <DIR>          ..
+05/06/2022  15:09             2,409 shared_file_io.adb
+               1 File(s)          2,409 bytes
+
+     Total Files Listed:
+              15 File(s)         57,956 bytes
+              56 Dir(s)  785,499,332,608 bytes free
+
+C:\Users\MR_HAL~1\AppData\Local\Temp> 
