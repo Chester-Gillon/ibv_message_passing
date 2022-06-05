@@ -2,6 +2,80 @@
  * @file compare_ada_files.cpp
  * @date 21 May 2022
  * @author Chester Gillon
+ * @details
+ *  This program has been created to compare two trees of Ada sources files to identify if any textual differences
+ *  would cause the Ada compiler to generate different code or not, based upon the lexical contents of the file.
+ *
+ *  For Ada source files in the tree each source file is marked with a comparison result of either:
+ *    "Left only"     : The source file only appears in the left source tree
+ *    "Right only"    : The source file only appears in the right source tree
+ *    "Binary equal"  : The source file is binary equal between the left and right source trees
+ *    "Lexical equal" : The source file has the same lexical contents between the left and right source trees.
+ *                      This means the source file should have no functional differences. Possible differences in the
+ *                      source code text are in:
+ *                      - Comments
+ *                      - Whitespace
+ *                      - Line endings
+ *                      - Casing of identifiers or numeric literals (may have hex digits or exponents)
+ *                      - How statements are wrapped between lines
+ *    "Different"     : The source file has some lexical differences between the left and right source trees.
+ *
+ *  The output from the program is:
+ *  1. Counts on the console for the files in each of the comparison types.
+ *  2. When the --results-dir option is used creates a comparison_summary.csv with one row for each source file reporting
+ *     the comparison result for that source file.
+ *  3. When the --results-dir option is used creates <comparison_type>_file_list.txt files, which for a given comparison
+ *     type gives the names of all source files. One line per source file.
+ *     Intended to be used with the svn --targets option. E.g. use lexical_equal_file_list.txt to revert all SVN changes
+ *     to all files with no functional difference.
+ *  4. When the --results-dir and --write-lexical options are used creates a sub-directory structure of the lexical contents
+ *     of the source files, which is what is compared by this program.
+ *
+ *     The use for this is:
+ *     a. For "different" source files allows an external difference tools to compare the functional differences without
+ *        being confused by comments / whitespace / line wrapping changes.
+ *     b. For any type of comparison result for checking what the lexical contents was created by this program.
+ *
+ *  The approach is to read the raw contents of a source file and convert to the lexical contents by:
+ *  a. Removing comments.
+ *  b. Removing unnecessary whitespace.
+ *     A single space is used to separate identifiers and numeric literals in the lexical contents. This means the lexical
+ *     contents should still be legal Ada which can be compiled.
+ *  c. Storing identifiers and numeric literals (which may have hex digits) as lower case, since Ada is case insensitive.
+ *     Strings and character literals preserve their case.
+ *  d. While not necessary to check for lexical differences, the lexical contents has a newline inserted after either:
+ *     - A semicolon delimiter
+ *     - After certain keywords.
+ *
+ *     This is to try and break the lexical content into lines to aid comparing the lexical contents of two files in
+ *     external diff tools. This is simplistic since:
+ *     - Doesn't attempt to use indentation.
+ *     - Doesn't wrap statements after a certain length.
+ *       E.g. a procedure call with lots of arguments can result in a long line in the lexical contents.
+ *
+ *  The use case for this program is given two tree (branches) of a code base to identify files which should be functionally
+ *  equal but are textually different due to:
+ *  a. Changes in comments, e.g. header comments recording merges.
+ *  b. Pretty-printed in different ways resulting in changes in whitespace, identifier casing or wrapping of statements
+ *     across multiple lines.
+ *
+ *  This APIs used by the program are intended to allow it to be compiled using either:
+ *  a. Native gcc under Linux.
+ *  b. mingw cross-compiler under Linux, generating a Windows executable.
+ *     Oldest tried is i686-w64-mingw32-gcc 4.9.2 under CentOS 6.
+ *
+ *  Known limitations are:
+ *  1. Written assuming source files only use ASCII, i.e. no support for unicode.
+ *  2. The way identifiers and numeric literals are formed doesn't use all of the rules specified in the Ada RM
+ *     "Section 2: Lexical Elements", as this program is only attempting to recognise enough of an identifier
+ *     or numeric literal to remove unnecessary whitespace, rather than looking for legal Ada.
+ *  3. When cross-compiled under mingw the maximum path length (PATH_MAX) is limited to 260, which may be exceeded in the
+ *     depth of some source tree unless subst is used to be able to point at part of the paths.
+ *  4. When cross-compiled under mingw don't think will handle non-ASCII characters in filenames; think readdir() simply
+ *     won't return such names.
+ *
+ *  The limitations in 1 and 2 could potentially be addressed by changing to Ada and using libadalang from GNAT.
+ *  <regex> from C++11 might also be able to support a more complete lexical parsing.
  */
 
 #include <stdlib.h>
@@ -167,6 +241,8 @@ typedef struct
     size_t previous_identifier_length;
     /* When true the previous lexical contents was a numeric literal */
     bool previous_lexical_contents_numeric_literal;
+    /* When true a separator has been seen following an identifier or numeric literal */
+    bool separator_pending;
 } compared_file_contents_t;
 
 
@@ -506,35 +582,43 @@ static void append_lexical_char (compared_file_contents_t *const contents, const
  * @brief Called when detect a new identifier or numeric literal to insert a white space character as a separator.
  * @details This is so that preserve whitespace which is lexically significant.
  *          It should also ensure that the resulting lexical_contents still compiles.
+ *          Only inserts a separator if one has been seen in the source code, to prevent "merging" adjacent numeric literals
+ *          and identifiers as a result of not having a lexer which uses the full Ada rules for what is a valid identifier
+ *          or numeric literal.
  * @param[in/out] contents The current lexical contents, to append a separating whitespace character when required.
  */
 static void seperate_identifiers_or_numeric_literals (compared_file_contents_t *const contents)
 {
-    /* If the previous lexical contents was an identifier insert a white space character to separate the identifiers. */
-    if (contents->previous_lexical_contents_identifier)
+    if (contents->separator_pending)
     {
-        bool at_line_break = false;
-        for (size_t identifier_index = 0;
-             (!at_line_break) && (identifier_index < num_identifiers_for_line_breaks);
-             identifier_index++)
+        /* If the previous lexical contents was an identifier insert a white space character to separate the identifiers. */
+        if (contents->previous_lexical_contents_identifier)
         {
-            const char *const compared_identifier = identifiers_for_line_breaks[identifier_index];
-
-            if ((contents->previous_identifier_length == strlen (compared_identifier)) &&
-                (strncmp (&contents->lexical_contents[contents->previous_identifier_start_index],
-                          compared_identifier, contents->previous_identifier_length) == 0))
+            bool at_line_break = false;
+            for (size_t identifier_index = 0;
+                 (!at_line_break) && (identifier_index < num_identifiers_for_line_breaks);
+                 identifier_index++)
             {
-                at_line_break = true;
+                const char *const compared_identifier = identifiers_for_line_breaks[identifier_index];
+
+                if ((contents->previous_identifier_length == strlen (compared_identifier)) &&
+                    (strncmp (&contents->lexical_contents[contents->previous_identifier_start_index],
+                              compared_identifier, contents->previous_identifier_length) == 0))
+                {
+                    at_line_break = true;
+                }
             }
+            append_lexical_char (contents, at_line_break ? '\n' : ' ');
+            contents->previous_lexical_contents_identifier = false;
         }
-        append_lexical_char (contents, at_line_break ? '\n' : ' ');
-        contents->previous_lexical_contents_identifier = false;
+        else if (contents->previous_lexical_contents_numeric_literal)
+        {
+            append_lexical_char (contents, ' ');
+            contents->previous_lexical_contents_numeric_literal = false;
+        }
     }
-    else if (contents->previous_lexical_contents_numeric_literal)
-    {
-        append_lexical_char (contents, ' ');
-        contents->previous_lexical_contents_numeric_literal = false;
-    }
+
+    contents->separator_pending = false;
 }
 
 
@@ -554,6 +638,7 @@ static void parse_lexical_file_contents (compared_file_contents_t *const content
     contents->previous_lexical_contents_identifier = false;
     contents->in_numeric_literal = false;
     contents->previous_lexical_contents_numeric_literal = false;
+    contents->separator_pending = false;
 
     /* Process all the characters in the raw input file */
     size_t file_index = 0;
@@ -565,8 +650,13 @@ static void parse_lexical_file_contents (compared_file_contents_t *const content
 
         if (contents->in_comment)
         {
-            /* Comment finishes at end of line */
-            if (*ch == '\n')
+            /* Comment finishes at end of line. Which as per ADA RM is either:
+             * - line tabulation (VT)
+             * - carriage return (CR)
+             * - line feed (LF)
+             * - form feed (FF)
+             * */
+            if ((*ch == '\v') || (*ch == '\r') || (*ch == '\n') || (*ch == '\f'))
             {
                 contents->in_comment = false;
             }
@@ -608,6 +698,7 @@ static void parse_lexical_file_contents (compared_file_contents_t *const content
                  * separate two adjacent identifiers / numeric literals. */
                 contents->in_identifier = false;
                 contents->previous_lexical_contents_identifier = true;
+                contents->separator_pending = false;
                 num_chars_consumed = 0;
             }
         }
@@ -626,6 +717,7 @@ static void parse_lexical_file_contents (compared_file_contents_t *const content
                  * separate two adjacent identifiers / numeric literals. */
                 contents->in_numeric_literal = false;
                 contents->previous_lexical_contents_numeric_literal = true;
+                contents->separator_pending = false;
                 num_chars_consumed = 0;
             }
         }
@@ -633,6 +725,8 @@ static void parse_lexical_file_contents (compared_file_contents_t *const content
         {
             /* Found start of comment, which isn't part of the lexical contents */
             contents->in_comment = true;
+            contents->separator_pending =
+                    contents->previous_lexical_contents_identifier || contents->previous_lexical_contents_numeric_literal;
             num_chars_consumed++;
         }
         else if (*ch == '\"')
@@ -641,6 +735,7 @@ static void parse_lexical_file_contents (compared_file_contents_t *const content
             contents->in_character_literal = true;
             contents->previous_lexical_contents_identifier = false;
             contents->previous_lexical_contents_numeric_literal = false;
+            contents->separator_pending = false;
             append_lexical_char (contents, *ch);
         }
         else if ((num_remaining_chars >= 3) && (ch[0] == '\'') && (ch[2] == '\''))
@@ -655,6 +750,7 @@ static void parse_lexical_file_contents (compared_file_contents_t *const content
              *  */
             contents->previous_lexical_contents_identifier = false;
             contents->previous_lexical_contents_numeric_literal = false;
+            contents->separator_pending = false;
             append_lexical_char (contents, *ch++);
             append_lexical_char (contents, *ch++);
             num_chars_consumed++;
@@ -682,6 +778,8 @@ static void parse_lexical_file_contents (compared_file_contents_t *const content
         else if (isspace (*ch))
         {
             /* Whitespace character which isn't part of the lexical contents compared */
+            contents->separator_pending =
+                    contents->previous_lexical_contents_identifier || contents->previous_lexical_contents_numeric_literal;
         }
         else
         {
