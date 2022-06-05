@@ -115,13 +115,6 @@ static char arg_right_source_tree_root[PATH_MAX];
 static char arg_results_dir[PATH_MAX];
 
 
-/* Maximum number of open file descriptors used by ntfw().
- * Conservative value recommended by https://stackoverflow.com/questions/8436841/how-to-recursively-list-directories-in-c-on-linux
- *
- * sysconf() isn't implemented in mingw, so haven't used the other suggestion of basing upon sysconf(_SC_OPEN_MAX)
- */
-#define MAX_NFTW_OPEN_DESCRIPTORS 15
-
 /* Contains one source tree */
 typedef struct
 {
@@ -1175,7 +1168,7 @@ int main (int argc, char *argv[])
      *
      * The order in which iterates over the source trees is determined by the std::string compare() order
      * for the pathnames. The use of the source_file_list_t map to store the paths in the source trees means they
-     * are in both in string order, rather than the order nftw() walked the trees.
+     * are in both in string order, rather than the order walk_source_tree() walked the trees.
      */
     source_file_list_t::const_iterator left_it = left_tree.source_list.begin();
     source_file_list_t::const_iterator right_it = right_tree.source_list.begin();
