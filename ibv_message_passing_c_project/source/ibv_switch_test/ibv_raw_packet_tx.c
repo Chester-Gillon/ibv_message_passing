@@ -666,12 +666,38 @@ int main (int argc, char *argv[])
         check_assert (completion_timestamps != NULL, "Failed to allocate completion_timestamps[]");
     }
 
-    /* Allocate protection domain */
-    struct ibv_pd *pd;
-    pd = ibv_alloc_pd (rdma_device);
-    CHECK_ASSERT (pd != NULL);
+    /* Allocate thread domain, so locks are not used in this single threaded program */
+    struct ibv_td_init_attr td_init_attr =
+    {
+        .comp_mask = 0
+    };
+    struct ibv_td *td;
+    td = ibv_alloc_td (rdma_device, &td_init_attr);
+    CHECK_ASSERT (td != NULL);
 
-    /* Create completion queue, to be able to obtain completion timestamp */
+    /* Allocate protection domain */
+    struct ibv_pd *protection_domain;
+    protection_domain = ibv_alloc_pd (rdma_device);
+    CHECK_ASSERT (protection_domain != NULL);
+
+    /* Allocate parent domain, to be able to use the thread domain to avoid locks.
+     * No custom allocators are used. */
+    struct ibv_parent_domain_init_attr parent_domain_init_attr =
+    {
+        .pd = protection_domain,
+        .td = td,
+        .comp_mask = 0,
+        .alloc = NULL,
+        .free = NULL,
+        .pd_context = NULL
+    };
+    struct ibv_pd *parent_domain;
+    parent_domain = ibv_alloc_parent_domain (rdma_device, &parent_domain_init_attr);
+    CHECK_ASSERT (parent_domain != NULL);
+
+    /* Create completion queue, to be able to obtain completion timestamp.
+     * IBV_CREATE_CQ_ATTR_SINGLE_THREADED means the extended CQ API to avoid locking in this single threaded program.
+     * While a parent domain is passed, not sure if necessary since the parent domain isn't using custom allocators. */
     struct ibv_cq_ex *cq;
     struct ibv_cq_init_attr_ex cq_attr =
     {
@@ -680,15 +706,9 @@ int main (int argc, char *argv[])
         .channel = NULL, /* Completion events not used */
         .comp_vector = 0,
         .wc_flags = IBV_WC_EX_WITH_COMPLETION_TIMESTAMP,
-        .comp_mask = IBV_CQ_INIT_ATTR_MASK_FLAGS,
-        .flags = IBV_CREATE_CQ_ATTR_SINGLE_THREADED /* No need for locks as a single-threaded program */
-
-        /* parent_domain left out since:
-         * 1. Not sure of the providing a parent domain.
-         *    Only needed for a custom memory allocator or can the provider use it to share some resources?
-         * 2. The field is not present in the libibverbs 17.1 from Ubuntu 18.04.6 LTS nor
-         *    libibverbs 28.0 from Ubuntu 20.04.4 LTS
-         */
+        .comp_mask = IBV_CQ_INIT_ATTR_MASK_FLAGS | IBV_CQ_INIT_ATTR_MASK_PD,
+        .flags = IBV_CREATE_CQ_ATTR_SINGLE_THREADED,
+        .parent_domain = parent_domain
     };
     cq = ibv_create_cq_ex (rdma_device, &cq_attr);
     CHECK_ASSERT (cq != NULL);
@@ -696,11 +716,13 @@ int main (int argc, char *argv[])
     /* Allocate array, and memory region, to populate the frames which are queued for transmission */
     struct ibv_mr *mr;
     ethercat_frame_t *const tx_frames = calloc (SQ_NUM_DESC, sizeof (ethercat_frame_t));
-    mr = ibv_reg_mr (pd, tx_frames, sizeof (ethercat_frame_t) * SQ_NUM_DESC, IBV_ACCESS_LOCAL_WRITE);
+    mr = ibv_reg_mr (parent_domain, tx_frames, sizeof (ethercat_frame_t) * SQ_NUM_DESC, IBV_ACCESS_LOCAL_WRITE);
     CHECK_ASSERT (mr != NULL);
 
     /* Create Queue-Pair to send raw packets.
-     * The mlx4 provider fails with ENOTSUP when attempting to use IBV_QP_INIT_ATTR_SEND_OPS_FLAGS */
+     * The mlx4 provider fails with ENOTSUP when attempting to use IBV_QP_INIT_ATTR_SEND_OPS_FLAGS.
+     * Passing the parent domain, which has a thread domain set, allows the verbs work request API
+     * to avoid locking in this single threaded program. */
     struct ibv_qp *qp;
     struct ibv_qp_ex *qpx;
     struct ibv_qp_init_attr_ex qp_init_attr =
@@ -719,7 +741,7 @@ int main (int argc, char *argv[])
         },
 
         .qp_type = IBV_QPT_RAW_PACKET,
-        .pd = pd,
+        .pd = parent_domain,
         .comp_mask = IBV_QP_INIT_ATTR_PD | IBV_QP_INIT_ATTR_SEND_OPS_FLAGS,
         .send_ops_flags = IBV_QP_EX_WITH_SEND
     };
@@ -958,7 +980,13 @@ int main (int argc, char *argv[])
     rc = ibv_destroy_cq (ibv_cq_ex_to_cq (cq));
     CHECK_ASSERT (rc == 0);
 
-    rc = ibv_dealloc_pd (pd);
+    rc = ibv_dealloc_pd (parent_domain);
+    CHECK_ASSERT (rc == 0);
+
+    rc = ibv_dealloc_pd (protection_domain);
+    CHECK_ASSERT (rc == 0);
+
+    rc = ibv_dealloc_td (td);
     CHECK_ASSERT (rc == 0);
 
     if (arg_timestamps_csv_filename_set)
