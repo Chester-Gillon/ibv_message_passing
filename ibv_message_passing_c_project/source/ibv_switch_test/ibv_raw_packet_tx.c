@@ -680,6 +680,7 @@ int main (int argc, char *argv[])
         .channel = NULL, /* Completion events not used */
         .comp_vector = 0,
         .wc_flags = IBV_WC_EX_WITH_COMPLETION_TIMESTAMP,
+        .comp_mask = IBV_CQ_INIT_ATTR_MASK_FLAGS,
         .flags = IBV_CREATE_CQ_ATTR_SINGLE_THREADED /* No need for locks as a single-threaded program */
 
         /* parent_domain left out since:
