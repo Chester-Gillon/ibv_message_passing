@@ -1537,7 +1537,6 @@ static void *transmit_receive_thread (void *arg)
                 /* Frame has completed transmission */
                 CHECK_ASSERT (context->num_tx_buffers_queued > 0);
                 context->num_tx_buffers_queued--;
-                context->next_tx_buffer_index = (context->next_tx_buffer_index + 1) % context->tx_num_buffers;
                 break;
 
             case IBV_WC_RECV:
