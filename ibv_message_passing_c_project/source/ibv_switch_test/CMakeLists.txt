@@ -5,6 +5,9 @@ project (ibv_switch_test C)
 if (${HAVE_IBV_WR_START})
     add_executable (ibv_raw_packet_tx "ibv_raw_packet_tx.c")
     target_link_libraries (ibv_raw_packet_tx ibverbs cap)
+
+    add_executable (ibv_raw_packet_switch_test "ibv_raw_packet_switch_test.c")
+    target_link_libraries (ibv_raw_packet_switch_test pthread ibverbs cap)
 endif()
 
 add_executable (ibv_uc_flooded_packets "ibv_uc_flooded_packets.c")
