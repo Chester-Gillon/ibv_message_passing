@@ -179,13 +179,13 @@ typedef struct __attribute__((packed))
 
 
 /* The total number of bit times one ethercat_frame_t occupies a network port for */
-static const int64_t test_packet_total_octets = 7 + /* Preamble */
-                                                1 + /* Start frame delimiter */
-                                                sizeof (ethercat_frame_t) +
-                                                4 + /* Frame check sequence */
-                                                12; /* Interpacket gap */
-static const int64_t bits_per_octet = 8;
-static const int64_t test_packet_bits = test_packet_total_octets * bits_per_octet;
+#define TEST_PACKET_TOTAL_OCTETS (7 + /* Preamble */ \
+                                  1 + /* Start frame delimiter */ \
+                                  sizeof (ethercat_frame_t) + \
+                                  4 + /* Frame check sequence */ \
+                                  12) /* Interpacket gap */
+#define BITS_PER_OCTET 8
+#define TEST_PACKET_BITS (TEST_PACKET_TOTAL_OCTETS * BITS_PER_OCTET)
 
 
 /* Identifies one type of frame recorded by the test */
@@ -1796,7 +1796,7 @@ static void write_frame_test_statistics (results_summary_t *const results_summar
     console_printf ("%*.1f  ", count_field_width, frame_rate);
 
     /* Report the average bit rate generated for each switch port under test */
-    const double per_port_mbps = ((frame_rate * (double) test_packet_bits) / (double) num_tested_port_indices) / 1E6;
+    const double per_port_mbps = ((frame_rate * (double) TEST_PACKET_BITS) / (double) num_tested_port_indices) / 1E6;
     console_printf ("%*.2f\n", count_field_width, per_port_mbps);
 
     /* Display summary of missed frames over combination of source / destination ports */
@@ -1975,7 +1975,7 @@ int main (int argc, char *argv[])
     /* Decide if need to limit the transmitted frame rate or not */
     if (injection_port_bit_rate > requested_switch_under_test_bit_rate)
     {
-        const double limited_frame_rate = (double) requested_switch_under_test_bit_rate / (double) test_packet_bits;
+        const double limited_frame_rate = (double) requested_switch_under_test_bit_rate / (double) TEST_PACKET_BITS;
         tx_rx_thread_context->tx_interval = lround (1E9 / limited_frame_rate);
         tx_rx_thread_context->tx_rate_limited = true;
         console_printf ("Limiting max frame rate to %.1f Hz, as bit-rate on interface to injection switch exceeds that across all switch ports under test\n",
