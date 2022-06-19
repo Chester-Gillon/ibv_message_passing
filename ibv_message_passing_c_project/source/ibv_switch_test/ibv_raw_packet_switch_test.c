@@ -19,6 +19,7 @@
 #include <time.h>
 #include <stdarg.h>
 #include <limits.h>
+#include <math.h>
 
 #include <arpa/inet.h>
 #include <sys/mman.h>
@@ -177,6 +178,16 @@ typedef struct __attribute__((packed))
 } ethercat_frame_t;
 
 
+/* The total number of bit times one ethercat_frame_t occupies a network port for */
+static const int64_t test_packet_total_octets = 7 + /* Preamble */
+                                                1 + /* Start frame delimiter */
+                                                sizeof (ethercat_frame_t) +
+                                                4 + /* Frame check sequence */
+                                                12; /* Interpacket gap */
+static const int64_t bits_per_octet = 8;
+static const int64_t test_packet_bits = test_packet_total_octets * bits_per_octet;
+
+
 /* Identifies one type of frame recorded by the test */
 typedef enum
 {
@@ -259,10 +270,9 @@ static uint8_t arg_rdma_port_num;
 static int64_t arg_test_interval_secs = 10;
 
 
-/* Command line argument which specifies the maximum rate at which transmit frames can be sent.
- * If <= 0 then no maximum rate is applied, i.e. transmits as quickly as possible. */
-static int64_t arg_max_frame_rate_hz = -1;
-static bool arg_max_frame_rate_hz_set = false;
+/* Command line argument which specifies the requested rate on each tested switch port, in Mbps */
+#define DEFAULT_TESTED_PORT_MBPS 100.0
+static double arg_tested_port_mbps = DEFAULT_TESTED_PORT_MBPS;
 
 
 /* Command line argument which controls how the test runs:
@@ -547,7 +557,7 @@ static void check_assert (const bool assertion, const char *format, ...)
  */
 static void display_usage (const char *const program_name)
 {
-    printf ("Usage %s: -i <rdma_device_name> -n <rdma_port_num> [-t <duration_secs>] [-d] [-p <port_list>] [-r <rate_hz>]\n", program_name);
+    printf ("Usage %s: -i <rdma_device_name> -n <rdma_port_num> [-t <duration_secs>] [-d] [-p <port_list>] [-r <rate_mbps>]\n", program_name);
     printf ("\n");
     printf ("  -i specifies the name of the RDMA device to send frames on\n");
     printf ("  -n specifies the name of the RDMA port number to send frames on\n");
@@ -561,9 +571,8 @@ static void display_usage (const char *const program_name)
     printf ("     string, with each item either a single port number or a start and end port\n");
     printf ("     range delimited by a dash. E.g. 1,4-6 specifies ports 1,4,5,6.\n");
     printf ("     If not specified defaults to all %u defined ports\n", NUM_DEFINED_PORTS);
-    printf ("  -r Specifies the maximum rate at which frames are transmitted.\n");
-    printf ("     Using a value <= 0 means the frame transmission rate is not limited,\n");
-    printf ("     even when testing a small number of ports.\n");
+    printf ("  -r Specifies the bit rate generated on each port on the switch under test,\n");
+    printf ("     as a floating point mega bits per second. Default is %g\n", DEFAULT_TESTED_PORT_MBPS);
 
     exit (EXIT_FAILURE);
 }
@@ -750,12 +759,11 @@ static void read_command_line_arguments (const int argc, char *argv[])
             break;
 
         case 'r':
-            if (sscanf (optarg, "%" SCNi64 "%c", &arg_max_frame_rate_hz, &junk) != 1)
+            if (sscanf (optarg, "%lf%c", &arg_tested_port_mbps, &junk) != 1)
             {
-                printf ("Error: Invalid <rate_hz> %s\n", optarg);
+                printf ("Error: Invalid <rate_mbps> %s\n", optarg);
                 exit (EXIT_FAILURE);
             }
-            arg_max_frame_rate_hz_set = true;
             break;
 
         case '?':
@@ -1019,6 +1027,69 @@ static void close_rdma_device (frame_tx_rx_thread_context_t *const context)
 
 
 /**
+ * @brief Convert the active speed and width of a RDA ports into Mbps
+ * @details Used https://github.com/linux-rdma/rdma-core/blob/master/libibverbs/examples/devinfo.c to lookup the
+ *          speed and width as no enumerations defined in verbs.h
+ * @param[in] context The initialised context to obtains the speed and width from
+ * @return The rate for the RDMA port being used for the test
+ */
+static int64_t get_rate_mbps (const frame_tx_rx_thread_context_t *const context)
+{
+    int64_t lane_rate_mbps = 0;
+    int64_t port_width = 0;
+
+    switch (context->port_attributes.active_speed)
+    {
+    case  1:
+        lane_rate_mbps = 2500;
+        break;
+    case  2:
+        lane_rate_mbps = 5000;
+        break;
+    case  4: /* fall through */
+    case  8:
+        lane_rate_mbps = 10000;
+        break;
+    case 16:
+        lane_rate_mbps = 14000;
+        break;
+    case 32:
+        lane_rate_mbps = 25000;
+        break;
+    case 64:
+        lane_rate_mbps = 50000;
+        break;
+    case 128:
+        lane_rate_mbps = 100000;
+        break;
+    }
+
+    switch (context->port_attributes.active_width)
+    {
+    case 1:
+        port_width = 1;
+        break;
+    case 2:
+        port_width = 4;
+        break;
+    case 4:
+        port_width = 8;
+        break;
+    case 8:
+        port_width = 12;
+        break;
+    case 16:
+        port_width = 2;
+        break;
+    }
+
+    check_assert ((lane_rate_mbps != 0) && (port_width != 0), "Unable to determine rate from active_width=%u active_speed=%u",
+            context->port_attributes.active_width, context->port_attributes.active_speed);
+    return lane_rate_mbps * port_width;
+}
+
+
+/**
  * @brief Create a EtherCAT test frame which can be sent.
  * @details The EtherCAT commands and datagram contents are not significant; have just used values which populate
  *          a maximum length frame and for which Wireshark reports a valid frame (for debugging).
@@ -1237,10 +1308,8 @@ static void transmit_receive_initialise (frame_tx_rx_thread_context_t *const con
     context->statistics.interval_start_time = now;
     context->test_interval_end_time = now + (arg_test_interval_secs * NSECS_PER_SEC);
 
-    context->tx_rate_limited = arg_max_frame_rate_hz > 0;
     if (context->tx_rate_limited)
     {
-        context->tx_interval = NSECS_PER_SEC / arg_max_frame_rate_hz;
         context->tx_time_of_next_frame = now;
     }
 }
@@ -1708,7 +1777,7 @@ static void write_frame_test_statistics (results_summary_t *const results_summar
     {
         console_printf ("%*s  ", count_field_width, frame_record_types[frame_type]);
     }
-    console_printf ("%*s  %*s\n", count_field_width, "missed frames", count_field_width, "tx rate (Hz)");
+    console_printf ("%*s  %*s  %*s\n", count_field_width, "missed frames", count_field_width, "tx rate (Hz)", count_field_width, "per port Mbps");
 
     /* Display the count of the different frame types during the test interval.
      * Even when no missing frames the count of the transmit and receive frames may be different due to frames
@@ -1723,8 +1792,12 @@ static void write_frame_test_statistics (results_summary_t *const results_summar
 
     /* Report the average frame rate achieved over the statistics interval */
     const double statistics_interval_secs = (double) (statistics->interval_end_time - statistics->interval_start_time) / 1E9;
-    console_printf ("%*.1f\n", count_field_width,
-            (double) statistics->frame_counts[FRAME_RECORD_TX_TEST_FRAME] / statistics_interval_secs);
+    const double frame_rate = (double) statistics->frame_counts[FRAME_RECORD_TX_TEST_FRAME] / statistics_interval_secs;
+    console_printf ("%*.1f  ", count_field_width, frame_rate);
+
+    /* Report the average bit rate generated for each switch port under test */
+    const double per_port_mbps = ((frame_rate * (double) test_packet_bits) / (double) num_tested_port_indices) / 1E6;
+    console_printf ("%*.2f\n", count_field_width, per_port_mbps);
 
     /* Display summary of missed frames over combination of source / destination ports */
     console_printf ("\nSummary of missed frames : '.' none missed 'S' some missed 'A' all missed\n");
@@ -1890,29 +1963,28 @@ int main (int argc, char *argv[])
         exit (EXIT_FAILURE);
     }
 
-    /* The test setup is assumed for the PC running this program having a 1G Ethernet interface sending frames to the
-     * injection switch, and 100M ports between the injection switch and the switch under test.
-     *
-     * If the number of 100M ports being tested is less than the (assumed) ratio between the Ethernet interface on this PC
-     * and the speed of the ports under test then frames can be lost.
-     *
-     * Therefore, unless the user has specifically set a maximum frame rate then automatically set a frame rate to protect
-     * against frame loss according to the number of ports under test. */
-    const int64_t injection_port_to_switch_port_under_test_speed_ratio = 10;
-    const int64_t injection_port_bit_rate = 1000000000;
-    const int64_t test_packet_total_octets = 7 + /* Preamble */
-                                             1 + /* Start frame delimiter */
-                                             sizeof (ethercat_frame_t) +
-                                             4 + /* Frame check sequence */
-                                             12; /* Interpacket gap */
-    const int64_t bits_per_octet = 8;
-    const int64_t max_frame_rate_on_injection_port = injection_port_bit_rate / (test_packet_total_octets * bits_per_octet);
-    if ((num_tested_port_indices < injection_port_to_switch_port_under_test_speed_ratio) && (!arg_max_frame_rate_hz_set))
+    /* Get the bit rate of the RDMA port used by this program */
+    const int injection_port_bit_rate_mbps = get_rate_mbps (tx_rx_thread_context);
+    const int64_t injection_port_bit_rate = 1000000L * injection_port_bit_rate_mbps;
+    console_printf ("Bit rate on interface to injection switch = %d (Mbps)\n", injection_port_bit_rate_mbps);
+
+    /* The requested bit rate to be generated across all the switch ports under test */
+    const int64_t requested_switch_under_test_bit_rate = lround (arg_tested_port_mbps * 1E6) * num_tested_port_indices;
+    console_printf ("Requested bit rate to be generated on each switch port under test = %.2f (Mbps)\n", arg_tested_port_mbps);
+
+    /* Decide if need to limit the transmitted frame rate or not */
+    if (injection_port_bit_rate > requested_switch_under_test_bit_rate)
     {
-        arg_max_frame_rate_hz = (max_frame_rate_on_injection_port * num_tested_port_indices) /
-                injection_port_to_switch_port_under_test_speed_ratio;
-        console_printf ("Automatically limiting maximum frame rate due to testing less than %" PRIi64 " ports\n",
-                injection_port_to_switch_port_under_test_speed_ratio);
+        const double limited_frame_rate = (double) requested_switch_under_test_bit_rate / (double) test_packet_bits;
+        tx_rx_thread_context->tx_interval = lround (1E9 / limited_frame_rate);
+        tx_rx_thread_context->tx_rate_limited = true;
+        console_printf ("Limiting max frame rate to %.1f Hz, as bit-rate on interface to injection switch exceeds that across all switch ports under test\n",
+                limited_frame_rate);
+    }
+    else
+    {
+        tx_rx_thread_context->tx_rate_limited = false;
+        console_printf ("Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test\n");
     }
 
     /* Report the command line arguments used */
@@ -1920,14 +1992,6 @@ int main (int argc, char *argv[])
     console_printf ("Using interface %s port %u\n", arg_rdma_device_name, arg_rdma_port_num);
     console_printf ("Test interval = %" PRIi64 " (secs)\n", arg_test_interval_secs);
     console_printf ("Frame debug enabled = %s\n", arg_frame_debug_enabled ? "Yes" : "No");
-    if (arg_max_frame_rate_hz > 0)
-    {
-        console_printf ("Frame transmit max rate = %" PRIi64 " Hz\n", arg_max_frame_rate_hz);
-    }
-    else
-    {
-        console_printf ("Frame transmit max rate = None\n");
-    }
 
     /* Create the transmit_receive_thread */
     pthread_t tx_rx_thread_handle;
