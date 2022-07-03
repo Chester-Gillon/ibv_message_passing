@@ -52,7 +52,7 @@ mkdir ${RESULTS_ROOT}
 SOURCE_PATHNAME=${SCRIPT_PATH}/ibv_message_passing_ada_project/source/coverage_for_ada_task/coverage_for_ada_task.adb
 ORIGINAL_PATH=${PATH}
 
-GNAT_VERSIONS="2017 2018 2019 2020 2021"
+GNAT_VERSIONS="2017 2018 2019 2020 2021 gnat-x86_64-linux-11.2.0-4"
 for GNAT_VERSION in ${GNAT_VERSIONS}
 do
     GNAT_BIN=/opt/GNAT/${GNAT_VERSION}/bin
