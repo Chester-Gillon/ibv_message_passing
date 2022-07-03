@@ -61,7 +61,7 @@ do
     then
         # Put tested GNAT version first in the path
         export PATH=${GNAT_BIN}:${ORIGINAL_PATH}
-        GCC_VERSION=`gcc --version | grep GNAT`
+        GCC_VERSION=`gcc --version | grep GCC`
         echo ""
         echo "Testing ${GCC_VERSION}"
 
