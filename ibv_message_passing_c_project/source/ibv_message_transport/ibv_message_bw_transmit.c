@@ -296,7 +296,7 @@ void message_transmit_attach_remote_pre_rtr (tx_message_context_handle context)
     /* Transition the transmit Queue Pair to the Ready to Receive state */
     memset (&qp_attr, 0, sizeof (qp_attr));
     qp_attr.qp_state = IBV_QPS_RTR;
-    qp_attr.path_mtu = context->endpoint.port_attributes.active_mtu;
+    qp_attr.path_mtu = select_path_mtu (&context->slp_connection);
     qp_attr.dest_qp_num = context->slp_connection.remote_attributes.qp_num;
     qp_attr.rq_psn = context->slp_connection.remote_attributes.psn;
     qp_attr.max_dest_rd_atomic = 0;

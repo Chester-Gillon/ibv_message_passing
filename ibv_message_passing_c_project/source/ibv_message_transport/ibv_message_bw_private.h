@@ -27,6 +27,8 @@ typedef struct
     uint32_t psn;
     /** The Queue Pair number for the memory buffer */
     uint32_t qp_num;
+    /** The active MTU, used to determine the largest MTU which both ends support */
+    enum ibv_mtu active_mtu;
     /** true once the Queue Pair is ready to receive */
     int qp_ready_to_receive;
     /** The GID index to address the memory buffer when using RoCE. -1 means a global address isn't used */
@@ -108,6 +110,7 @@ void register_memory_buffer_with_slp (communication_path_slp_connection *const s
 void report_local_memory_buffer_rtr_with_slp (communication_path_slp_connection *const slp_connection);
 void get_remote_memory_buffer_from_slp (communication_path_slp_connection *const slp_connection);
 void await_remote_memory_buffer_rtr_from_slp (communication_path_slp_connection *const slp_connection);
+enum ibv_mtu select_path_mtu (const communication_path_slp_connection *const slp_connection);
 void close_slp_connection (communication_path_slp_connection *const slp_connection);
 void create_memory_buffer (memory_buffer *const buffer, const bool is_tx_end,
                            const communication_path_definition *const path_def);

@@ -292,9 +292,10 @@ static void publish_memory_buffer_with_slp (const communication_path_slp_connect
 
     gid_status = inet_ntop (AF_INET6, &slp_connection->local_attributes.gid, gid, sizeof (gid));
     check_assert (gid_status != NULL, "inet_ntop");
-    sprintf (attributes_text, "(size=%lu,rkey=%u,addr=0x%lx,lid=%u,psn=%u,qp_num=%u,qp_rtr=%d,gid_index=%d,gid=%s)",
+    sprintf (attributes_text, "(size=%lu,rkey=%u,addr=0x%lx,lid=%u,psn=%u,qp_num=%u,active_mtu=%d,qp_rtr=%d,gid_index=%d,gid=%s)",
              slp_connection->local_attributes.size, slp_connection->local_attributes.rkey, slp_connection->local_attributes.addr,
              slp_connection->local_attributes.lid, slp_connection->local_attributes.psn, slp_connection->local_attributes.qp_num,
+             slp_connection->local_attributes.active_mtu,
              slp_connection->local_attributes.qp_ready_to_receive,
              slp_connection->local_attributes.gid_index, gid);
     /* This sends a Service Registration request to slpd on the loopback interface, and receives a Service Acknowledge reply */
@@ -348,6 +349,7 @@ void register_memory_buffer_with_slp (communication_path_slp_connection *const s
     slp_connection->local_attributes.lid = endpoint->port_attributes.lid;
     slp_connection->local_attributes.psn = psn;
     slp_connection->local_attributes.qp_num = qp->qp_num;
+    slp_connection->local_attributes.active_mtu = endpoint->port_attributes.active_mtu;
     slp_connection->local_attributes.qp_ready_to_receive = false;
     publish_memory_buffer_with_slp (slp_connection);
 }
@@ -405,17 +407,20 @@ static SLPBoolean slp_service_attributes_callback (const SLPHandle handle, const
     communication_path_slp_connection *const slp_connection = (communication_path_slp_connection *) cookie;
     char gid[INET6_ADDRSTRLEN];
     int rc;
+    int active_mtu;
 
     if ((error_code == SLP_OK) && (!slp_connection->remote_attributes_obtained))
     {
-        const int num_items = sscanf (attributes, "(size=%lu,rkey=%u,addr=0x%lx,lid=%hu,psn=%u,qp_num=%u,qp_rtr=%d,gid_index=%d,gid=%[^,)])",
+        const int num_items = sscanf (attributes, "(size=%lu,rkey=%u,addr=0x%lx,lid=%hu,psn=%u,qp_num=%u,active_mtu=%d,qp_rtr=%d,gid_index=%d,gid=%[^,)])",
                 &slp_connection->remote_attributes.size, &slp_connection->remote_attributes.rkey,
                 &slp_connection->remote_attributes.addr, &slp_connection->remote_attributes.lid,
                 &slp_connection->remote_attributes.psn, &slp_connection->remote_attributes.qp_num,
+                &active_mtu,
                 &slp_connection->remote_attributes.qp_ready_to_receive,
                 &slp_connection->remote_attributes.gid_index, gid);
 
-        slp_connection->remote_attributes_obtained = num_items == 9;
+        slp_connection->remote_attributes.active_mtu = active_mtu;
+        slp_connection->remote_attributes_obtained = num_items == 10;
         if (slp_connection->remote_attributes_obtained)
         {
             rc = inet_pton (AF_INET6, gid, &slp_connection->remote_attributes.gid);
@@ -530,6 +535,17 @@ void await_remote_memory_buffer_rtr_from_slp (communication_path_slp_connection 
             slp_retry_holdoff (&start_time);
         }
     }
+}
+
+/**
+ * @brief Select the MTU to be used for a communication path, the largest which both ends support
+ * @param[in] slp_connection The connection to return the MTU for
+ * @return The MTU to be used
+ */
+enum ibv_mtu select_path_mtu (const communication_path_slp_connection *const slp_connection)
+{
+    return (slp_connection->local_attributes.active_mtu < slp_connection->remote_attributes.active_mtu) ?
+            slp_connection->local_attributes.active_mtu : slp_connection->remote_attributes.active_mtu;
 }
 
 /**

@@ -156,7 +156,7 @@ rx_message_context_handle message_receive_create_local (const communication_path
                         IBV_QP_ACCESS_FLAGS);
     if (rc != 0)
     {
-        perror ("ibv_modify_qp freed_sequence_number_qp failed");
+        perror ("ibv_modify_qp message_receive_create_local failed");
         exit (EXIT_FAILURE);
     }
     verify_qp_state (IBV_QPS_INIT, context->freed_sequence_number_qp, "freed_sequence_number_qp", NULL);
@@ -250,7 +250,7 @@ void message_receive_attach_remote_pre_rtr (rx_message_context_handle context)
     /* Transition the receiver Queue Pair to the Ready to Receive state */
     memset (&qp_attr, 0, sizeof (qp_attr));
     qp_attr.qp_state = IBV_QPS_RTR;
-    qp_attr.path_mtu = context->endpoint.port_attributes.active_mtu;
+    qp_attr.path_mtu = select_path_mtu (&context->slp_connection);
     qp_attr.dest_qp_num = context->slp_connection.remote_attributes.qp_num;
     qp_attr.rq_psn = context->slp_connection.remote_attributes.psn;
     qp_attr.max_dest_rd_atomic = 0;
@@ -276,7 +276,7 @@ void message_receive_attach_remote_pre_rtr (rx_message_context_handle context)
                         IBV_QP_MIN_RNR_TIMER);
     if (rc != 0)
     {
-        perror ("ibv_modify_qp freed_sequence_number_qp failed");
+        perror ("ibv_modify_qp message_receive_attach_remote_pre_rtr failed");
         exit (EXIT_FAILURE);
     }
     verify_qp_state (IBV_QPS_RTR, context->freed_sequence_number_qp, "freed_sequence_number_qp", NULL);
@@ -315,7 +315,7 @@ void message_receive_attach_remote_post_rtr (rx_message_context_handle context)
                         IBV_QP_MAX_QP_RD_ATOMIC);
     if (rc != 0)
     {
-        perror ("ibv_modify_qp freed_sequence_number_qp failed");
+        perror ("ibv_modify_qp void message_receive_attach_remote_post_rtr failed");
         exit (EXIT_FAILURE);
     }
     verify_qp_state (IBV_QPS_RTS, context->freed_sequence_number_qp, "freed_sequence_number_qp", &context->path_def);
