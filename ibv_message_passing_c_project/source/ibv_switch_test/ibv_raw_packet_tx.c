@@ -705,7 +705,7 @@ int main (int argc, char *argv[])
         .cq_context = NULL, /* Not used */
         .channel = NULL, /* Completion events not used */
         .comp_vector = 0,
-        .wc_flags = IBV_WC_EX_WITH_COMPLETION_TIMESTAMP,
+        .wc_flags = IBV_WC_EX_WITH_COMPLETION_TIMESTAMP_WALLCLOCK,
         .comp_mask = IBV_CQ_INIT_ATTR_MASK_FLAGS | IBV_CQ_INIT_ATTR_MASK_PD,
         .flags = IBV_CREATE_CQ_ATTR_SINGLE_THREADED,
         .parent_domain = parent_domain
@@ -844,17 +844,29 @@ int main (int argc, char *argv[])
 
     while (!test_complete)
     {
-        /* Poll for completion, optionally recording  . This will wait if all transfers are queued */
+        /* Poll for completion, optionally recording completion timestamps . This will wait if all transfers are queued */
         do
         {
             rc = ibv_start_poll (cq, &poll_cq_attr);
+            /* As a result of IBV_WC_EX_WITH_COMPLETION_TIMESTAMP_WALLCLOCK being used to create the extended completion queue:
+             *  When ibv_start_poll() has returned zero, indicating completions are available, then mlx5dv_get_clock_info() has
+             *  been called to get the clock information used by ibv_wc_read_completion_wallclock_ns() to convert the raw
+             *  completion timestamp to wallclock time.
+             *
+             * In drivers/net/ethernet/mellanox/mlx5/core/lib/clock.c the mlx5_update_clock_info_page() function updates the
+             * information read by mlx5dv_get_clock_info(). mlx5_update_clock_info_page() is called from:
+             * - mlx5_timestamp_overflow()
+             * - mlx5_ptp_settime()
+             * - mlx5_ptp_adjtime()
+             * - mlx5_ptp_adjfreq()
+             */
             while (rc != ENOENT)
             {
                 CHECK_ASSERT (rc == 0);
                 CHECK_ASSERT (cq->status == IBV_WC_SUCCESS);
                 if (num_completion_timestamps < max_completion_timestamps)
                 {
-                    completion_timestamps[num_completion_timestamps] = ibv_wc_read_completion_ts (cq);
+                    completion_timestamps[num_completion_timestamps] = ibv_wc_read_completion_wallclock_ns (cq);
                     num_completion_timestamps++;
                 }
                 num_pending_completion--;
@@ -996,14 +1008,24 @@ int main (int argc, char *argv[])
         FILE *csv_file = fopen (arg_timestamps_csv_filename, "w");
 
         check_assert (csv_file != NULL, "Failed to create %s", arg_timestamps_csv_filename);
-        fprintf (csv_file, "Raw HCA completion timestamp (ticks),Sequence num,HCA timestamp delta (ticks),Delta (secs)\n");
+        fprintf (csv_file, "HCA completion wallclock timestamp (ns),HCA completion wallclock time,Sequence num,HCA timestamp delta (ns)\n");
         for (uint32_t timestamp_index = 0; timestamp_index < num_completion_timestamps; timestamp_index++)
         {
-            fprintf (csv_file, "%" PRIu64 ",%"PRIu32, completion_timestamps[timestamp_index], timestamp_index + 1);
+            const uint64_t completion_timestamp = completion_timestamps[timestamp_index];
+            struct tm tm_result;
+            const time_t time_sec = (time_t) (completion_timestamp / 1000000000UL);
+            char date_time[40];
+
+            (void) gmtime_r (&time_sec, &tm_result);
+            (void) strftime (date_time, sizeof (date_time), "%Y%m%dT%H%M%S", &tm_result);
+            fprintf (csv_file, "%" PRIu64 ", %s.%09" PRIu64 ",%" PRIu32,
+                    completion_timestamp,
+                    date_time, completion_timestamp % 1000000000UL,
+                    timestamp_index + 1);
             if (timestamp_index > 0)
             {
-                const uint64_t delta_ticks = completion_timestamps[timestamp_index] - completion_timestamps[timestamp_index - 1];
-                fprintf (csv_file, ",%" PRIu64 ",%.9f", delta_ticks, ((double) delta_ticks) / hca_core_clock_hz);
+                const uint64_t delta_ns = completion_timestamp - completion_timestamps[timestamp_index - 1];
+                fprintf (csv_file, ",%" PRIu64, delta_ns);
             }
             fprintf (csv_file, "\n");
         }
