@@ -48,15 +48,19 @@ void register_controller_worker_messages (const bool controller_and_workers_on_s
         {
             path_def.source_ib_device = "mlx4_0";
             path_def.source_port_num = (worker_node_id % 2) + 1;
+            path_def.source_gid_index = 0;
             path_def.destination_ib_device = "mlx4_0";
             path_def.destination_port_num = (worker_node_id % 2) + 1;
+            path_def.destination_gid_index = 0;
         }
         else
         {
             path_def.source_ib_device = "mlx4_0";
             path_def.source_port_num = 1;
+            path_def.source_gid_index = 0;
             path_def.destination_ib_device = "mlx4_0";
             path_def.destination_port_num = 2;
+            path_def.destination_gid_index = 0;
         }
         path_def.service_level = DEFAULT_SERVICE_LEVEL;
         path_def.max_message_size = sizeof (controller_to_worker_msgs);
@@ -74,15 +78,19 @@ void register_controller_worker_messages (const bool controller_and_workers_on_s
         {
             path_def.source_ib_device = "mlx4_0";
             path_def.source_port_num = (worker_node_id % 2) + 1;
+            path_def.source_gid_index = 0;
             path_def.destination_ib_device = "mlx4_0";
             path_def.destination_port_num = (worker_node_id % 2) + 1;
+            path_def.destination_gid_index = 0;
         }
         else
         {
             path_def.source_ib_device = "mlx4_0";
             path_def.source_port_num = 2;
+            path_def.source_gid_index = 0;
             path_def.destination_ib_device = "mlx4_0";
             path_def.destination_port_num = 1;
+            path_def.destination_gid_index = 0;
         }
         path_def.service_level = DEFAULT_SERVICE_LEVEL;
         path_def.max_message_size = sizeof (worker_to_controller_msgs);

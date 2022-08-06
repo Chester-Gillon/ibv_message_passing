@@ -39,8 +39,10 @@ void register_time_sync_measurement_messages (void)
     path_def.instance = TIME_SYNC_MASTER_TO_SLAVE_PATH;
     path_def.source_ib_device = "mlx4_0";
     path_def.source_port_num = 1;
+    path_def.source_gid_index = 0;
     path_def.destination_ib_device = "mlx4_0";
     path_def.destination_port_num = 1;
+    path_def.destination_gid_index = 0;
     path_def.service_level = DEFAULT_SERVICE_LEVEL;
     path_def.max_message_size = 0;
     path_def.num_message_buffers = 10;
@@ -52,8 +54,10 @@ void register_time_sync_measurement_messages (void)
     path_def.instance = TIME_SYNC_SLAVE_TO_MASTER_PATH;
     path_def.source_ib_device = "mlx4_0";
     path_def.source_port_num = 2;
+    path_def.source_gid_index = 0;
     path_def.destination_ib_device = "mlx4_0";
     path_def.destination_port_num = 2;
+    path_def.destination_gid_index = 0;
     path_def.service_level = DEFAULT_SERVICE_LEVEL;
     path_def.max_message_size = sizeof (slave_current_time_msg);
     path_def.num_message_buffers = 10;

@@ -43,6 +43,10 @@ typedef struct
     uint8_t source_port_num;
     /** The port of the Infiniband device used by the destination endpoint to receive messages */
     uint8_t destination_port_num;
+    /** When the link-layer of the source endpoint is Ethernet the GID index used */
+    int source_gid_index;
+    /** When the link-layer of the destination endpoint is Ethernet the GID index used */
+    int destination_gid_index;
     /** The Infiniband Service Level used on the communication path */
     uint8_t service_level;
     /** The maximum message data size sent on the communication path */

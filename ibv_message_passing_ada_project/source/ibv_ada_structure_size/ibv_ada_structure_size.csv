@@ -1,5 +1,5 @@
 Structure name,Size (bits),Offset (bytes)
-communication_path_definition,448
+communication_path_definition,512
 communication_path_definition.source_node,32,0
 communication_path_definition.destination_node,32,4
 communication_path_definition.instance,32,8
@@ -7,14 +7,16 @@ communication_path_definition.source_ib_device,64,16
 communication_path_definition.destination_ib_device,64,24
 communication_path_definition.source_port_num,8,32
 communication_path_definition.destination_port_num,8,33
-communication_path_definition.service_level,8,34
-communication_path_definition.max_message_size,32,36
-communication_path_definition.num_message_buffers,32,40
-communication_path_definition.allocation_type,32,44
-communication_path_definition.tx_polls_for_errors,8,48
-communication_path_definition.tx_checks_memory_buffer_size,8,49
-communication_path_definition.set_non_default_retry_timeout,8,50
-communication_path_definition.retry_timeout,8,51
+communication_path_definition.source_gid_index,32,36
+communication_path_definition.destination_gid_index,32,40
+communication_path_definition.service_level,8,44
+communication_path_definition.max_message_size,32,48
+communication_path_definition.num_message_buffers,32,52
+communication_path_definition.allocation_type,32,56
+communication_path_definition.tx_polls_for_errors,8,60
+communication_path_definition.tx_checks_memory_buffer_size,8,61
+communication_path_definition.set_non_default_retry_timeout,8,62
+communication_path_definition.retry_timeout,8,63
 message_header,128
 message_header.sequence_number,32,0
 message_header.message_length,32,4

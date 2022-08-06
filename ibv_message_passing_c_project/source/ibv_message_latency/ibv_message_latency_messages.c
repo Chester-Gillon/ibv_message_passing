@@ -65,8 +65,10 @@ uint32_t register_message_latency_messages (const char *service_levels_arg,
         path_def.instance = MASTER_TEST_MESSAGES_FIRST_PATH + num_data_paths;
         path_def.source_ib_device = "mlx4_0";
         path_def.source_port_num = 1;
+        path_def.source_gid_index = 0;
         path_def.destination_ib_device = "mlx4_0";
         path_def.destination_port_num = 1;
+        path_def.destination_gid_index = 0;
         path_def.service_level = ib_sl;
         path_def.max_message_size = MESSAGE_LATENCY_DATA_SIZE_BYTES;
         path_def.num_message_buffers = 1;
@@ -83,8 +85,10 @@ uint32_t register_message_latency_messages (const char *service_levels_arg,
     path_def.instance = SLAVE_ACK_PATH;
     path_def.source_ib_device = "mlx4_0";
     path_def.source_port_num = 2;
+    path_def.source_gid_index = 0;
     path_def.destination_ib_device = "mlx4_0";
     path_def.destination_port_num = 2;
+    path_def.destination_gid_index = 0;
     path_def.service_level = DEFAULT_SERVICE_LEVEL;
     path_def.max_message_size = sizeof (latency_ack_msg);
     path_def.num_message_buffers = 1;

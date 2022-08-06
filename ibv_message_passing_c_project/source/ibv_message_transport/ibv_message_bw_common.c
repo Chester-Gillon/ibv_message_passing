@@ -125,6 +125,7 @@ void open_ib_port_endpoint (ib_port_endpoint *const endpoint, const communicatio
     int device_index;
 
     endpoint->port_num = is_tx_end ? path_def->source_port_num : path_def->destination_port_num;
+    endpoint->gid_index = is_tx_end ? path_def->source_gid_index : path_def->destination_gid_index;
 
     /* Get the available Infiniband devices */
     endpoint->device_list = ibv_get_device_list (&endpoint->num_devices);
@@ -321,17 +322,7 @@ void register_memory_buffer_with_slp (communication_path_slp_connection *const s
 
     if (endpoint->port_attributes.link_layer == IBV_LINK_LAYER_ETHERNET)
     {
-        /* @todo When the link level is Ethernet assume GID index zero is for RoCEv1.
-         *       Support for RoCE was tested on Mellanox Connect-X2 VPI cards which only support RoCEv1.
-         *
-         *       Later versions of rdma-core have ibv_query_gid_type() which could be used to search for a specific RoCE version.
-         *
-         *       There is also /sys/class/infiniband/<device>/ports/<port_number>/gid_attrs/types/<gid_index> which has a string
-         *       for the RoCE version for the GID index on a given index of a port.
-         *       Older Kernels, e.g. 3.10.33-rt32.33.el6rt.x86_64, may not have the gid_attrs files in which only RoCEv1
-         *       is supported.
-         */
-        slp_connection->local_attributes.gid_index = 0;
+        slp_connection->local_attributes.gid_index = endpoint->gid_index;
         rc = ibv_query_gid (endpoint->device_context, endpoint->port_num, slp_connection->local_attributes.gid_index,
                 &slp_connection->local_attributes.gid);
         check_assert (rc == 0, "ibv_query_gid");

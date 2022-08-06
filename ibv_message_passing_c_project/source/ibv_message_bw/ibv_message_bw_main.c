@@ -52,6 +52,10 @@ static char *arg_ib_devices[MAX_THREADS];
 static unsigned int num_ib_ports;
 static uint32_t arg_ib_ports[MAX_THREADS];
 
+/** Optional command line argument which specifies the GID index used for each thread */
+static unsigned int num_ib_gid_indices;
+static int arg_ib_gid_indices[MAX_THREADS];
+
 /** Optional command line argument which specifies the service levels used for each thread */
 static unsigned int num_ib_service_levels;
 static uint32_t arg_ib_service_levels[MAX_THREADS];
@@ -235,6 +239,7 @@ static const struct option command_line_options[] =
     {"thread", required_argument, NULL, 0},
     {"ib-dev", required_argument, NULL, 0},
     {"ib-port", required_argument, NULL, 0},
+    {"ib-gid", required_argument, NULL, 0},
     {"ib-sl", required_argument, NULL, 0},
     {"core", required_argument, NULL, 0},
     {"max-msg-size", required_argument, NULL, 0},
@@ -271,6 +276,7 @@ static void display_usage (void)
     printf ("             Receive or transmit messages on the path with numeric <instance>\n");
     printf ("  --ib-dev=<dev>    Use IB device <dev>\n");
     printf ("  --ib-port=<port>  Use <port> of IB device\n");
+    printf ("  --ib-gid=<gid_index>  Use <gid_index> when the link level is Ethernet\n");
     printf ("  --ib-sl=<sl>  Use <sl> as the IB service level\n");
     printf ("  --core=<core>     Set the affinity of the tx / rx thread to the CPU <core>.\n");
     printf ("                    Also causes messages buffers to be allocated from the local\n");
@@ -400,6 +406,43 @@ static void process_ib_port_argument (const struct option *const optdef)
         {
             arg_ib_ports[num_ib_ports] = ib_port;
             num_ib_ports++;
+        }
+        else
+        {
+            fprintf (stderr, "Too many %s instances\n", optdef->name);
+            exit (EXIT_FAILURE);
+        }
+        token = strtok_r (NULL, DELIMITER, &saveptr);
+    }
+    free (arg_copy);
+}
+
+
+/**
+ * @brief Process the ib-gid command line argument which is a comma-separated list
+ * @param[in] optdef Option definition
+ */
+static void process_ib_gid_argument (const struct option *const optdef)
+{
+    char *arg_copy;
+    char *saveptr;
+    char *token;
+    char junk;
+    int ib_gid_index;
+
+    arg_copy = strdup (optarg);
+    token = strtok_r (arg_copy, DELIMITER, &saveptr);
+    while (token != NULL)
+    {
+        if ((sscanf (token, "%d%c", &ib_gid_index, &junk) != 1) || (ib_gid_index < 0))
+        {
+            fprintf (stderr, "Invalid %s %s\n", optdef->name, token);
+            exit (EXIT_FAILURE);
+        }
+        if (num_ib_gid_indices < MAX_THREADS)
+        {
+            arg_ib_gid_indices[num_ib_gid_indices] = ib_gid_index;
+            num_ib_gid_indices++;
         }
         else
         {
@@ -580,6 +623,10 @@ static void parse_command_line_arguments (const int argc, char *argv[])
             {
                 process_ib_port_argument (optdef);
             }
+            else if (strcmp (optdef->name, "ib-gid") == 0)
+            {
+                process_ib_gid_argument (optdef);
+            }
             else if (strcmp (optdef->name, "ib-sl") == 0)
             {
                 process_ib_service_level_argument (optdef);
@@ -669,6 +716,11 @@ static void parse_command_line_arguments (const int argc, char *argv[])
     if ((num_threads != num_ib_devices) || (num_threads != num_ib_ports))
     {
         fprintf (stderr, "The number of ib-dev and ib-port instances must be the same as the number of threads\n");
+        exit (EXIT_FAILURE);
+    }
+    if ((num_ib_gid_indices != 0) && (num_ib_gid_indices != num_threads))
+    {
+        fprintf (stderr, "When the ib-gid argument is specified the number of instances must be the same as the number of threads\n");
         exit (EXIT_FAILURE);
     }
     if ((num_ib_service_levels != 0) && (num_ib_service_levels != num_threads))
@@ -1155,6 +1207,7 @@ static void create_message_threads (void)
             tx_or_rx->tx_thread_context->path_def = path_def;
             tx_or_rx->tx_thread_context->path_def.source_ib_device = arg_ib_devices[thread_index];
             tx_or_rx->tx_thread_context->path_def.source_port_num = (uint8_t) arg_ib_ports[thread_index];
+            tx_or_rx->tx_thread_context->path_def.source_gid_index = arg_ib_gid_indices[thread_index];
             tx_or_rx->tx_thread_context->verify_data = arg_verify_data;
             if (arg_tx_all_msg_sizes)
             {
@@ -1186,6 +1239,7 @@ static void create_message_threads (void)
             tx_or_rx->rx_thread_context->path_def = path_def;
             tx_or_rx->rx_thread_context->path_def.destination_ib_device = arg_ib_devices[thread_index];
             tx_or_rx->rx_thread_context->path_def.destination_port_num = (uint8_t) arg_ib_ports[thread_index];
+            tx_or_rx->rx_thread_context->path_def.destination_gid_index = arg_ib_gid_indices[thread_index];
             initialise_test_results (&tx_or_rx->rx_thread_context->results);
             tx_or_rx->previous_results = tx_or_rx->rx_thread_context->results;
             clock_gettime (CLOCK_MONOTONIC, &tx_or_rx->current_results_time);

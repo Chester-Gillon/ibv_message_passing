@@ -33,6 +33,8 @@ int main (int argc, char *argv[])
     PRINT_STRUCT_FIELD (communication_path_definition, destination_ib_device);
     PRINT_STRUCT_FIELD (communication_path_definition, source_port_num);
     PRINT_STRUCT_FIELD (communication_path_definition, destination_port_num);
+    PRINT_STRUCT_FIELD (communication_path_definition, source_gid_index);
+    PRINT_STRUCT_FIELD (communication_path_definition, destination_gid_index);
     PRINT_STRUCT_FIELD (communication_path_definition, service_level);
     PRINT_STRUCT_FIELD (communication_path_definition, max_message_size);
     PRINT_STRUCT_FIELD (communication_path_definition, num_message_buffers);

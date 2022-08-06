@@ -80,6 +80,9 @@ typedef struct
     struct ibv_device_attr device_attributes;
     /** The number of the selected port */
     uint8_t port_num;
+    /** The requested GID index to use for this endpoint, as specified communication_path_definition.
+     *  The value is only used when the link-layer is Ethernet. */
+    int gid_index;
     /** The attributes for the port on selected_device which is used for transmitting or receiving messages from */
     struct ibv_port_attr port_attributes;
 } ib_port_endpoint;
