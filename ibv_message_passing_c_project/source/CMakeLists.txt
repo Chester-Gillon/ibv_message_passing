@@ -144,6 +144,7 @@ add_subdirectory ("${PROJECT_SOURCE_DIR}/ibv_switch_test")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/coverage_for_continue")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/compare_ada_files")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/clear_gcno_artificial_function_flags")
+add_subdirectory ("${PROJECT_SOURCE_DIR}/udp_broadcast")
 
 # Location of the source code for the linuxptp package, to gain access to the phc.[ch]
 set (LINUXPTP_ROOT "$ENV{HOME}/linuxptp-1.6")
