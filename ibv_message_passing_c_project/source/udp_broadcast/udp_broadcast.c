@@ -67,10 +67,16 @@ typedef struct
     struct in_addr source_addr;
     /* The name of the interface which the source_addr is on */
     char ifa_name[IF_NAMESIZE];
-    /* The socket used to transmit, which is bound to source_addr */
-    int tx_socket;
-    /* The socket used to receive, which is bound to the interface for source_addr */
-    int rx_socket;
+    /* The index for ifa_name */
+    int ifa_index;
+    /* The socket used to transmit or receive, which is bound to the interface for source_addr */
+    int socket;
+    /* Used to send tx_message via sendmsg() */
+    struct iovec tx_iovec[1];
+    /* Space used to create the tx_pktinfo */
+    char tx_msg_control[1024];
+    /* Used to set the source and destination IP address for transmitted messages */
+    struct msghdr tx_msg;
     /* Used to transmit messages from the socket */
     test_msg_t tx_message;
     /* The number of messages sent with a successful sendto() return */
@@ -78,6 +84,8 @@ typedef struct
     /* The number of tried to sent a message, but sendto() returned a failure */
     uint32_t num_failed_sends;
     /* Used to receive messages from the socket */
+    /* The errno for the last failed send which occurred */
+    int last_failed_send_errno;
     test_msg_t rx_message;
     /* The number of different source addresses from which messages were received.
      * The number of valid entries in the messages_per_source[] array. */
@@ -294,7 +302,7 @@ static void get_interface_statistics_after_test (interface_statistics_t *const h
 
 /**
  * @brief Display the change in broadcast packet statistics for all interfaces on the host during the test
- * @param[in] head The link-listed of statistics fro all interfaces on the host
+ * @param[in] head The link-listed of statistics for all interfaces on the host
  */
 static void display_broadcast_interface_statistics (const interface_statistics_t *const head)
 {
@@ -372,6 +380,9 @@ int main (int argc, char *argv[])
     int rc;
     int saved_errno;
     uint32_t ip_index;
+    size_t cmsg_space;
+    struct cmsghdr *cmsg;
+    struct in_pktinfo *tx_pktinfo;
     struct pollfd poll_fds[MAX_SOURCE_IPS] = {0};
 
     if (argc < 2)
@@ -438,8 +449,23 @@ int main (int argc, char *argv[])
             exit (EXIT_FAILURE);
         }
 
+        source_ip->ifa_index = if_nametoindex (source_ip->ifa_name);
+        if (source_ip->ifa_index == 0)
+        {
+            printf ("Failed to get the interface index for %s\n", source_ip->ifa_name);
+            exit (EXIT_FAILURE);
+        }
+
         num_source_ips++;
     }
+
+    /* Broadcast IPv4 address */
+    struct sockaddr_in broadcast_addr =
+    {
+        .sin_family = AF_INET,
+        .sin_port = htons (UDP_PORT_NUM),
+        .sin_addr.s_addr = INADDR_BROADCAST
+    };
 
     interface_statistics_t *const if_stats_head = get_interface_statistics_before_test (interface_addresses);
 
@@ -448,66 +474,33 @@ int main (int argc, char *argv[])
     {
         per_source_ip_t *const source_ip = &source_ips[ip_index];
 
-        /* Create a non-blocking UDP transmit socket */
-        source_ip->tx_socket = socket (AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
-        if (source_ip->tx_socket == -1)
+        /* Create a non-blocking UDP socket for transmit/receive */
+        source_ip->socket = socket (AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+        if (source_ip->socket == -1)
         {
             printf ("socket() failed\n");
             exit (EXIT_FAILURE);
         }
-
-        int reuse_port = 1;
-        rc = setsockopt (source_ip->tx_socket, SOL_SOCKET, SO_REUSEPORT, &reuse_port, sizeof (reuse_port));
-        if (rc != 0)
-        {
-            printf ("Failed to reuse port for transmit socket\n");
-            exit (EXIT_FAILURE);
-        }
-
-        /* Bind to the specified source IP address and fixed port number for transmit */
-        struct sockaddr_in tx_addr =
-        {
-            .sin_family = AF_INET,
-            .sin_port = htons (UDP_PORT_NUM),
-            .sin_addr = source_ip->source_addr
-        };
-        errno = 0;
-        rc = bind (source_ip->tx_socket, &tx_addr, sizeof (tx_addr));
-        saved_errno = errno;
-        if (rc != 0)
-        {
-            printf ("Failed to bind tx_socket to %s : %s\n", source_ip->ip_addr_string, strerror (saved_errno));
-            exit (EXIT_FAILURE);
-        }
-
-        /* Allow broadcast on the transmit socket */
-        int enable_broadcast = 1;
-        rc = setsockopt (source_ip->tx_socket, SOL_SOCKET, SO_BROADCAST, &enable_broadcast, sizeof (enable_broadcast));
-        if (rc != 0)
-        {
-            printf ("setsockopt (SO_BROADCAST) failed\n");
-            exit (EXIT_FAILURE);
-        }
-
-        /* Create a non-blocking UDP receive socket */
-        source_ip->rx_socket = socket (AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
-        if (source_ip->rx_socket == -1)
-        {
-            printf ("socket() failed\n");
-            exit (EXIT_FAILURE);
-        }
-        poll_fds[ip_index].fd = source_ip->rx_socket;
+        poll_fds[ip_index].fd = source_ip->socket;
         poll_fds[ip_index].events = POLLIN;
 
-        /* Need to bind the receive socket to the device to receive broadcasts only delivered to the interface.
-         * The transmit socket is bound to the source IP address.
+        /* Allow the port to be used in case are using multiple source IP addresses on the same interface */
+        int reuse_port = 1;
+        rc = setsockopt (source_ip->socket, SOL_SOCKET, SO_REUSEPORT, &reuse_port, sizeof (reuse_port));
+        if (rc != 0)
+        {
+            printf ("Failed to reuse port for socket\n");
+            exit (EXIT_FAILURE);
+        }
+
+        /* Bind the socket to the device to receive broadcasts only delivered to the interface.
          * SO_BINDTODEVICE requires CAP_NET_RAW.
          *
-         * @todo This seems to receive a copy of the transmitted packets.
+         * @todo Will this still receive a copy of the transmitted packets?
          *       Possible to make use of IP_PKTINFO as per https://stackoverflow.com/questions/3062205/setting-the-source-ip-for-a-udp-socket ?
          * */
         errno = 0;
-        rc = setsockopt (source_ip->rx_socket, SOL_SOCKET, SO_BINDTODEVICE, source_ip->ifa_name, sizeof (source_ip->ifa_name));
+        rc = setsockopt (source_ip->socket, SOL_SOCKET, SO_BINDTODEVICE, source_ip->ifa_name, sizeof (source_ip->ifa_name));
         saved_errno = errno;
         if (rc != 0)
         {
@@ -515,27 +508,52 @@ int main (int argc, char *argv[])
             exit (EXIT_FAILURE);
         }
 
-        rc = setsockopt (source_ip->rx_socket, SOL_SOCKET, SO_REUSEPORT, &reuse_port, sizeof (reuse_port));
-        if (rc != 0)
-        {
-            printf ("Failed to reuse port for receive socket\n");
-            exit (EXIT_FAILURE);
-        }
-
-        /* Bind to the specified fixed port number for receive */
+        /* Bind to the specified fixed port number for transmit/receive */
         struct sockaddr_in rx_addr =
         {
             .sin_family = AF_INET,
             .sin_port = htons (UDP_PORT_NUM),
         };
         errno = 0;
-        rc = bind (source_ip->rx_socket, &rx_addr, sizeof (rx_addr));
+        rc = bind (source_ip->socket, &rx_addr, sizeof (rx_addr));
         saved_errno = errno;
         if (rc != 0)
         {
-            printf ("Failed to bind rx_socket to %s : %s\n", source_ip->ip_addr_string, strerror (saved_errno));
+            printf ("Failed to bind socket to %s : %s\n", source_ip->ip_addr_string, strerror (saved_errno));
             exit (EXIT_FAILURE);
         }
+
+        /* Allow broadcast on the transmit socket */
+        int enable_broadcast = 1;
+        rc = setsockopt (source_ip->socket, SOL_SOCKET, SO_BROADCAST, &enable_broadcast, sizeof (enable_broadcast));
+        if (rc != 0)
+        {
+            printf ("setsockopt (SO_BROADCAST) failed\n");
+            exit (EXIT_FAILURE);
+        }
+
+        /* Create the IO vector for the single transmit message buffer */
+        source_ip->tx_iovec[0].iov_base = &source_ip->tx_message;
+        source_ip->tx_iovec[0].iov_len = sizeof (source_ip->tx_message);
+
+        /* Set the pktinfo structure such that the source IP address is set */
+        source_ip->tx_msg.msg_name = &broadcast_addr;
+        source_ip->tx_msg.msg_namelen = sizeof (broadcast_addr);
+        source_ip->tx_msg.msg_iov = source_ip->tx_iovec;
+        source_ip->tx_msg.msg_iovlen = sizeof (source_ip->tx_iovec) / sizeof (source_ip->tx_iovec[0]);
+        source_ip->tx_msg.msg_control = source_ip->tx_msg_control;
+        source_ip->tx_msg.msg_controllen = sizeof (source_ip->tx_msg_control);
+        source_ip->tx_msg.msg_flags = 0;
+        cmsg_space = 0;
+        cmsg = CMSG_FIRSTHDR (&source_ip->tx_msg);
+        cmsg->cmsg_level = IPPROTO_IP;
+        cmsg->cmsg_type = IP_PKTINFO;
+        cmsg->cmsg_len = CMSG_LEN (sizeof (*tx_pktinfo));
+        tx_pktinfo = (struct in_pktinfo *) CMSG_DATA (cmsg);
+        tx_pktinfo->ipi_ifindex = source_ip->ifa_index;
+        tx_pktinfo->ipi_spec_dst = source_ip->source_addr;
+        cmsg_space += CMSG_SPACE (sizeof (*tx_pktinfo));
+        source_ip->tx_msg.msg_controllen = cmsg_space;
 
         source_ip->num_messages_sent = 0;
         source_ip->num_failed_sends = 0;
@@ -544,13 +562,6 @@ int main (int argc, char *argv[])
                 source_ip->ip_addr_string);
         source_ip->num_received_sources = 0;
     }
-
-    const struct sockaddr_in broadcast_addr =
-    {
-        .sin_family = AF_INET,
-        .sin_port = htons (UDP_PORT_NUM),
-        .sin_addr.s_addr = INADDR_BROADCAST
-    };
 
     /* Run test until requested to stop */
     struct sigaction action;
@@ -581,8 +592,9 @@ int main (int argc, char *argv[])
             {
                 per_source_ip_t *const source_ip = &source_ips[ip_index];
 
-                rc = sendto (source_ip->tx_socket, &source_ip->tx_message, sizeof (source_ip->tx_message), 0,
-                        &broadcast_addr, sizeof (broadcast_addr));
+                errno = 0;
+                rc = sendmsg (source_ip->socket, &source_ip->tx_msg, 0);
+                saved_errno = errno;
                 if (rc == sizeof (source_ip->tx_message))
                 {
                     source_ip->num_messages_sent++;
@@ -590,6 +602,7 @@ int main (int argc, char *argv[])
                 else
                 {
                     source_ip->num_failed_sends++;
+                    source_ip->last_failed_send_errno = saved_errno;
                 }
                 source_ip->tx_message.sequence_number++;
             }
@@ -606,7 +619,7 @@ int main (int argc, char *argv[])
 
             if ((poll_fds[ip_index].revents & POLLIN) == POLLIN)
             {
-                rc = recvfrom (source_ip->rx_socket, &source_ip->rx_message, sizeof (source_ip->rx_message), 0,
+                rc = recvfrom (source_ip->socket, &source_ip->rx_message, sizeof (source_ip->rx_message), 0,
                         &remote_addr, &remote_addr_len);
                 if ((rc == sizeof (source_ip->rx_message)) && (remote_addr_len == sizeof (remote_addr)))
                 {
@@ -655,6 +668,10 @@ int main (int argc, char *argv[])
         printf ("Results for source IP %s on interface %s\n", source_ip->ip_addr_string, source_ip->ifa_name);
         printf ("  num_messages_sent=%" PRIu32 "  num_failed_sends=%" PRIu32 "\n",
                 source_ip->num_messages_sent, source_ip->num_failed_sends);
+        if (source_ip->num_failed_sends > 0)
+        {
+            printf ("  last failed send error : %s\n", strerror (source_ip->last_failed_send_errno));
+        }
         printf ("  num_received_sources=%" PRIu32 "\n", source_ip->num_received_sources);
         for (uint32_t rx_source_index = 0; rx_source_index < source_ip->num_received_sources; rx_source_index++)
         {
