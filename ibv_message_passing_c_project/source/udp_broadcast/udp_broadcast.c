@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -47,7 +48,7 @@ typedef struct
     /* The IPv4 source address the message was received from */
     in_addr_t s_addr;
     /* The total number of messages received from the source */
-    uint32_t num_messages_received;
+    uint64_t num_messages_received;
     /* The first and last messages received from the source. The difference between the sequence numbers can be compared
      * against num_messages_received to determine how many messages were not seen. */
     test_msg_t first_message;
@@ -390,10 +391,41 @@ int main (int argc, char *argv[])
         }
     }
 
+    /* Display the results of the test */
     const int64_t test_end_time = get_monotonic_time ();
     const double test_duration_seconds = (double) (test_end_time - test_start_time) / 1E9;
 
-    printf ("Test ran for %.3f seconds\n", test_duration_seconds);
+    printf ("\nTest ran for %.3f seconds\n", test_duration_seconds);
+    for (ip_index = 0; ip_index < num_source_ips; ip_index++)
+    {
+        const per_source_ip_t *const source_ip = &source_ips[ip_index];
+
+        printf ("Results for source IP %s on interface %s\n", source_ip->ip_addr_string, source_ip->ifa_name);
+        printf ("  num_messages_sent=%" PRIu32 "  num_failed_sends=%" PRIu32 "\n",
+                source_ip->num_messages_sent, source_ip->num_failed_sends);
+        printf ("  num_received_sources=%" PRIu32 "\n", source_ip->num_received_sources);
+        for (uint32_t rx_source_index = 0; rx_source_index < source_ip->num_received_sources; rx_source_index++)
+        {
+            char ip_addr_string[INET6_ADDRSTRLEN];
+            const char *inet_ntop_status;
+            const messages_from_source_t *const rx_source = &source_ip->messages_per_source[rx_source_index];
+            const uint64_t rx_sequence_num_range =
+                    (rx_source->last_message.sequence_number - rx_source->first_message.sequence_number) + 1;
+
+            inet_ntop_status = inet_ntop (AF_INET, &rx_source->s_addr, ip_addr_string, sizeof (ip_addr_string));
+            if (inet_ntop_status == NULL)
+            {
+                snprintf (ip_addr_string, sizeof (ip_addr_string), "<inet_ntop() failed>");
+            }
+            printf ("  [%" PRIu32 "] source_from_recvfrom=%s  source_from_message=%s\n",
+                    rx_source_index, ip_addr_string, rx_source->first_message.source_ip_addr_string);
+            printf ("  [%" PRIu32 "] num_received=%" PRIu64 "  rx_sequence_nums=%" PRIu64 "..%" PRIu64 " (%" PRIu64 " missed)\n",
+                    rx_source_index, rx_source->num_messages_received,
+                    rx_source->first_message.sequence_number, rx_source->last_message.sequence_number,
+                    rx_sequence_num_range - rx_source->num_messages_received);
+        }
+        printf ("\n");
+    }
 
     return EXIT_SUCCESS;
 }
