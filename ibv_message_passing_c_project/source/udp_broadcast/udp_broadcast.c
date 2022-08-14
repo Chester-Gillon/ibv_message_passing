@@ -491,7 +491,8 @@ static void display_broadcast_interface_statistics (const interface_statistics_t
     static const char *const broadcast_statistic_prefixes[] =
     {
         "rx_broadcast",
-        "tx_broadcast"
+        "tx_broadcast",
+		"broadcast"
     };
 
     while (if_stats != NULL)
