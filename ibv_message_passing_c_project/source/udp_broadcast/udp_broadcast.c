@@ -55,7 +55,7 @@
 /* Fixed UDP source and destination port number used by program */
 #define UDP_PORT_NUM 5000
 
-#define MAX_SOURCE_IPS 10
+#define MAX_SOURCE_IPS 20
 
 /* Defines the UDP test messages sent by this program */
 typedef struct
