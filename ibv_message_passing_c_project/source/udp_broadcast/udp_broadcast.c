@@ -2,6 +2,27 @@
  * @file udp_broadcast.c
  * @date 7 Aug 2022
  * @author Chester Gillon
+ * @brief Program to investigate UDP IPv4 broadcast under Linux, for both transmit and receive.
+ * @details
+ *   Command line arguments specify one or more source IPv4 addresses, and for each address:
+ *   1. One socket is created to transmit/receive.
+ *      The socket is bound to only the UDP port number, and no specific IP address.
+ *      This is so that can receive broadcasts.
+ *      The sendmsg() IP_PKTINFO ancillary data is used to set the source IP address for the broadcasts.
+ *   2. Sends UDP broadcasts at a fixed rate, using the specified source IPv4 address.
+ *   3. Poll for receipt. The same UDP source and destination port number is used for all sockets, so can tell
+ *      if receive "copies" of broadcast packets.
+ *      The source IP address and interface on the the packet was received from is reported, which identifies
+ *      if broadcasts are being received by multiple interfaces.
+ *
+ *   A command line option can enable the use of SO_BINDTODEVICE to cause the receive sockets to only
+ *   receive packets from the specific interface on which the source IP address is set.
+ *   Use of SO_BINDTODEVICE can be used to investigate filtering of "copies" of broadcasts received on multiple
+ *   interfaces, which may have some interaction with the net.ipv4.conf.all.rp_filter setting in the network stack.
+ *
+ *   As well as reporting the test packets received from a UDP socket, also reads the ethtool broadcast statistics
+ *   on all interfaces on the host so that can tell if copies of broadcasts are being received on all network
+ *   interfaces or not. This is to support testing of VLANs to create separate "domains" to isolate broadcasts.
  */
 
 #define _GNU_SOURCE /* Avoids the need for a cast in the address parameter to bind() */
@@ -13,6 +34,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 
+#include <getopt.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <errno.h>
@@ -126,6 +148,19 @@ typedef struct interface_statistics_s
 } interface_statistics_t;
 
 
+/** Command line option used to specify if to use the SO_BINDTODEVICE option */
+static int arg_bind_to_device = false;
+
+
+/** The command line options for this program, in the format passed to getopt_long().
+ *  Only long arguments are supported */
+static const struct option command_line_options[] =
+{
+    {"bind-to-device", no_argument, &arg_bind_to_device, true},
+    {NULL, 0, NULL, 0}
+};
+
+
 /* Set from a signal handler to request the test is stopped */
 static volatile bool stop_transmission;
 
@@ -135,6 +170,141 @@ static volatile bool stop_transmission;
 static void stop_transmission_handler (const int sig)
 {
     stop_transmission = true;
+}
+
+
+/**
+ * @brief Display usage information for the program
+ * @param[in] program_name Name of the program from argv[0]
+ */
+static void display_usage (const char *const program_name)
+{
+    printf ("Usage %s : <source_IPv4_1> [ ... <source_IPv4_N> ] [--bind-to-device]\n", program_name);
+    printf ("  <source_IPv4> is one source IPv4 dotted-decimal address to send\n");
+    printf ("  broadcast packets from.\n");
+    printf ("\n");
+    printf ("  --bind-to-device If this option is specified the SO_BINDTODEVICE socket\n");
+    printf ("    option is used to bind to only receive packets from the interface the\n");
+    printf ("    the source IP address is on. Needs capability CAP_NET_RAW\n");
+
+    exit (EXIT_FAILURE);
+}
+
+
+/**
+ * @brief Process one source IP address specified as a command line argument, adding to the array to be tested
+ * @param[in] ip_addr_string The dotted-decimal IPv4 source address command line argument
+ * @param[in] interface_addresses The list of all network interfaces on the local host
+ */
+static void process_source_ip_argument (const char *const ip_addr_string, struct ifaddrs *const interface_addresses)
+{
+    per_source_ip_t *const source_ip = &source_ips[num_source_ips];
+    int rc;
+
+    if (num_source_ips == MAX_SOURCE_IPS)
+    {
+        printf ("Number of source IPs exceeds compiled in maximum\n");
+        exit (EXIT_FAILURE);
+    }
+
+    /* Convert source address string into internal format */
+    snprintf (source_ip->ip_addr_string, sizeof (source_ip->ip_addr_string), "%s", ip_addr_string);
+    rc = inet_pton (AF_INET, ip_addr_string, &source_ip->source_addr);
+    if (rc != 1)
+    {
+        printf ("%s is not a valid IPv4 address\n", ip_addr_string);
+        exit (EXIT_FAILURE);
+    }
+
+    /* Locate the interface which the source address is on */
+    struct ifaddrs *iap = interface_addresses;
+    bool found_interface = false;
+    while ((!found_interface) && (iap != NULL))
+    {
+        if ((iap->ifa_addr != NULL) && ((iap->ifa_flags & IFF_UP) == IFF_UP) && (iap->ifa_addr->sa_family == AF_INET))
+        {
+            struct sockaddr_in *const sa = (struct sockaddr_in *) iap->ifa_addr;
+
+            if (sa->sin_addr.s_addr == source_ip->source_addr.s_addr)
+            {
+                snprintf (source_ip->ifa_name, sizeof (source_ip->ifa_name), "%s", iap->ifa_name);
+                found_interface = true;
+            }
+        }
+        iap = iap->ifa_next;
+    }
+
+    if (found_interface)
+    {
+        printf ("source address %s is on interface %s\n", source_ip->ip_addr_string, source_ip->ifa_name);
+    }
+    else
+    {
+        printf ("Unable to find source address %s on any network interface which is UP\n", source_ip->ip_addr_string);
+        exit (EXIT_FAILURE);
+    }
+
+    source_ip->ifa_index = if_nametoindex (source_ip->ifa_name);
+    if (source_ip->ifa_index == 0)
+    {
+        printf ("Failed to get the interface index for %s\n", source_ip->ifa_name);
+        exit (EXIT_FAILURE);
+    }
+
+    num_source_ips++;
+}
+
+
+/**
+ * @brief Parse command line arguments, storing the result in global variables
+ * @details Aborts the program if invalid arguments
+ * @param[in] argc, argv Arguments passed to main
+ * @param[in] interface_addresses The list of all network interfaces on the local host
+ */
+static void read_command_line_arguments (const int argc, char *argv[], struct ifaddrs *const interface_addresses)
+{
+    const char *const program_name = argv[0];
+    int opt_status;
+
+    /* Process any command line option flags */
+    do
+    {
+        int option_index = 0;
+
+        opt_status = getopt_long (argc, argv, "", command_line_options, &option_index);
+        if (opt_status == '?')
+        {
+            display_usage (program_name);
+        }
+        else if (opt_status >= 0)
+        {
+            const struct option *const optdef = &command_line_options[option_index];
+
+            if (optdef->flag != NULL)
+            {
+                /* Argument just sets a flag */
+            }
+            else
+            {
+                /* This is a program error, and shouldn't be triggered by the command line options */
+                fprintf (stderr, "Unexpected argument definition %s\n", optdef->name);
+                exit (EXIT_FAILURE);
+            }
+        }
+    } while (opt_status != -1);
+
+    /* Process the non-argument options as source IPv4 addresses */
+    for (int arg_index = optind; arg_index < argc; arg_index++)
+    {
+        process_source_ip_argument (argv[arg_index], interface_addresses);
+    }
+
+    if (num_source_ips == 0)
+    {
+        printf ("At least one source IPv4 address must be specified\n");
+        display_usage (program_name);
+        exit (EXIT_FAILURE);
+    }
 }
 
 
@@ -393,12 +563,6 @@ int main (int argc, char *argv[])
     struct in_pktinfo *tx_pktinfo;
     struct pollfd poll_fds[MAX_SOURCE_IPS] = {0};
 
-    if (argc < 2)
-    {
-        printf ("Usage: %s <source_IPv4_1> [ ... <source_IPv4_N> ]\n", argv[0]);
-        exit (EXIT_FAILURE);
-    }
-
     /* Get all interfaces to be able to lookup interface for source IP address, and to get interface statistics */
     struct ifaddrs *interface_addresses = NULL;
     rc = getifaddrs (&interface_addresses);
@@ -408,64 +572,8 @@ int main (int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    /* Parse command line arguments, converting the IPv4 dotted decimal source addresses */
-    for (int arg_index = 1; arg_index < argc; arg_index++)
-    {
-        per_source_ip_t *const source_ip = &source_ips[num_source_ips];
-        const char *const ip_addr_string = argv[arg_index];
-
-        if (num_source_ips == MAX_SOURCE_IPS)
-        {
-            printf ("Number of source IPs exceeds compiled in maximum\n");
-            exit (EXIT_FAILURE);
-        }
-
-        /* Convert source address string into internal format */
-        snprintf (source_ip->ip_addr_string, sizeof (source_ip->ip_addr_string), "%s", ip_addr_string);
-        rc = inet_pton (AF_INET, ip_addr_string, &source_ip->source_addr);
-        if (rc != 1)
-        {
-            printf ("%s is not a valid IPv4 address\n", ip_addr_string);
-            exit (EXIT_FAILURE);
-        }
-
-        /* Locate the interface which the source address is on */
-        struct ifaddrs *iap = interface_addresses;
-        bool found_interface = false;
-        while ((!found_interface) && (iap != NULL))
-        {
-            if ((iap->ifa_addr != NULL) && ((iap->ifa_flags & IFF_UP) == IFF_UP) && (iap->ifa_addr->sa_family == AF_INET))
-            {
-                struct sockaddr_in *const sa = (struct sockaddr_in *) iap->ifa_addr;
-
-                if (sa->sin_addr.s_addr == source_ip->source_addr.s_addr)
-                {
-                    snprintf (source_ip->ifa_name, sizeof (source_ip->ifa_name), "%s", iap->ifa_name);
-                    found_interface = true;
-                }
-            }
-            iap = iap->ifa_next;
-        }
-
-        if (found_interface)
-        {
-            printf ("source address %s is on interface %s\n", source_ip->ip_addr_string, source_ip->ifa_name);
-        }
-        else
-        {
-            printf ("Unable to find source address %s on any network interface which is UP\n", source_ip->ip_addr_string);
-            exit (EXIT_FAILURE);
-        }
-
-        source_ip->ifa_index = if_nametoindex (source_ip->ifa_name);
-        if (source_ip->ifa_index == 0)
-        {
-            printf ("Failed to get the interface index for %s\n", source_ip->ifa_name);
-            exit (EXIT_FAILURE);
-        }
-
-        num_source_ips++;
-    }
+    /* Parse command line arguments */
+    read_command_line_arguments (argc, argv, interface_addresses);
 
     /* Broadcast IPv4 address */
     struct sockaddr_in broadcast_addr =
@@ -493,7 +601,9 @@ int main (int argc, char *argv[])
         poll_fds[ip_index].fd = source_ip->socket;
         poll_fds[ip_index].events = POLLIN;
 
-        /* Allow the port to be used in case are using multiple source IP addresses on the same interface */
+        /* Allow the port to be used in case are either:
+         * a. Using multiple source IP addresses on the same interface.
+         * b. Not using SO_BINDTODEVICE. */
         rc = setsockopt (source_ip->socket, SOL_SOCKET, SO_REUSEPORT, &on, sizeof (on));
         if (rc != 0)
         {
@@ -509,19 +619,25 @@ int main (int argc, char *argv[])
             exit (EXIT_FAILURE);
         }
 
-        /* Bind the socket to the device to receive broadcasts only delivered to the interface.
+        /* When requested by command line arguments bind the socket to the device to receive broadcasts only delivered
+         * to the interface.
          * SO_BINDTODEVICE requires CAP_NET_RAW.
          *
-         * @todo Will this still receive a copy of the transmitted packets?
-         *       Possible to make use of IP_PKTINFO as per https://stackoverflow.com/questions/3062205/setting-the-source-ip-for-a-udp-socket ?
-         * */
-        errno = 0;
-        rc = setsockopt (source_ip->socket, SOL_SOCKET, SO_BINDTODEVICE, source_ip->ifa_name, sizeof (source_ip->ifa_name));
-        saved_errno = errno;
-        if (rc != 0)
+         * Without this, broadcasts received on other interfaces may be passed to the receive socket, depending upon
+         * the effect of net.ipv4.conf.all.rp_filter
+         *
+         * Regardless of using this option, the program receives a copy of the transmitted packet on the socket
+         * which sent the message. */
+        if (arg_bind_to_device)
         {
-            printf ("Failed to bind to device %s : %s\n", source_ip->ifa_name, strerror (saved_errno));
-            exit (EXIT_FAILURE);
+            errno = 0;
+            rc = setsockopt (source_ip->socket, SOL_SOCKET, SO_BINDTODEVICE, source_ip->ifa_name, sizeof (source_ip->ifa_name));
+            saved_errno = errno;
+            if (rc != 0)
+            {
+                printf ("Failed to bind to device %s : %s\n", source_ip->ifa_name, strerror (saved_errno));
+                exit (EXIT_FAILURE);
+            }
         }
 
         /* Bind to the specified fixed port number for transmit/receive */
