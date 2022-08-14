@@ -50,6 +50,8 @@ typedef struct
 {
     /* The IPv4 source address the message was received from */
     in_addr_t s_addr;
+    /* The index of the interface the message was received from, or -1 if not known */
+    int ifa_index;
     /* The total number of messages received from the source */
     uint64_t num_messages_received;
     /* The first and last messages received from the source. The difference between the sequence numbers can be compared
@@ -86,6 +88,12 @@ typedef struct
     /* Used to receive messages from the socket */
     /* The errno for the last failed send which occurred */
     int last_failed_send_errno;
+    /* Used to receive rx_message via recv_msg() */
+    struct iovec rx_iovec[1];
+    /* Space used to read the rx_pktinfo */
+    char rx_msg_control[1024];
+    /* Used to obtain the source interface and IP address for received messages */
+    struct msghdr rx_msg;
     test_msg_t rx_message;
     /* The number of different source addresses from which messages were received.
      * The number of valid entries in the messages_per_source[] array. */
@@ -472,6 +480,7 @@ int main (int argc, char *argv[])
     /* Initialise the sockets used for each source IP address */
     for (ip_index = 0; ip_index < num_source_ips; ip_index++)
     {
+        const int on = 1;
         per_source_ip_t *const source_ip = &source_ips[ip_index];
 
         /* Create a non-blocking UDP socket for transmit/receive */
@@ -485,11 +494,18 @@ int main (int argc, char *argv[])
         poll_fds[ip_index].events = POLLIN;
 
         /* Allow the port to be used in case are using multiple source IP addresses on the same interface */
-        int reuse_port = 1;
-        rc = setsockopt (source_ip->socket, SOL_SOCKET, SO_REUSEPORT, &reuse_port, sizeof (reuse_port));
+        rc = setsockopt (source_ip->socket, SOL_SOCKET, SO_REUSEPORT, &on, sizeof (on));
         if (rc != 0)
         {
             printf ("Failed to reuse port for socket\n");
+            exit (EXIT_FAILURE);
+        }
+
+        /* Enable receipt of ancillary information which gives the interface on which the packet arrived */
+        rc = setsockopt (source_ip->socket, IPPROTO_IP, IP_PKTINFO, &on, sizeof (on));
+        if (rc != 0)
+        {
+            printf ("Failed to set IP_PKTINFO for socket\n");
             exit (EXIT_FAILURE);
         }
 
@@ -614,24 +630,48 @@ int main (int argc, char *argv[])
         for (ip_index = 0; ip_index < num_source_ips; ip_index++)
         {
             per_source_ip_t *const source_ip = &source_ips[ip_index];
-            struct sockaddr_in remote_addr;
-            socklen_t remote_addr_len = sizeof (remote_addr);
 
             if ((poll_fds[ip_index].revents & POLLIN) == POLLIN)
             {
-                rc = recvfrom (source_ip->socket, &source_ip->rx_message, sizeof (source_ip->rx_message), 0,
-                        &remote_addr, &remote_addr_len);
-                if ((rc == sizeof (source_ip->rx_message)) && (remote_addr_len == sizeof (remote_addr)))
+                struct sockaddr_in from = {0};
+                struct iovec rx_iovec[1];
+
+                /* Initialise the structure which allows the ancillary information with the source interface to be obtained */
+                rx_iovec[0].iov_base = &source_ip->rx_message;
+                rx_iovec[0].iov_len = sizeof (source_ip->rx_message);
+                source_ip->rx_msg.msg_iov = rx_iovec;
+                source_ip->rx_msg.msg_iovlen = sizeof (rx_iovec) / sizeof (rx_iovec[0]);
+                source_ip->rx_msg.msg_name = &from;
+                source_ip->rx_msg.msg_namelen = sizeof (from);
+                source_ip->rx_msg.msg_control = source_ip->rx_msg_control;
+                source_ip->rx_msg.msg_controllen = sizeof (source_ip->rx_msg_control);
+                source_ip->rx_msg.msg_flags = 0;
+
+                rc = recvmsg (source_ip->socket, &source_ip->rx_msg, 0);
+                if ((rc == sizeof (source_ip->rx_message)) && (from.sin_family == AF_INET))
                 {
                     bool found_existing_source = false;
 
+                    /* Extract the source interface from the ancillary information */
+                    int ifa_index = -1;
+                    for (cmsg = CMSG_FIRSTHDR (&source_ip->rx_msg); cmsg != NULL; cmsg = CMSG_NXTHDR (&source_ip->rx_msg, cmsg))
+                    {
+                        if ((cmsg->cmsg_level == IPPROTO_IP) && (cmsg->cmsg_type == IP_PKTINFO))
+                        {
+                            const struct in_pktinfo *const rx_pktinfo = (const struct in_pktinfo *) CMSG_DATA (cmsg);
+
+                            ifa_index = rx_pktinfo->ipi_ifindex;
+                        }
+                    }
+
+                    /* Search for an existing combination of source IP address and source interface index */
                     for (uint32_t rx_source_index = 0;
                             (!found_existing_source) && (rx_source_index < source_ip->num_received_sources);
                             rx_source_index++)
                     {
                         messages_from_source_t *const existing_source = &source_ip->messages_per_source[rx_source_index];
 
-                        if (remote_addr.sin_addr.s_addr == existing_source->s_addr)
+                        if ((from.sin_addr.s_addr == existing_source->s_addr) && (ifa_index == existing_source->ifa_index))
                         {
                             existing_source->num_messages_received++;
                             existing_source->last_message = source_ip->rx_message;
@@ -643,7 +683,8 @@ int main (int argc, char *argv[])
                     {
                         messages_from_source_t *const new_source = &source_ip->messages_per_source[source_ip->num_received_sources];
 
-                        new_source->s_addr = remote_addr.sin_addr.s_addr;
+                        new_source->ifa_index = ifa_index;
+                        new_source->s_addr = from.sin_addr.s_addr;
                         new_source->num_messages_received = 1;
                         new_source->first_message = source_ip->rx_message;
                         new_source->last_message = source_ip->rx_message;
@@ -676,17 +717,26 @@ int main (int argc, char *argv[])
         for (uint32_t rx_source_index = 0; rx_source_index < source_ip->num_received_sources; rx_source_index++)
         {
             char ip_addr_string[INET6_ADDRSTRLEN];
+            char interface_name[IF_NAMESIZE];
+            char *if_index_to_name_status = NULL;
             const char *inet_ntop_status;
             const messages_from_source_t *const rx_source = &source_ip->messages_per_source[rx_source_index];
             const uint64_t rx_sequence_num_range =
                     (rx_source->last_message.sequence_number - rx_source->first_message.sequence_number) + 1;
+
+            if (rx_source->ifa_index != 1)
+            {
+                if_index_to_name_status = if_indextoname (rx_source->ifa_index, interface_name);
+            }
 
             inet_ntop_status = inet_ntop (AF_INET, &rx_source->s_addr, ip_addr_string, sizeof (ip_addr_string));
             if (inet_ntop_status == NULL)
             {
                 snprintf (ip_addr_string, sizeof (ip_addr_string), "%s", "<inet_ntop() failed>");
             }
-            printf ("  [%" PRIu32 "] source_from_recvfrom=%s  source_from_message=%s\n",
+            printf ("  [%" PRIu32 "] source interface=%s\n",
+                    rx_source_index, (if_index_to_name_status != NULL) ? interface_name : "<unknown>");
+            printf ("  [%" PRIu32 "] source_from_recvmsg=%s  source_from_message=%s\n",
                     rx_source_index, ip_addr_string, rx_source->first_message.source_ip_addr_string);
             printf ("  [%" PRIu32 "] num_received=%" PRIu64 "  rx_sequence_nums=%" PRIu64 "..%" PRIu64 " (%" PRIu64 " missed)\n",
                     rx_source_index, rx_source->num_messages_received,
