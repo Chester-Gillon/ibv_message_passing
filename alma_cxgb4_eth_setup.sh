@@ -62,3 +62,7 @@ do
       sleep 1
    done
 done
+
+# Give read permission to the debugfs for the cxgb4 modules
+chmod o+rX /sys/kernel/debug
+chmod -R o+rX /sys/kernel/debug/*cxgb4
