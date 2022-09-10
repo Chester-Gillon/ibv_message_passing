@@ -2,30 +2,34 @@
  * @file bind_local.c
  * @date 4 Sep 2022
  * @author Chester Gillon
- *
- * To investigate https://stackoverflow.com/questions/23907095/address-already-in-use-but-nothing-in-netstat-or-lsof
- * and checking which ports iwpmd has reserved.
+ * @details
+ *   To investigate https://stackoverflow.com/questions/23907095/address-already-in-use-but-nothing-in-netstat-or-lsof
+ *   and checking which ports iwpmd has reserved.
  */
 
 #define _GNU_SOURCE /* Avoids the need for a cast in the address parameter to bind() */
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 #include <inttypes.h>
 #include <stdio.h>
 
 #include <unistd.h>
+#include <sys/types.h>
 #include <sys/socket.h>
+#include <netdb.h>
 #include <arpa/inet.h>
 
 
 int main (int argc, char *argv[])
 {
-    const char *const optstring = "-p:-4:-6:";
+    const char *const optstring = "-p:-4:-6:l";
     int option;
     char junk;
     uint16_t port_to_bind = 0;
+    bool listen_on_port = false;
     struct sockaddr_storage local_addr =
     {
         .ss_family = AF_UNSPEC
@@ -50,35 +54,62 @@ int main (int argc, char *argv[])
             break;
 
         case '4':
-            local_addr.ss_family = AF_INET;
-            rc = inet_pton (AF_INET, optarg, &local_addr_in->sin_addr);
-            if (rc != 1)
             {
-                fprintf (stderr, "Error: %s is not a valid IPv4 address\n", optarg);
-                exit (EXIT_FAILURE);
+                const struct addrinfo hints_ipv4 =
+                {
+                    .ai_family = AF_INET,
+                    .ai_socktype = SOCK_STREAM,
+                    .ai_protocol = 0,
+                    .ai_flags = 0
+                };
+                struct addrinfo *res = NULL;
+
+                rc = getaddrinfo (optarg, NULL, &hints_ipv4, &res);
+                if (rc != 0)
+                {
+                    fprintf (stderr, "Error: %s does not resolve to a local IPv4 address : %s\n", optarg, gai_strerror (rc));
+                    exit (EXIT_FAILURE);
+                }
+                memcpy (local_addr_in, res->ai_addr, res->ai_addrlen);
             }
             break;
 
         case '6':
-            local_addr.ss_family = AF_INET6;
-            rc = inet_pton (AF_INET6, optarg, &local_addr_in6->sin6_addr);
-            if (rc != 1)
             {
-                fprintf (stderr, "Error: %s is not a valid IPv6 address\n", optarg);
-                exit (EXIT_FAILURE);
+                const struct addrinfo hints_ipv6 =
+                {
+                    .ai_family = AF_INET6,
+                    .ai_socktype = SOCK_STREAM,
+                    .ai_protocol = 0,
+                    .ai_flags = 0
+                };
+                struct addrinfo *res = NULL;
+
+                rc = getaddrinfo (optarg, NULL, &hints_ipv6, &res);
+                if (rc != 0)
+                {
+                    fprintf (stderr, "Error: %s does not resolve to a local IPv6 address : %s\n", optarg, gai_strerror (rc));
+                    exit (EXIT_FAILURE);
+                }
+                memcpy (local_addr_in6, res->ai_addr, res->ai_addrlen);
             }
+            break;
+
+        case 'l':
+            listen_on_port = true;
             break;
 
         case '?':
         default:
-            printf ("Usage %s [-p <port>] [-4 <IPv4_local_addr>] [-6 <IPv6_local_addr>]\n", argv[0]);
+            printf ("Usage %s [-p <port>] [-4 <IPv4_local_addr>] [-6 <IPv6_local_addr>] [-l]\n", argv[0]);
+            printf ("-l optionally specifies to listen on the port\n");
             break;
         }
 
         option = getopt (argc, argv, optstring);
     }
 
-    /* If no IP address was specified on the command line, default to a IPv6 socket.
+    /* If no local address was specified on the command line, default to a IPv6 socket.
      * Depending upon the value of the IPV6_V6ONLY socket option may allow a IPv4 connection. */
     if (local_addr.ss_family == AF_UNSPEC)
     {
@@ -139,7 +170,7 @@ int main (int argc, char *argv[])
             exit (EXIT_FAILURE);
         }
 
-        printf ("fd %d bound to %s port %u\n", socket_fd, addr_string, ntohs (local_addr_in6->sin6_port));
+        printf ("fd %d bound to %s scope-id %" PRIu32 " port %u\n", socket_fd, addr_string, local_addr_in6->sin6_scope_id, ntohs (local_addr_in6->sin6_port));
     }
     else
     {
@@ -153,9 +184,23 @@ int main (int argc, char *argv[])
         printf ("fd %d bound to %s port %u\n", socket_fd, addr_string, ntohs (local_addr_in->sin_port));
     }
 
-    char exit_string[40];
+    /* Listen on port if requested */
+    char prompt_string[40];
+    if (listen_on_port)
+    {
+        printf ("Press enter to listen on port\n");
+        fgets (prompt_string, sizeof (prompt_string), stdin);
+
+        rc = listen (socket_fd, 1);
+        if (rc != 0)
+        {
+            perror ("listen()");
+            exit (EXIT_FAILURE);
+        }
+    }
+
     printf ("Press return to exit");
-    fgets (exit_string, sizeof (exit_string), stdin);
+    fgets (prompt_string, sizeof (prompt_string), stdin);
 
     close (socket_fd);
 
