@@ -25,11 +25,12 @@
 
 int main (int argc, char *argv[])
 {
-    const char *const optstring = "-p:-4:-6:l";
+    const char *const optstring = "-p:-4:-6:lu";
     int option;
     char junk;
     uint16_t port_to_bind = 0;
     bool listen_on_port = false;
+    bool use_udp = false;
     struct sockaddr_storage local_addr =
     {
         .ss_family = AF_UNSPEC
@@ -99,14 +100,26 @@ int main (int argc, char *argv[])
             listen_on_port = true;
             break;
 
+        case 'u':
+            use_udp = true;
+            break;
+
         case '?':
         default:
-            printf ("Usage %s [-p <port>] [-4 <IPv4_local_addr>] [-6 <IPv6_local_addr>] [-l]\n", argv[0]);
+            printf ("Usage %s [-p <port>] [-4 <IPv4_local_addr>] [-6 <IPv6_local_addr>] [-l] [-u]\n", argv[0]);
             printf ("-l optionally specifies to listen on the port\n");
+            printf ("-u specifies to create a SOCK_DGRAM (UDP) rather than SOCK_STREAM (TCP) socket\n");
+            exit (EXIT_FAILURE);
             break;
         }
 
         option = getopt (argc, argv, optstring);
+    }
+
+    if (listen_on_port && use_udp)
+    {
+        printf ("Error: -l and -u can't be used together\n");
+        exit (EXIT_FAILURE);
     }
 
     /* If no local address was specified on the command line, default to a IPv6 socket.
@@ -127,7 +140,7 @@ int main (int argc, char *argv[])
     }
 
     /* Create socket of appropriate family */
-    socket_fd = socket ((local_addr.ss_family == AF_INET6) ? PF_INET6 : PF_INET, SOCK_STREAM, 0);
+    socket_fd = socket ((local_addr.ss_family == AF_INET6) ? PF_INET6 : PF_INET, use_udp ? SOCK_DGRAM : SOCK_STREAM, 0);
     if (socket_fd == -1)
     {
         perror ("socket()");
