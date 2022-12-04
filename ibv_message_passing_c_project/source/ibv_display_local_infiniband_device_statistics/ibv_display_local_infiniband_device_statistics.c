@@ -92,6 +92,34 @@ static void check_assert (const bool assertion, const char *format, ...)
 
 
 /**
+ * @brief Determine if a statistics counter is supported
+ * @details A counter is supported if can read a value from the statistics counter file.
+ *          This function was written since with a QLogic FastLinQ QL41000 Series device with the AlmaLinux 8.7
+ *          in-box driver it was found that statistic counter files are present, but return EINVAL attempting
+ *          to read the counters.
+ * @param[in] counter The counter to determine if is supported
+ * @return Returns true is the counter is supported
+ */
+static bool validate_counter_supported (const counter_sample_t *const counter)
+{
+    FILE *counter_file;
+    int num_read;
+    uint64_t current_value;
+    bool counter_supported = false;
+
+    counter_file = fopen (counter->pathname, "r");
+    if (counter_file != NULL)
+    {
+        num_read = fscanf (counter_file, "%" SCNu64, &current_value);
+        counter_supported = (num_read == 1);
+        (void) fclose (counter_file);
+    }
+
+    return counter_supported;
+}
+
+
+/**
  * @brief Add the definitions of all statistics counter files in one directory
  * @param[in] counters_dir The directory to add the statistics counters for
  * @param[in/out] counter Used to build the counter definition. On entry identifies the device and port for counters_dir
@@ -100,6 +128,8 @@ static void add_counters_in_directory (const char *const counters_dir, counter_s
 {
     DIR *dir;
     struct dirent *entry;
+    uint32_t num_supported_counters_in_dir = 0;
+    uint32_t total_counters_in_dir = 0;
     const uint32_t array_grow_size = 16;
 
     dir = opendir (counters_dir);
@@ -116,20 +146,31 @@ static void add_counters_in_directory (const char *const counters_dir, counter_s
                     snprintf (counter->filename, sizeof (counter->filename), "%s", entry->d_name);
                     snprintf (counter->pathname, sizeof (counter->pathname), "%s/%s", counters_dir, entry->d_name);
 
-                    if (num_counters >= counters_array_size)
+                    total_counters_in_dir++;
+                    if (validate_counter_supported (counter))
                     {
-                        counters_array_size += array_grow_size;
-                        counters = realloc (counters, counters_array_size * sizeof (counter_sample_t));
-                    }
+                        if (num_counters >= counters_array_size)
+                        {
+                            counters_array_size += array_grow_size;
+                            counters = realloc (counters, counters_array_size * sizeof (counter_sample_t));
+                        }
 
-                    counters[num_counters] = *counter;
-                    num_counters++;
+                        counters[num_counters] = *counter;
+                        num_counters++;
+                        num_supported_counters_in_dir++;
+                    }
                 }
             }
 
             entry = readdir (dir);
         }
         closedir (dir);
+    }
+
+    if (num_supported_counters_in_dir != total_counters_in_dir)
+    {
+        printf ("Only %" PRIu32 " of %" PRIu32 " counters in %s are supported\n",
+                num_supported_counters_in_dir, total_counters_in_dir, counters_dir);
     }
 }
 
