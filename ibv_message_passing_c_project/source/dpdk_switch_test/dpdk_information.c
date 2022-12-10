@@ -23,6 +23,7 @@ int main (int argc, char *argv[])
     struct rte_eth_dev_info dev_info;
     struct rte_eth_link link;
     char if_name[IF_NAMESIZE];
+    uint64_t offload;
 
     rc = rte_eal_init (argc, argv);
     if (rc < 0)
@@ -54,6 +55,50 @@ int main (int argc, char *argv[])
         {
             printf ("\n");
         }
+
+        /* Display the offloading capabilities in the same layout as the testpmd utility.
+         * For per-port (aka per-devidce) shows only capabilities which are *not* available per queue.
+         */
+        printf ("  Rx Offloading Capabilities:\n");
+        printf ("    Per Queue :");
+        for (offload = 1; offload != 0; offload <<= 1)
+        {
+            if ((dev_info.rx_queue_offload_capa & offload) != 0)
+            {
+                printf (" %s", rte_eth_dev_rx_offload_name (offload));
+            }
+        }
+        printf ("\n");
+
+        printf ("    Per Port  :");
+        for (offload = 1; offload != 0; offload <<= 1)
+        {
+            if (((dev_info.rx_queue_offload_capa & offload) == 0) && ((dev_info.rx_offload_capa & offload) != 0))
+            {
+                printf (" %s", rte_eth_dev_rx_offload_name (offload));
+            }
+        }
+        printf ("\n");
+
+        printf ("  Tx Offloading Capabilities:\n");
+        printf ("    Per Queue :");
+        for (offload = 1; offload != 0; offload <<= 1)
+        {
+            if ((dev_info.tx_queue_offload_capa & offload) != 0)
+            {
+                printf (" %s", rte_eth_dev_tx_offload_name (offload));
+            }
+        }
+        printf ("\n");
+        printf ("    Per Port  :");
+        for (offload = 1; offload != 0; offload <<= 1)
+        {
+            if (((dev_info.tx_queue_offload_capa & offload) == 0) && ((dev_info.tx_offload_capa & offload) != 0))
+            {
+                printf (" %s", rte_eth_dev_tx_offload_name (offload));
+            }
+        }
+        printf ("\n");
 
         rc = rte_eth_link_get (port_id, &link);
         if (rc == 0)
