@@ -31,6 +31,31 @@ int main (int argc, char *argv[])
         rte_panic("Cannot init EAL\n");
     }
 
+    /* Display the number of lcores which can be set by the -l option parsed by rte_eal_init().
+     * Defaults to all cores, when the -l option isn't used. */
+    printf ("rte_lcore_count = %u\n", rte_lcore_count());
+
+    /* Display the IOVA mode */
+    printf ("rte_eal_iova_mode : ");
+    switch (rte_eal_iova_mode ())
+    {
+    case RTE_IOVA_DC:
+        printf ("Don't care mode\n");
+        break;
+
+    case RTE_IOVA_PA:
+        printf ("DMA using physical address\n");
+        break;
+
+    case RTE_IOVA_VA:
+        printf ("DMA using virtual address\n");
+        break;
+
+    default:
+        printf ("???\n");
+        break;
+    }
+
     /* Display counts of available devices */
     printf ("rte_eth_dev_count_total = %" PRIu16 "\n", rte_eth_dev_count_total ());
     printf ("rte_eth_dev_count_avail = %" PRIu16 "\n", rte_eth_dev_count_avail ());
@@ -57,7 +82,7 @@ int main (int argc, char *argv[])
         }
 
         /* Display the offloading capabilities in the same layout as the testpmd utility.
-         * For per-port (aka per-devidce) shows only capabilities which are *not* available per queue.
+         * For per-port (aka per-device) shows only capabilities which are *not* available per queue.
          */
         printf ("  Rx Offloading Capabilities:\n");
         printf ("    Per Queue :");
