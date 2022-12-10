@@ -28,6 +28,7 @@
 									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 									<listOptionValue builtIn="false" value="/usr/lib64/glib-2.0/include"/>
 									<listOptionValue builtIn="false" value="/usr/include/libftdi1"/>
+									<listOptionValue builtIn="false" value="/usr/include/dpdk/"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.656804869" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_GNU_SOURCE"/>
@@ -43,6 +44,7 @@
 									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 									<listOptionValue builtIn="false" value="/usr/lib64/glib-2.0/include"/>
 									<listOptionValue builtIn="false" value="/usr/include/libftdi1"/>
+									<listOptionValue builtIn="false" value="/usr/include/dpdk/"/>
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.2085142445" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_GNU_SOURCE"/>
@@ -65,6 +67,7 @@
 									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 									<listOptionValue builtIn="false" value="/usr/lib64/glib-2.0/include"/>
 									<listOptionValue builtIn="false" value="/usr/include/libftdi1"/>
+									<listOptionValue builtIn="false" value="/usr/include/dpdk/"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.1905004801" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>
@@ -101,6 +104,7 @@
 									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 									<listOptionValue builtIn="false" value="/usr/lib64/glib-2.0/include"/>
 									<listOptionValue builtIn="false" value="/usr/include/libftdi1"/>
+									<listOptionValue builtIn="false" value="/usr/include/dpdk/"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.415227066" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_GNU_SOURCE"/>
@@ -116,6 +120,7 @@
 									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 									<listOptionValue builtIn="false" value="/usr/lib64/glib-2.0/include"/>
 									<listOptionValue builtIn="false" value="/usr/include/libftdi1"/>
+									<listOptionValue builtIn="false" value="/usr/include/dpdk/"/>
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.698761629" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_GNU_SOURCE"/>
@@ -138,6 +143,7 @@
 									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 									<listOptionValue builtIn="false" value="/usr/lib64/glib-2.0/include"/>
 									<listOptionValue builtIn="false" value="/usr/include/libftdi1"/>
+									<listOptionValue builtIn="false" value="/usr/include/dpdk/"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.1836244549" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>
@@ -174,6 +180,7 @@
 									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 									<listOptionValue builtIn="false" value="/usr/lib64/glib-2.0/include"/>
 									<listOptionValue builtIn="false" value="/usr/include/libftdi1"/>
+									<listOptionValue builtIn="false" value="/usr/include/dpdk/"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.71572491" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_GNU_SOURCE"/>
@@ -189,6 +196,7 @@
 									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 									<listOptionValue builtIn="false" value="/usr/lib64/glib-2.0/include"/>
 									<listOptionValue builtIn="false" value="/usr/include/libftdi1"/>
+									<listOptionValue builtIn="false" value="/usr/include/dpdk/"/>
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.667159463" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_GNU_SOURCE"/>
@@ -211,6 +219,7 @@
 									<listOptionValue builtIn="false" value="&quot;${HOME}/linuxptp-1.6&quot;"/>
 									<listOptionValue builtIn="false" value="/usr/lib64/glib-2.0/include"/>
 									<listOptionValue builtIn="false" value="/usr/include/libftdi1"/>
+									<listOptionValue builtIn="false" value="/usr/include/dpdk/"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.929424994" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>

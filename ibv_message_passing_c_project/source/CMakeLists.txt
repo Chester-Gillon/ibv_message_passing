@@ -17,6 +17,7 @@ cmake_minimum_required (VERSION 2.8.12)
 
 include (CheckStructHasMember)
 include (CheckSymbolExists)
+include (FindPkgConfig)
 
 # If a local rdma-core build directory has been specified, use that instead of the system installed version.
 # This causes CMake to set a rpath in the executables to the absolute path of the libraries in the local rdma-core
@@ -99,6 +100,9 @@ if (${HAVE_IBV_MODIFY_QP_RATE_LIMIT})
     add_definitions(-DHAVE_IBV_MODIFY_QP_RATE_LIMIT)
 endif()
 
+# Determine if DPDK is available
+pkg_check_modules (DPDK libdpdk)
+
 # -fmessage-length=0 is to allow Eclipse traceback for error messages
 set (COMMON_FLAGS "${PLATFORM_CFLAGS} -Wall -fmessage-length=0")
 
@@ -146,6 +150,9 @@ add_subdirectory ("${PROJECT_SOURCE_DIR}/compare_ada_files")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/clear_gcno_artificial_function_flags")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/udp_broadcast")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/bind_local")
+if (${DPDK_FOUND})
+    add_subdirectory ("${PROJECT_SOURCE_DIR}/dpdk_switch_test")
+endif()
 
 # Location of the source code for the linuxptp package, to gain access to the phc.[ch]
 set (LINUXPTP_ROOT "$ENV{HOME}/linuxptp-1.6")
