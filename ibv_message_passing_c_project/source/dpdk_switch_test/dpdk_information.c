@@ -28,6 +28,7 @@ int main (int argc, char *argv[])
     uint16_t port_id;
     struct rte_eth_dev_info dev_info;
     struct rte_eth_link link;
+    struct rte_eth_fc_conf fc_conf;
     char if_name[IF_NAMESIZE];
     uint64_t offload;
 
@@ -156,6 +157,45 @@ int main (int argc, char *argv[])
         else
         {
             printf ("rte_eth_link_get() failed : %s\n", strerror (-rc));
+        }
+
+        /* Display flow control settings */
+        rc = rte_eth_dev_flow_ctrl_get (port_id, &fc_conf);
+        if (rc == 0)
+        {
+            printf ("  Flow control mode : ");
+            switch (fc_conf.mode)
+            {
+            case RTE_ETH_FC_NONE:
+                printf ("Disable flow control\n");
+                break;
+
+            case RTE_ETH_FC_RX_PAUSE:
+                printf ("Rx pause frame, enable flowctrl on Tx side\n");
+                break;
+
+            case RTE_ETH_FC_TX_PAUSE:
+                printf ("Tx pause frame, enable flowctrl on Rx side\n");
+                break;
+
+            case RTE_ETH_FC_FULL:
+                printf ("Enable flow control on both side\n");
+                break;
+            default:
+                printf ("???\n");
+                break;
+            }
+            printf ("  Flow control high_water=%" PRIu32 " low_water=%" PRIu32 " pause_time=%" PRIu16 " send_xon=%" PRIu16 " mac_ctrl_frame_fwd=%" PRIu8 " autoneg=%" PRIu8 "\n",
+                    fc_conf.high_water,
+                    fc_conf.low_water,
+                    fc_conf.pause_time,
+                    fc_conf.send_xon,
+                    fc_conf.mac_ctrl_frame_fwd,
+                    fc_conf.autoneg);
+        }
+        else
+        {
+            printf ("rte_eth_dev_flow_ctrl_get() failed : %s\n", strerror (-rc));
         }
     }
 
