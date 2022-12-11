@@ -16,6 +16,12 @@
 #include <rte_debug.h>
 #include <rte_ethdev.h>
 
+static void display_usage (const char *const prgname)
+{
+    printf ("This program doesn't use any arguments over and above those used by the DPDK EAL\n");
+    printf ("prgname = %s\n\n", prgname);
+}
+
 int main (int argc, char *argv[])
 {
     int rc;
@@ -25,11 +31,24 @@ int main (int argc, char *argv[])
     char if_name[IF_NAMESIZE];
     uint64_t offload;
 
+    /* For testing display of application usage, i.e. other than the description of the EAL options */
+    (void) rte_set_application_usage_hook (display_usage);
+
     rc = rte_eal_init (argc, argv);
     if (rc < 0)
     {
-        rte_panic("Cannot init EAL\n");
+        printf ("rte_eal_init() failed : %s\n", strerror (-rc));
+        (void) rte_eal_cleanup();
+        exit (EXIT_FAILURE);
     }
+
+    /* Display the non EAL arguments. Always includes the program name as the first */
+    printf ("Non EAL arguments:");
+    for (int arg_index = rc; arg_index < argc; arg_index++)
+    {
+        printf (" %s", argv[arg_index]);
+    }
+    printf ("\n");
 
     /* Display the number of lcores which can be set by the -l option parsed by rte_eal_init().
      * Defaults to all cores, when the -l option isn't used. */
