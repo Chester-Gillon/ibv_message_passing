@@ -82,6 +82,7 @@ int main (int argc, char *argv[])
 
     RTE_ETH_FOREACH_DEV (port_id)
     {
+        const struct rte_eth_fp_ops *const ops = &rte_eth_fp_ops[port_id];
         rc = rte_eth_dev_info_get (port_id, &dev_info);
         if (rc != 0)
         {
@@ -197,6 +198,39 @@ int main (int argc, char *argv[])
         {
             printf ("rte_eth_dev_flow_ctrl_get() failed : %s\n", strerror (-rc));
         }
+
+        /* Display descriptor limits */
+        printf ("  rx_desc_lim nb_max=%" PRIu16 " nb_min=%" PRIu16 " nb_align=%" PRIu16 " nb_seg_max=%" PRIu16 " nb_mtu_seg_max=%" PRIu16 "\n",
+                dev_info.rx_desc_lim.nb_max,
+                dev_info.rx_desc_lim.nb_min,
+                dev_info.rx_desc_lim.nb_align,
+                dev_info.rx_desc_lim.nb_seg_max,
+                dev_info.rx_desc_lim.nb_mtu_seg_max);
+        printf ("  tx_desc_lim nb_max=%" PRIu16 " nb_min=%" PRIu16 " nb_align=%" PRIu16 " nb_seg_max=%" PRIu16 " nb_mtu_seg_max=%" PRIu16 "\n",
+                dev_info.tx_desc_lim.nb_max,
+                dev_info.tx_desc_lim.nb_min,
+                dev_info.tx_desc_lim.nb_align,
+                dev_info.tx_desc_lim.nb_seg_max,
+                dev_info.tx_desc_lim.nb_mtu_seg_max);
+
+        /* Display configured number of queues */
+        printf ("  nb_rx_queues=%" PRIu16 " nb_tx_queues=%" PRIu16 "\n", dev_info.nb_rx_queues, dev_info.nb_tx_queues);
+
+        /* Display parameter recommendations */
+        printf ("  default_rxportconf burst_size=%" PRIu16 " ring_size=%" PRIu16 " nb_queues=%" PRIu16 "\n",
+                dev_info.default_rxportconf.burst_size,
+                dev_info.default_rxportconf.ring_size,
+                dev_info.default_rxportconf.nb_queues);
+        printf ("  default_txportconf burst_size=%" PRIu16 " ring_size=%" PRIu16 " nb_queues=%" PRIu16 "\n",
+                dev_info.default_txportconf.burst_size,
+                dev_info.default_txportconf.ring_size,
+                dev_info.default_txportconf.nb_queues);
+
+        /* Display fast-path function pointers */
+        printf ("  rx_pkt_burst=%p rx_queue_count=%p rx_descriptor_status=%p\n",
+                ops->rx_pkt_burst, ops->rx_queue_count, ops->rx_descriptor_status);
+        printf ("  tx_pkt_burst=%p tx_pkt_prepare=%p tx_descriptor_status=%p\n",
+                ops->tx_pkt_burst, ops->tx_pkt_prepare, ops->tx_descriptor_status);
     }
 
     /* clean up the EAL */
