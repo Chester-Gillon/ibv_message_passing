@@ -1,0 +1,312 @@
+For this using:
+a. HP Z4 G4 PC
+b. AlmaLinux 8.7
+c. DPDK 21.11.0 packaged by AlmaLinux
+
+When booted temporarily added intel_iommu=on to the command line, to allow DPDK to use vfio-pci to bind to a QL41112HxCU-DE:
+[mr_halfword@skylake-alma release]$ cat /proc/cmdline 
+BOOT_IMAGE=(hd1,gpt2)/vmlinuz-4.18.0-425.3.1.el8.x86_64 root=/dev/mapper/almalinux_skylake--alma-root ro resume=/dev/mapper/almalinux_skylake--alma-swap rd.lvm.lv=almalinux_skylake-alma/root rd.lvm.lv=almalinux_skylake-alma/swap rhgb quiet intel_iommu=on
+
+See https://gist.github.com/Chester-Gillon/cb4bba2a3a33ac04d9e964661731afcc#833-adding-intel_iommuon-allows-dpdk-to-use-vfio-pci-to-bind-to-a-ql41112hxcu-de
+
+
+When the PC had booted the network devices were the following, which were all in use by a kernel driver:
+[mr_halfword@skylake-alma ~]$ dpdk-devbind.py --status
+
+Network devices using kernel driver
+===================================
+0000:00:1f.6 'Ethernet Connection (2) I219-LM 15b7' if=eno1 drv=e1000e unused= *Active*
+0000:02:00.0 'I210 Gigabit Network Connection 1533' if=eno2 drv=igb unused= *Active*
+0000:21:00.0 'MT27710 Family [ConnectX-4 Lx] 1015' if=ens1f0 drv=mlx5_core unused= *Active*
+0000:21:00.1 'MT27710 Family [ConnectX-4 Lx] 1015' if=ens1f1 drv=mlx5_core unused= *Active*
+0000:2d:00.0 'FastLinQ QL41000 Series 10/25/40/50GbE Controller 8070' if=ens5f0 drv=qede unused= *Active*
+0000:2d:00.1 'FastLinQ QL41000 Series 10/25/40/50GbE Controller 8070' if=ens5f1 drv=qede unused= *Active*
+
+No 'Baseband' devices detected
+==============================
+
+No 'Crypto' devices detected
+============================
+
+DMA devices using kernel driver
+===============================
+0000:00:04.0 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused= 
+0000:00:04.1 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused= 
+0000:00:04.2 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused= 
+0000:00:04.3 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused= 
+0000:00:04.4 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused= 
+0000:00:04.5 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused= 
+0000:00:04.6 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused= 
+0000:00:04.7 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused= 
+
+No 'Eventdev' devices detected
+==============================
+
+No 'Mempool' devices detected
+=============================
+
+No 'Compress' devices detected
+==============================
+
+No 'Misc (rawdev)' devices detected
+===================================
+
+No 'Regex' devices detected
+===========================
+
+
+Where:
+a. I219-LM and I210 are onboard 1G network interfaces
+b. MT27710 Family [ConnectX-4 Lx] 1015' is a dual port ConnectX-4 Lx En with 10G ports
+c. 'FastLinQ QL41000 Series 10/25/40/50GbE Controller 8070' is a dual port QL41112HxCU-DE with 10G ports
+
+All network ports were connected to a switch, and when in use with the kernel driver the links were up.
+
+In the Network Manager turned all six interfaces off.
+
+
+The ConnectX-4 uses a DPDK Bifurcated Driver, so for that the kernel driver is left attached.
+
+To allow the other interfaces to be used by DPDK first load the vfio-pci module:
+[mr_halfword@skylake-alma release]$ sudo modprobe vfio-pci
+[sudo] password for mr_halfword: 
+
+And in turn bind DPDK to the network interfaces, which causes the links on these interfaces to go down:
+[mr_halfword@skylake-alma release]$ sudo dpdk-devbind.py --bind=vfio-pci 0000:00:1f.6
+[mr_halfword@skylake-alma release]$ sudo dpdk-devbind.py --bind=vfio-pci 0000:02:00.0
+[mr_halfword@skylake-alma release]$ sudo dpdk-devbind.py --bind=vfio-pci 0000:2d:00.0
+[mr_halfword@skylake-alma release]$ sudo dpdk-devbind.py --bind=vfio-pci 0000:2d:00.1
+
+
+And the I219-LM, I210 and QL41112HxCU-DE then show as using a DPDK-compatible driver:
+[mr_halfword@skylake-alma ~]$ dpdk-devbind.py --status
+
+Network devices using DPDK-compatible driver
+============================================
+0000:00:1f.6 'Ethernet Connection (2) I219-LM 15b7' drv=vfio-pci unused=e1000e
+0000:02:00.0 'I210 Gigabit Network Connection 1533' drv=vfio-pci unused=igb
+0000:2d:00.0 'FastLinQ QL41000 Series 10/25/40/50GbE Controller 8070' drv=vfio-pci unused=qede
+0000:2d:00.1 'FastLinQ QL41000 Series 10/25/40/50GbE Controller 8070' drv=vfio-pci unused=qede
+
+Network devices using kernel driver
+===================================
+0000:21:00.0 'MT27710 Family [ConnectX-4 Lx] 1015' if=ens1f0 drv=mlx5_core unused=vfio-pci 
+0000:21:00.1 'MT27710 Family [ConnectX-4 Lx] 1015' if=ens1f1 drv=mlx5_core unused=vfio-pci 
+
+No 'Baseband' devices detected
+==============================
+
+No 'Crypto' devices detected
+============================
+
+DMA devices using kernel driver
+===============================
+0000:00:04.0 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=vfio-pci 
+0000:00:04.1 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=vfio-pci 
+0000:00:04.2 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=vfio-pci 
+0000:00:04.3 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=vfio-pci 
+0000:00:04.4 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=vfio-pci 
+0000:00:04.5 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=vfio-pci 
+0000:00:04.6 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=vfio-pci 
+0000:00:04.7 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=vfio-pci 
+
+No 'Eventdev' devices detected
+==============================
+
+No 'Mempool' devices detected
+=============================
+
+No 'Compress' devices detected
+==============================
+
+No 'Misc (rawdev)' devices detected
+===================================
+
+No 'Regex' devices detected
+===========================
+
+
+The results of running dpdk_information were:
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_information --no-huge -m 1024m
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: VFIO support initialized
+EAL: Using IOMMU type 1 (Type 1)
+EAL: Probe PCI driver: net_e1000_em (8086:15b7) device: 0000:00:1f.6 (socket 0)
+EAL: Ignore mapping IO port bar(2)
+EAL: Probe PCI driver: net_e1000_igb (8086:1533) device: 0000:02:00.0 (socket 0)
+EAL: Probe PCI driver: mlx5_pci (15b3:1015) device: 0000:21:00.0 (socket 0)
+mlx5_net: No available register for sampler.
+EAL: Probe PCI driver: mlx5_pci (15b3:1015) device: 0000:21:00.1 (socket 0)
+mlx5_net: No available register for sampler.
+EAL: Ignore mapping IO port bar(1)
+EAL: Ignore mapping IO port bar(3)
+EAL: Ignore mapping IO port bar(5)
+EAL: Probe PCI driver: net_qede (1077:8070) device: 0000:2d:00.0 (socket 0)
+EAL: Ignore mapping IO port bar(1)
+EAL: Ignore mapping IO port bar(3)
+EAL: Ignore mapping IO port bar(5)
+EAL: Probe PCI driver: net_qede (1077:8070) device: 0000:2d:00.1 (socket 0)
+TELEMETRY: No legacy callbacks, legacy socket not created
+Non EAL arguments: dpdk_switch_test/dpdk_information
+rte_lcore_count = 8
+rte_eal_iova_mode : DMA using virtual address
+rte_eth_dev_count_total = 6
+rte_eth_dev_count_avail = 6
+
+port_id=0 driver_name=net_e1000_em
+  device.name=0000:00:1f.6
+  if_index=0
+  Rx Offloading Capabilities:
+    Per Queue : VLAN_STRIP IPV4_CKSUM UDP_CKSUM TCP_CKSUM VLAN_FILTER SCATTER KEEP_CRC
+    Per Port  :
+  Tx Offloading Capabilities:
+    Per Queue : VLAN_INSERT IPV4_CKSUM UDP_CKSUM TCP_CKSUM MULTI_SEGS
+    Per Port  :
+  adjusted nb_rxd=32 nb_txd=32
+  rx_qinfo nb_desc=32 rx_buf_size=0 scattered_rx=0
+  rx_qinfo rx_free_thresh=0 rx_drop_en=0 pthresh=0 hthresh=0 wthresh=0
+  tx_qinfo nb_desc=32 pthresh=0 hthresh=0 wthresh=0 tx_rs_thresh=8 tx_free_thresh=8
+EAL: Error enabling MSI-X interrupts for fd 44
+  link_speed=1000 Mbps  link_duplex=Full  link_autoneg=Autonegotiated  link_status=Up
+  Flow control mode : Disable flow control
+  Flow control high_water=23552 low_water=22052 pause_time=1664 send_xon=1 mac_ctrl_frame_fwd=0 autoneg=1
+  rx_desc_lim nb_max=4096 nb_min=32 nb_align=8 nb_seg_max=0 nb_mtu_seg_max=0
+  tx_desc_lim nb_max=4096 nb_min=32 nb_align=8 nb_seg_max=255 nb_mtu_seg_max=255
+  nb_rx_queues=0 nb_tx_queues=0
+  default_rxportconf burst_size=0 ring_size=256 nb_queues=1
+  default_txportconf burst_size=0 ring_size=256 nb_queues=1
+  rx_pkt_burst=0x7effbd434c40 rx_queue_count=0x7effbd438570 rx_descriptor_status=0x7effbd4385d0
+  tx_pkt_burst=0x7effbd436870 tx_pkt_prepare=0x7effbd437d00 tx_descriptor_status=0x7effbd438620
+
+port_id=1 driver_name=net_e1000_igb
+  device.name=0000:02:00.0
+  if_index=0
+  Rx Offloading Capabilities:
+    Per Queue :
+    Per Port  : VLAN_STRIP IPV4_CKSUM UDP_CKSUM TCP_CKSUM VLAN_FILTER VLAN_EXTEND SCATTER KEEP_CRC RSS_HASH
+  Tx Offloading Capabilities:
+    Per Queue : VLAN_INSERT IPV4_CKSUM UDP_CKSUM TCP_CKSUM SCTP_CKSUM TCP_TSO MULTI_SEGS
+    Per Port  :
+  adjusted nb_rxd=32 nb_txd=32
+  rx_qinfo nb_desc=32 rx_buf_size=0 scattered_rx=0
+  rx_qinfo rx_free_thresh=32 rx_drop_en=0 pthresh=0 hthresh=0 wthresh=0
+  tx_qinfo nb_desc=32 pthresh=8 hthresh=1 wthresh=16 tx_rs_thresh=0 tx_free_thresh=0
+Waiting (with timeout) for link to come up
+  Link came up after 3.554 seconds
+  link_speed=1000 Mbps  link_duplex=Full  link_autoneg=Autonegotiated  link_status=Up
+  Flow control mode : Disable flow control
+  Flow control high_water=31780 low_water=30280 pause_time=1664 send_xon=1 mac_ctrl_frame_fwd=0 autoneg=1
+  rx_desc_lim nb_max=4096 nb_min=32 nb_align=8 nb_seg_max=0 nb_mtu_seg_max=0
+  tx_desc_lim nb_max=4096 nb_min=32 nb_align=8 nb_seg_max=255 nb_mtu_seg_max=255
+  nb_rx_queues=0 nb_tx_queues=0
+  default_rxportconf burst_size=0 ring_size=0 nb_queues=0
+  default_txportconf burst_size=0 ring_size=0 nb_queues=0
+  rx_pkt_burst=0x7effbd441900 rx_queue_count=0x7effbd445810 rx_descriptor_status=0x7effbd445870
+  tx_pkt_burst=0x7effbd442b70 tx_pkt_prepare=0x7effbd441430 tx_descriptor_status=0x7effbd4458c0
+
+port_id=2 driver_name=mlx5_pci
+  device.name=0000:21:00.0
+  if_index=6  if_name=ens1f0
+  Rx Offloading Capabilities:
+    Per Queue : VLAN_STRIP IPV4_CKSUM UDP_CKSUM TCP_CKSUM TCP_LRO SCATTER TIMESTAMP KEEP_CRC RSS_HASH BUFFER_SPLIT
+    Per Port  : VLAN_FILTER
+  Tx Offloading Capabilities:
+    Per Queue :
+    Per Port  : VLAN_INSERT IPV4_CKSUM UDP_CKSUM TCP_CKSUM TCP_TSO OUTER_IPV4_CKSUM VXLAN_TNL_TSO GRE_TNL_TSO GENEVE_TNL_TSO MULTI_SEGS MBUF_FAST_FREE UDP_TNL_TSO IP_TNL_TSO
+  adjusted nb_rxd=1 nb_txd=1
+  rx_qinfo nb_desc=1 rx_buf_size=0 scattered_rx=0
+  rx_qinfo rx_free_thresh=1 rx_drop_en=1 pthresh=0 hthresh=0 wthresh=0
+mlx5_net: port 2 number of descriptors requested for Tx queue 0 must be higher than MLX5_TX_COMP_THRESH, using 33 instead of 1
+mlx5_net: port 2 increased number of descriptors in Tx queue 0 to the next power of two (64)
+  tx_qinfo nb_desc=64 pthresh=0 hthresh=0 wthresh=0 tx_rs_thresh=0 tx_free_thresh=0
+  link_speed=10000 Mbps  link_duplex=Full  link_autoneg=Autonegotiated  link_status=Up
+  Flow control mode : Enable flow control on both side
+  Flow control high_water=0 low_water=0 pause_time=0 send_xon=0 mac_ctrl_frame_fwd=0 autoneg=0
+  rx_desc_lim nb_max=65535 nb_min=0 nb_align=1 nb_seg_max=65535 nb_mtu_seg_max=65535
+  tx_desc_lim nb_max=65535 nb_min=0 nb_align=1 nb_seg_max=40 nb_mtu_seg_max=40
+  nb_rx_queues=0 nb_tx_queues=0
+  default_rxportconf burst_size=64 ring_size=256 nb_queues=8
+  default_txportconf burst_size=64 ring_size=256 nb_queues=8
+  rx_pkt_burst=0x7effbbef2e30 rx_queue_count=0x7effbbd595b0 rx_descriptor_status=0x7effbbd593b0
+  tx_pkt_burst=0x7effbbe6db80 tx_pkt_prepare=(nil) tx_descriptor_status=0x7effbbd6df80
+
+port_id=3 driver_name=mlx5_pci
+  device.name=0000:21:00.1
+  if_index=7  if_name=ens1f1
+  Rx Offloading Capabilities:
+    Per Queue : VLAN_STRIP IPV4_CKSUM UDP_CKSUM TCP_CKSUM TCP_LRO SCATTER TIMESTAMP KEEP_CRC RSS_HASH BUFFER_SPLIT
+    Per Port  : VLAN_FILTER
+  Tx Offloading Capabilities:
+    Per Queue :
+    Per Port  : VLAN_INSERT IPV4_CKSUM UDP_CKSUM TCP_CKSUM TCP_TSO OUTER_IPV4_CKSUM VXLAN_TNL_TSO GRE_TNL_TSO GENEVE_TNL_TSO MULTI_SEGS MBUF_FAST_FREE UDP_TNL_TSO IP_TNL_TSO
+  adjusted nb_rxd=1 nb_txd=1
+  rx_qinfo nb_desc=1 rx_buf_size=0 scattered_rx=0
+  rx_qinfo rx_free_thresh=1 rx_drop_en=1 pthresh=0 hthresh=0 wthresh=0
+mlx5_net: port 3 number of descriptors requested for Tx queue 0 must be higher than MLX5_TX_COMP_THRESH, using 33 instead of 1
+mlx5_net: port 3 increased number of descriptors in Tx queue 0 to the next power of two (64)
+  tx_qinfo nb_desc=64 pthresh=0 hthresh=0 wthresh=0 tx_rs_thresh=0 tx_free_thresh=0
+  link_speed=10000 Mbps  link_duplex=Full  link_autoneg=Autonegotiated  link_status=Up
+  Flow control mode : Enable flow control on both side
+  Flow control high_water=0 low_water=0 pause_time=0 send_xon=0 mac_ctrl_frame_fwd=0 autoneg=0
+  rx_desc_lim nb_max=65535 nb_min=0 nb_align=1 nb_seg_max=65535 nb_mtu_seg_max=65535
+  tx_desc_lim nb_max=65535 nb_min=0 nb_align=1 nb_seg_max=40 nb_mtu_seg_max=40
+  nb_rx_queues=0 nb_tx_queues=0
+  default_rxportconf burst_size=64 ring_size=256 nb_queues=8
+  default_txportconf burst_size=64 ring_size=256 nb_queues=8
+  rx_pkt_burst=0x7effbbef2e30 rx_queue_count=0x7effbbd595b0 rx_descriptor_status=0x7effbbd593b0
+  tx_pkt_burst=0x7effbbe6db80 tx_pkt_prepare=(nil) tx_descriptor_status=0x7effbbd6df80
+
+port_id=4 driver_name=net_qede
+  device.name=0000:2d:00.0
+  if_index=0
+  Rx Offloading Capabilities:
+    Per Queue :
+    Per Port  : VLAN_STRIP IPV4_CKSUM UDP_CKSUM TCP_CKSUM TCP_LRO OUTER_IPV4_CKSUM VLAN_FILTER SCATTER KEEP_CRC RSS_HASH
+  Tx Offloading Capabilities:
+    Per Queue : VLAN_INSERT IPV4_CKSUM UDP_CKSUM TCP_CKSUM TCP_TSO OUTER_IPV4_CKSUM VXLAN_TNL_TSO GENEVE_TNL_TSO MULTI_SEGS
+    Per Port  :
+  adjusted nb_rxd=128 nb_txd=256
+rte_eth_rx_queue_info_get() failed : Operation not supported
+rte_eth_tx_queue_info_get() failed : Operation not supported
+Waiting (with timeout) for link to come up
+  Link came up after 0.071 seconds
+  link_speed=10000 Mbps  link_duplex=Full  link_autoneg=Fixed  link_status=Up
+  Flow control mode : Enable flow control on both side
+  Flow control high_water=0 low_water=0 pause_time=0 send_xon=0 mac_ctrl_frame_fwd=0 autoneg=0
+  rx_desc_lim nb_max=32768 nb_min=128 nb_align=128 nb_seg_max=0 nb_mtu_seg_max=0
+  tx_desc_lim nb_max=32768 nb_min=256 nb_align=256 nb_seg_max=255 nb_mtu_seg_max=18
+  nb_rx_queues=0 nb_tx_queues=0
+  default_rxportconf burst_size=0 ring_size=0 nb_queues=0
+  default_txportconf burst_size=0 ring_size=0 nb_queues=0
+  rx_pkt_burst=0x7effbb67f640 rx_queue_count=(nil) rx_descriptor_status=0x7effbb684490
+  tx_pkt_burst=0x7effbb682320 tx_pkt_prepare=0x7effbb682210 tx_descriptor_status=(nil)
+
+port_id=5 driver_name=net_qede
+  device.name=0000:2d:00.1
+  if_index=0
+  Rx Offloading Capabilities:
+    Per Queue :
+    Per Port  : VLAN_STRIP IPV4_CKSUM UDP_CKSUM TCP_CKSUM TCP_LRO OUTER_IPV4_CKSUM VLAN_FILTER SCATTER KEEP_CRC RSS_HASH
+  Tx Offloading Capabilities:
+    Per Queue : VLAN_INSERT IPV4_CKSUM UDP_CKSUM TCP_CKSUM TCP_TSO OUTER_IPV4_CKSUM VXLAN_TNL_TSO GENEVE_TNL_TSO MULTI_SEGS
+    Per Port  :
+  adjusted nb_rxd=128 nb_txd=256
+rte_eth_rx_queue_info_get() failed : Operation not supported
+rte_eth_tx_queue_info_get() failed : Operation not supported
+Waiting (with timeout) for link to come up
+  Link came up after 0.071 seconds
+  link_speed=10000 Mbps  link_duplex=Full  link_autoneg=Fixed  link_status=Up
+  Flow control mode : Enable flow control on both side
+  Flow control high_water=0 low_water=0 pause_time=0 send_xon=0 mac_ctrl_frame_fwd=0 autoneg=0
+  rx_desc_lim nb_max=32768 nb_min=128 nb_align=128 nb_seg_max=0 nb_mtu_seg_max=0
+  tx_desc_lim nb_max=32768 nb_min=256 nb_align=256 nb_seg_max=255 nb_mtu_seg_max=18
+  nb_rx_queues=0 nb_tx_queues=0
+  default_rxportconf burst_size=0 ring_size=0 nb_queues=0
+  default_txportconf burst_size=0 ring_size=0 nb_queues=0
+  rx_pkt_burst=0x7effbb67f640 rx_queue_count=(nil) rx_descriptor_status=0x7effbb684490
+  tx_pkt_burst=0x7effbb682320 tx_pkt_prepare=0x7effbb682210 tx_descriptor_status=(nil)
+EAL: Error disabling MSI-X interrupts for fd 44

@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <time.h>
 
 #include <net/if.h>
 
@@ -22,6 +23,16 @@ static void display_usage (const char *const prgname)
     printf ("This program doesn't use any arguments over and above those used by the DPDK EAL\n");
     printf ("prgname = %s\n\n", prgname);
 }
+
+
+static double get_monotonic_time (void)
+{
+    struct timespec now;
+
+    clock_gettime (CLOCK_MONOTONIC, &now);
+    return (double) now.tv_sec + ((double) now.tv_nsec / 1E9);
+}
+
 
 int main (int argc, char *argv[])
 {
@@ -196,15 +207,20 @@ int main (int argc, char *argv[])
             exit (EXIT_FAILURE);
         }
 
-        /* Allocate and setup 1 RX queue for the port */
+        /* Allocate and setup 1 RX queue for the port. */
         rc = rte_eth_rx_queue_setup (port_id, queue_id, nb_rxd, rte_eth_dev_socket_id (port_id), NULL, mbuf_pool);
         if (rc == 0)
         {
+            /* Attempt to display information about the created queue.
+             * May not be supported by all drivers (e.g. qede) */
             rc = rte_eth_rx_queue_info_get (port_id, queue_id, &rx_qinfo);
             if (rc == 0)
             {
-                printf ("  rx_qinfo nb_desc=%" PRIu16 " rx_buf_size=%" PRIu16 "\n",
-                        rx_qinfo.nb_desc, rx_qinfo.rx_buf_size);
+                printf ("  rx_qinfo nb_desc=%" PRIu16 " rx_buf_size=%" PRIu16 " scattered_rx=%" PRIu16 "\n",
+                        rx_qinfo.nb_desc, rx_qinfo.rx_buf_size, rx_qinfo.scattered_rx);
+                printf ("  rx_qinfo rx_free_thresh=%" PRIu16 " rx_drop_en=%" PRIu8 " pthresh=%" PRIu16 " hthresh=%" PRIu8 " wthresh=%" PRIu8 "\n",
+                        rx_qinfo.conf.rx_free_thresh, rx_qinfo.conf.rx_drop_en,
+                        rx_qinfo.conf.rx_thresh.pthresh, rx_qinfo.conf.rx_thresh.hthresh, rx_qinfo.conf.rx_thresh.wthresh);
             }
             else
             {
@@ -220,6 +236,11 @@ int main (int argc, char *argv[])
         rc = rte_eth_tx_queue_setup (port_id, queue_id, nb_txd, rte_eth_dev_socket_id (port_id), NULL);
         if (rc == 0)
         {
+            /* Attempt to display information about the created queue.
+             * May not be supported by all drivers (e.g. qede).
+             * With the mlx5_pci driver rte_eth_tx_queue_setup() can increase the number of descriptors
+             * over that set by rte_eth_dev_adjust_nb_rx_tx_desc()
+             */
             rc = rte_eth_tx_queue_info_get (port_id, queue_id, &tx_qinfo);
             if (rc == 0)
             {
@@ -245,9 +266,36 @@ int main (int argc, char *argv[])
             printf ("rte_eth_dev_start() failed : %s\n", strerror (-rc));
         }
 
-        rc = rte_eth_link_get (port_id, &link);
+        rc = rte_eth_link_get_nowait (port_id, &link);
         if (rc == 0)
         {
+            if (link.link_status == RTE_ETH_LINK_DOWN)
+            {
+                /* Wait with a timeout for the link to come up.
+                 * With the qede or net_e1000_igb driver the link is only enable to come up once
+                 * rte_eth_dev_start() has been called, and then has to wait for the auto-negotiation to complete. */
+                const double start_time = get_monotonic_time ();
+                const double expiry_time = start_time + 15;
+                double now;
+                const struct timespec hold_off =
+                {
+                    .tv_sec = 0,
+                    .tv_nsec = 10000000 /* 10 milliseconds */
+                };
+
+                printf ("Waiting (with timeout) for link to come up\n");
+                do
+                {
+                    clock_nanosleep (CLOCK_MONOTONIC, 0, &hold_off, NULL);
+                    rc = rte_eth_link_get_nowait (port_id, &link);
+                    now = get_monotonic_time ();
+                } while ((link.link_status == RTE_ETH_LINK_DOWN) && (now < expiry_time));
+
+                printf ("  Link %s after %.3lf seconds\n",
+                        (link.link_status == RTE_ETH_LINK_UP) ? "came up" : "still down",
+                        now - start_time);
+            }
+
             printf ("  link_speed=%" PRIu32 " Mbps  link_duplex=%s  link_autoneg=%s  link_status=%s\n",
                     (link.link_speed == RTE_ETH_SPEED_NUM_UNKNOWN) ? 0 : link.link_speed,
                     (link.link_duplex == RTE_ETH_LINK_FULL_DUPLEX) ? "Full" : "Half",
