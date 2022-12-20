@@ -4,6 +4,7 @@
  * @author Chester Gillon
  * @details A variant of the https://github.com/chester-gillon/switch_test but which uses
  *          Data Plane Development Kit (DPDK)to transmit and receive the frames, rather than PCAP.
+ * @todo console_printf() doesn't write any console output from the DPDK EAL, e.g. errors, to the log file.
  */
 
 #include <stdbool.h>
@@ -12,6 +13,9 @@
 #include <inttypes.h>
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
+#include <signal.h>
+#include <math.h>
 
 #include <unistd.h>
 #include <limits.h>
@@ -107,6 +111,12 @@ static const port_id_t test_ports[NUM_DEFINED_PORTS] =
     { .switch_port_number = 47, .mac_addr = {2,0,1,0,0,46}, .vlan = 1047},
     { .switch_port_number = 48, .mac_addr = {2,0,1,0,0,47}, .vlan = 1048},
 };
+
+
+/* Only need a single device queue for this program */
+#define NUM_RX_QUEUES 1
+#define NUM_TX_QUEUES 1
+#define QUEUE_ID      0
 
 
 /* Array which defines which of the indices in test_ports[] are tested at run-time.
@@ -252,10 +262,6 @@ typedef struct
 static FILE *console_file;
 
 
-/* The DPDK port identity (aka device) used to send/receive test frames, which is extracted from the EAL options.
- *  rte_eal_init() will have probed the device. */
-static uint16_t arg_port_id;
-
 /* Command line argument which specifies the test interval in seconds, which is the interval over which statistics are
  * accumulated and then reported. */
 static int64_t arg_test_interval_secs = 10;
@@ -366,6 +372,13 @@ typedef struct
 /* The context used for the thread which sends/receive the test frames */
 typedef struct
 {
+    /* The identity of the lcore used to send/receive the test frames */
+    int worker_lcore_id;
+    /* The DPDK port identity (aka device) used to send/receive test frames, which is extracted from the EAL options.
+     *  rte_eal_init() will have probed the device. */
+    uint16_t port_id;
+    /* The DPDK device information for port_id */
+    struct rte_eth_dev_info dev_info;
     /* The RDMA device used to send/receive frames */
     //@todo change for DPDK struct ibv_context *rdma_device;
     /* Attributes for rdma_device and the selected port */
@@ -384,26 +397,33 @@ typedef struct
     //@todo change for DPDK struct ibv_qp_ex *qpx;
     /* Receive flow used to receive raw all raw Ethernet packets */
     //@todo change for DPDK struct ibv_flow *flow;
-    /** The number of buffers allocated for transmit and receive, which can be queued for RDMA */
-    uint32_t tx_num_buffers;
-    uint32_t rx_num_buffers;
+    /* The number of DPDK descriptors allocated for transmit and receive.
+     * These are adjusted to fit the limits imposed for the Ethernet device. */
+    uint16_t tx_num_descriptors;
+    uint16_t rx_num_descriptors;
+    /* Pool used for transmit descriptors */
+    struct rte_mempool *tx_mbuf_pool;
+    /* Pool used for receive descriptors */
+    struct rte_mempool *rx_mbuf_pool;
+    /* Array of length [rx_num_descriptors] used for receiving packets */
+    struct rte_mbuf **rx_pkts;
     /* Used to allocate space for tx_num_buffers+rx_num_buffers for transmitting and receiving frames by RDMA.
      * Initially haven't attempted to align the start of each frame to a cache line as not sure if will improve
      * performance without measuring it. */
-    ethercat_frame_t *frames;
+    //@todo DPDK mempool's are used ethercat_frame_t *frames;
     /* The RDMA memory region to access the frames[] array */
     //@todo change for DPDK struct ibv_mr *mr;
     /* Circular buffer of length [tx_num_buffers] for queueing frames for transmit via RDMA */
-    ethercat_frame_t *tx_frames;
+    //@todo DPDK mbufs are used ethercat_frame_t *tx_frames;
     /* The index into tx_frames[] to be used for the next frame transmitted */
-    uint32_t next_tx_buffer_index;
+    //@todo DPDK mbufs are used so no index maintained uint32_t next_tx_buffer_index;
     /* The number of entries in tx_frames[] which have been queued for transmission and waiting for completion.
      * When num_tx_buffers_queued==tx_num_buffers transmission has to pause waiting for a completion to be signaled. */
-    uint32_t num_tx_buffers_queued;
+    //@todo DPDK doesn't allow this to be tracked with all drivers uint32_t num_tx_buffers_queued;
     /* Circular buffer of length [rx_num_buffers] for posting receive requests via RDMA */
-    ethercat_frame_t *rx_frames;
+    //@todo DPDK mbufs are used ethercat_frame_t *rx_frames;
     /* The index into rx_frames[] to be used for the next frame received */
-    uint32_t next_rx_buffer_index;
+    //@todo DPDK mbufs are used so no index maintained uint32_t next_rx_buffer_index;
     /* The next sequence number to be transmitted */
     uint32_t next_tx_sequence_number;
     /* The next index into tested_port_indices[] for the next destination port to use for a transmitted frame */
@@ -799,6 +819,182 @@ static void read_command_line_arguments (const int argc, char *argv[])
 }
 
 
+/**
+ * @brief Open the DPDK device used to send/receive test frames
+ * @param[in/out] context The context being initialised.
+ */
+static void open_dpdk_device (frame_tx_rx_thread_context_t *const context)
+{
+    int rc;
+    struct rte_eth_conf port_conf;
+    struct rte_eth_txq_info tx_qinfo;
+
+    /* Find the identity of the worker lcore_id used by the test */
+    context->worker_lcore_id = rte_get_next_lcore (-1, 1, 0);
+    check_assert (context->worker_lcore_id != RTE_MAX_LCORE, "failed to determine worker lcore_id");
+
+    /* Get the identity of the first available port to be used for the test.
+     * read_command_line_arguments() has already verified that the command line arguments have selected
+     * a single available port. */
+    context->port_id = rte_eth_find_next_owned_by (0, RTE_ETH_DEV_NO_OWNER);
+    CHECK_ASSERT (context->port_id < RTE_MAX_ETHPORTS);
+    CHECK_ASSERT (rte_eth_dev_is_valid_port (context->port_id));
+
+    /* Get the device information for information about descriptor limits */
+    rc = rte_eth_dev_info_get (context->port_id, &context->dev_info);
+    CHECK_ASSERT (rc == 0);
+    console_printf ("Using DPDK driver_name=%s device_name=%s\n",
+            context->dev_info.driver_name, context->dev_info.device->name);
+
+    /* Warn if the worker lcore and Ethernet device are on different sockets (NUMA nodes) as may impact performance */
+    const int lcore_socket_id = rte_lcore_to_socket_id (context->worker_lcore_id);
+    const int device_socket_id = rte_eth_dev_socket_id (context->port_id);
+    if (lcore_socket_id != device_socket_id)
+    {
+        console_printf ("Warning: worked_lcore_id %d is on a different socket_id %d to the device on socket_id %d (may impact performance)\n",
+                context->worker_lcore_id, lcore_socket_id, device_socket_id);
+    }
+
+    /* Configure device using defaults, and no offloads enabled */
+    memset (&port_conf, 0, sizeof (port_conf));
+    rc = rte_eth_dev_configure (context->port_id, NUM_RX_QUEUES, NUM_TX_QUEUES, &port_conf);
+
+    /* Limit the burst which can be queued for transmission to the number of ports on the switch under test,
+     * to avoid potentially overloading switch ports if the software gets behind. */
+    const uint16_t desired_tx_num_descriptors = (uint16_t) num_tested_port_indices;
+
+    /* @todo Is this an over estimate? While smaller may make better use of cache not sure how that works
+     *       with DPDK (which has to target memory?).
+     *       Also, the comment about the rationale for the value of NOMINAL_TOTAL_PENDING_RX_FRAMES has
+     *       been copied from the code which used pcap.
+     *
+     *       With pcap the amount of transmit and receive buffering was not visible to the program.
+     *
+     *       Whereas with DPDK this program can limit the maximum number of Tx frames which can be queued
+     *       and therefore should be determine the maximum number of pending Rx frames after some allowance
+     *       for flooded packets / other packets.
+     *
+     *       However, can the switches delay sending frames? */
+    const uint16_t desired_rx_num_descriptors = NOMINAL_TOTAL_PENDING_RX_FRAMES;
+
+    /* Adjust the number of descriptors to any device imposed limits */
+    context->tx_num_descriptors = desired_tx_num_descriptors;
+    context->rx_num_descriptors = desired_rx_num_descriptors;
+    rc = rte_eth_dev_adjust_nb_rx_tx_desc (context->port_id, &context->rx_num_descriptors, &context->tx_num_descriptors);
+    CHECK_ASSERT (rc == 0);
+
+    /* Allocate and create the transmit queue, using a default configuration */
+    rc = rte_eth_tx_queue_setup (context->port_id, QUEUE_ID, context->tx_num_descriptors, device_socket_id, NULL);
+    CHECK_ASSERT (rc == 0);
+
+    /* As of DPDK 21.11.0 the mlx5_pci driver can increase the number of transmit descriptors when
+     * rte_eth_tx_queue_info_get() to more than that set by rte_eth_dev_adjust_nb_rx_tx_desc().
+     * Attempt to get the information of the created transmit queue, and check if the number of descriptors
+     * has changed.
+     *
+     * Some drivers, e.g. net_qede, don't support rte_eth_tx_queue_info_get which is the reason for the test
+     * on ENOTSUP. */
+    rc = rte_eth_tx_queue_info_get (context->port_id, QUEUE_ID, &tx_qinfo);
+    if (rc != -ENOTSUP)
+    {
+        CHECK_ASSERT (rc == 0);
+        if (tx_qinfo.nb_desc != context->tx_num_descriptors)
+        {
+            console_printf ("rte_eth_tx_queue_info_get() changed number of Tx descriptors from %" PRIu16 " to %" PRIu16 "\n",
+                    context->tx_num_descriptors, tx_qinfo.nb_desc);
+            context->tx_num_descriptors = tx_qinfo.nb_desc;
+        }
+    }
+
+    /* Handle drivers which needs the number of ring descriptors as a power-of-two, but for which
+     * rte_eth_dev_adjust_nb_rx_tx_desc() doesn't apply the adjustment. */
+    if ((strcmp (context->dev_info.driver_name, "net_qede") == 0) ||
+        (strcmp (context->dev_info.driver_name, "mlx5_pci") == 0))
+    {
+        context->rx_num_descriptors = rte_align32pow2 (context->rx_num_descriptors);
+        context->tx_num_descriptors = rte_align32pow2 (context->tx_num_descriptors);
+    }
+
+    /* Create the pool used for transmit. The number of elements in the pool is one more than the number of
+     * descriptors so can still obtain one more mbuf if the transmit ring becomes full. The act of trying to
+     * queue a mbuf for transmission is the means by which the DPDK PMD will check for a free descriptor.
+     * Default buffer size is sufficient since are using the maximum length standard Ethernet frame.
+     * I.e. not using jumbo frames.
+     * No cache is used since only used by a single lcore.
+     * No private data is needed. */
+    context->tx_mbuf_pool = rte_pktmbuf_pool_create ("MBUF_POOL_TX", context->tx_num_descriptors + 1,
+            0, 0, RTE_MBUF_DEFAULT_BUF_SIZE, lcore_socket_id);
+    CHECK_ASSERT (context->tx_mbuf_pool != NULL);
+
+    /* Create the pool used for receive. Default buffer size is sufficient since are using the maximum length
+     * standard Ethernet frame. I.e. not using jumbo frames.
+     * No cache is used since only used by a single lcore.
+     * No private data is needed. */
+    context->rx_mbuf_pool = rte_pktmbuf_pool_create ("MBUF_POOL_RX", context->rx_num_descriptors,
+            0, 0, RTE_MBUF_DEFAULT_BUF_SIZE, lcore_socket_id);
+    CHECK_ASSERT (context->rx_mbuf_pool != NULL);
+
+    context->rx_pkts = calloc (context->rx_num_descriptors, sizeof (context->rx_pkts[0]));
+    CHECK_ASSERT (context->rx_pkts != NULL);
+
+    /* Allocate and create the receive queue, using a default configuration */
+    rc = rte_eth_rx_queue_setup (context->port_id, QUEUE_ID, context->rx_num_descriptors,
+            device_socket_id, NULL, context->rx_mbuf_pool);
+    CHECK_ASSERT (rc == 0);
+
+    /* Start the Ethernet device */
+    rc = rte_eth_dev_start (context->port_id);
+    CHECK_ASSERT (rc == 0);
+
+    /* Display the desired number of descriptors, and the actual number to meet the limits of the device */
+    console_printf ("tx_num_descriptors : desired=%" PRIu16 " actual=%" PRIu16 "\n",
+            desired_tx_num_descriptors, context->tx_num_descriptors);
+    console_printf ("rx_num_descriptors : desired=%" PRIu16 " actual=%" PRIu16 "\n",
+            desired_rx_num_descriptors, context->rx_num_descriptors);
+}
+
+
+/**
+ * @brief Get the of the DPDK Ethernet device being used for the test
+ * @details Waits until has got a valid link speed, since for Network devices using DPDK-compatible driver
+ *          the link may not start to come up until rte_eth_dev_start() has been called
+ * @return The rate in Mbps, or RTE_ETH_SPEED_NUM_UNKNOWN if the user used Ctrl-C to abort waiting
+ *         to obtain the link speed.
+ */
+static uint32_t get_rate_mbps (const frame_tx_rx_thread_context_t *const context)
+{
+    int rc;
+    struct rte_eth_link link;
+    bool link_speed_valid;
+    const struct timespec hold_off =
+    {
+        .tv_sec = 0,
+        .tv_nsec = 100000000 /* 100 milliseconds */
+    };
+    bool first_wait = true;
+
+    do
+    {
+        rc = rte_eth_link_get_nowait (context->port_id, &link);
+        CHECK_ASSERT (rc == 0);
+        link_speed_valid = (link.link_status == RTE_ETH_LINK_UP) &&
+                (link.link_speed != RTE_ETH_SPEED_NUM_NONE) && (link.link_speed != RTE_ETH_SPEED_NUM_UNKNOWN);
+
+        if (!link_speed_valid)
+        {
+            if (first_wait)
+            {
+                console_printf ("Waiting to get link speed (link needs to be up). Press Ctrl-C to abort.\n");
+                first_wait = false;
+            }
+            clock_nanosleep (CLOCK_MONOTONIC, 0, &hold_off, NULL);
+        }
+    } while (!link_speed_valid && !test_stop_requested);
+
+    return link_speed_valid ? link.link_speed : RTE_ETH_SPEED_NUM_UNKNOWN;
+}
+
+
 int main (int argc, char *argv[])
 {
     int num_eal_parsed_arguments;
@@ -810,6 +1006,12 @@ int main (int argc, char *argv[])
         fprintf (stderr, "sizeof (ethercat_frame_t) unexpected value of %" PRIuPTR, sizeof (ethercat_frame_t));
         exit (EXIT_FAILURE);
     }
+
+    /* Initialise the semaphores used to control access to the test interval statistics */
+    rc = sem_init (&test_statistics_free, 0, 1);
+    CHECK_ASSERT (rc == 0);
+    rc = sem_init (&test_statistics_populated, 0, 0);
+    CHECK_ASSERT (rc == 0);
 
     /* Initialise the DPDK EAL */
     (void) rte_set_application_usage_hook (display_application_usage);
@@ -823,16 +1025,90 @@ int main (int argc, char *argv[])
     /* Parse remaining arguments which our for out application, ignoring those parsed by the DPDK EAL */
     read_command_line_arguments (argc - num_eal_parsed_arguments, &argv[num_eal_parsed_arguments]);
 
-    /* Find the identity of the worker lcore_id used by the test */
-    const int worker_lcore_id = rte_get_next_lcore (-1, 1, 0);
-    check_assert (worker_lcore_id != RTE_MAX_LCORE, "failed to determine worker lcore_id");
-
     /* Try and avoid page faults while running */
     rc = mlockall (MCL_CURRENT | MCL_FUTURE);
     if (rc != 0)
     {
         printf ("mlockall() failed\n");
     }
+
+    /* Set filenames which contain the output files containing the date/time and OS used  */
+    results_summary_t results_summary = {{0}};
+    const time_t tod_now = time (NULL);
+    struct tm broken_down_time;
+    char date_time_str[80];
+    char frame_debug_csv_filename[160];
+    char console_filename[160];
+
+    localtime_r (&tod_now, &broken_down_time);
+    strftime (date_time_str, sizeof (date_time_str), "%Y%m%dT%H%M%S", &broken_down_time);
+    snprintf (frame_debug_csv_filename, sizeof (frame_debug_csv_filename), "%s_frames_debug_%s.csv", date_time_str, OS_NAME);
+    snprintf (console_filename, sizeof (console_filename), "%s_console_%s.txt", date_time_str, OS_NAME);
+    snprintf (results_summary.per_port_counts_csv_filename, sizeof (results_summary.per_port_counts_csv_filename),
+            "%s_per_port_counts_%s.csv", date_time_str, OS_NAME);
+
+    console_file = fopen (console_filename, "wt");
+    if (console_file == NULL)
+    {
+        fprintf (stderr, "Failed to create %s\n", console_filename);
+        exit (EXIT_FAILURE);
+    }
+
+    /* Open the DPDK device selected by the command line */
+    frame_tx_rx_thread_context_t *const tx_rx_thread_context = calloc (1, sizeof (*tx_rx_thread_context));
+    open_dpdk_device (tx_rx_thread_context);
+
+    /* Install signal handler, used to request test is stopped */
+    struct sigaction action;
+
+    memset (&action, 0, sizeof (action));
+    action.sa_handler = stop_test_handler;
+    action.sa_flags = SA_RESTART;
+    rc = sigaction (SIGINT, &action, NULL);
+    CHECK_ASSERT (rc == 0);
+
+    /* Get the bit rate of the Ethernet link used by this program */
+    const uint32_t injection_port_bit_rate_mbps = get_rate_mbps (tx_rx_thread_context);
+
+    if (injection_port_bit_rate_mbps != RTE_ETH_SPEED_NUM_UNKNOWN)
+    {
+        const int64_t injection_port_bit_rate = 1000000L * (int64_t) injection_port_bit_rate_mbps;
+        console_printf ("Bit rate on interface to injection switch = %d (Mbps)\n", injection_port_bit_rate_mbps);
+
+        /* The requested bit rate to be generated across all the switch ports under test */
+        const int64_t requested_switch_under_test_bit_rate = lround (arg_tested_port_mbps * 1E6) * num_tested_port_indices;
+        console_printf ("Requested bit rate to be generated on each switch port under test = %.2f (Mbps)\n", arg_tested_port_mbps);
+
+        /* Decide if need to limit the transmitted frame rate or not */
+        if (injection_port_bit_rate > requested_switch_under_test_bit_rate)
+        {
+            const double limited_frame_rate = (double) requested_switch_under_test_bit_rate / (double) TEST_PACKET_BITS;
+            tx_rx_thread_context->tx_interval = lround (1E9 / limited_frame_rate);
+            tx_rx_thread_context->tx_rate_limited = true;
+            console_printf ("Limiting max frame rate to %.1f Hz, as bit-rate on interface to injection switch exceeds that across all switch ports under test\n",
+                    limited_frame_rate);
+        }
+        else
+        {
+            tx_rx_thread_context->tx_rate_limited = false;
+            console_printf ("Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test\n");
+        }
+
+        /* Report the command line arguments used */
+        console_printf ("Writing per-port counts to %s\n", results_summary.per_port_counts_csv_filename);
+        console_printf ("Test interval = %" PRIi64 " (secs)\n", arg_test_interval_secs);
+        console_printf ("Frame debug enabled = %s\n", arg_frame_debug_enabled ? "Yes" : "No");
+    }
+    else
+    {
+        console_printf ("Test aborted while waiting to obtain the link speed\n");
+    }
+
+    /* Stop and close the Ethernet device */
+    rc = rte_eth_dev_stop (tx_rx_thread_context->port_id);
+    CHECK_ASSERT (rc == 0);
+    rc = rte_eth_dev_close (tx_rx_thread_context->port_id);
+    CHECK_ASSERT (rc == 0);
 
     /* clean up the EAL */
     rc = rte_eal_cleanup();
