@@ -899,9 +899,11 @@ static void open_dpdk_device (frame_tx_rx_thread_context_t *const context)
 
     /* Create the pool used for receive. Default buffer size is sufficient since are using the maximum length
      * standard Ethernet frame. I.e. not using jumbo frames.
+     * The number of mbufs is twice the number of descriptors, since some drivers (e.g. net_e1000_igb)
+     * need to allocate mbufs in rte_eth_rx_burst().
      * No cache is used since only used by a single lcore.
      * No private data is needed. */
-    context->rx_mbuf_pool = rte_pktmbuf_pool_create ("MBUF_POOL_RX", context->rx_num_descriptors,
+    context->rx_mbuf_pool = rte_pktmbuf_pool_create ("MBUF_POOL_RX", context->rx_num_descriptors * 2,
             0, 0, RTE_MBUF_DEFAULT_BUF_SIZE, lcore_socket_id);
     CHECK_ASSERT (context->rx_mbuf_pool != NULL);
 
