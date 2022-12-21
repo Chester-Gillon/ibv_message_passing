@@ -915,6 +915,10 @@ static void open_dpdk_device (frame_tx_rx_thread_context_t *const context)
     rc = rte_eth_dev_start (context->port_id);
     CHECK_ASSERT (rc == 0);
 
+    /* Need to enable promiscuous mode to receive the test frames */
+    rc = rte_eth_promiscuous_enable (context->port_id);
+    CHECK_ASSERT (rc == 0);
+
     /* Display the desired number of descriptors, and the actual number to meet the limits of the device */
     console_printf ("tx_num_descriptors : desired=%" PRIu16 " actual=%" PRIu16 "\n",
             desired_tx_num_descriptors, context->tx_num_descriptors);
@@ -1346,7 +1350,7 @@ static void transmit_next_test_frame (frame_tx_rx_thread_context_t *const contex
     /* Create the test frame and queue for transmission.
      * If the transmit ring is full then tx_pkt is left as non-NULL and the caller will attempt re-transmission,
      * since it is the rte_eth_tx_burst() which frees descriptors from the ring which have been transmitted. */
-    ethercat_frame_t *const tx_frame = context->tx_pkt->buf_addr;
+    ethercat_frame_t *const tx_frame = rte_pktmbuf_mtod (context->tx_pkt, ethercat_frame_t *);
     create_test_frame (tx_frame, source_port_index, destination_port_index, context->next_tx_sequence_number);
     rte_pktmbuf_append (context->tx_pkt, sizeof (ethercat_frame_t));
     num_transmitted = rte_eth_tx_burst (context->port_id, QUEUE_ID, &context->tx_pkt, 1);
@@ -1438,8 +1442,9 @@ static int transmit_receive_thread (void *arg)
             for (uint16_t rx_pkt_index = 0; rx_pkt_index < num_received; rx_pkt_index++)
             {
                 const struct rte_mbuf *const rx_pkt = context->rx_pkts[rx_pkt_index];
+                ethercat_frame_t *const rx_frame = rte_pktmbuf_mtod (rx_pkt, ethercat_frame_t *);
 
-                identify_frame (context, rx_pkt, rx_pkt->buf_addr, &frame_record);
+                identify_frame (context, rx_pkt, rx_frame, &frame_record);
                 if (frame_record.frame_type != FRAME_RECORD_RX_OTHER)
                 {
                     handle_pending_rx_frame (context, &frame_record);
@@ -1882,6 +1887,7 @@ int main (int argc, char *argv[])
             write_frame_debug_csv_file (frame_debug_csv_filename, &tx_rx_thread_context->frame_recording);
         }
 
+        fclose (results_summary.per_port_counts_csv_file);
     }
     else
     {
@@ -1902,7 +1908,6 @@ int main (int argc, char *argv[])
         exit (EXIT_FAILURE);
     }
 
-    fclose (results_summary.per_port_counts_csv_file);
     fclose (console_file);
 
     return EXIT_SUCCESS;
