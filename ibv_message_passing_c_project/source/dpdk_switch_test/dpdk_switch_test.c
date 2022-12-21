@@ -422,6 +422,8 @@ typedef struct
     int64_t tx_time_of_next_frame;
     /* The maximum number of pending receive frames for each source / destination port combination during the test */
     uint32_t pending_rx_sequence_numbers_length;
+    /* Device Ethernet statistics sampled at the end of the test */
+    struct rte_eth_stats eth_stats;
 } frame_tx_rx_thread_context_t;
 
 
@@ -1427,6 +1429,9 @@ static int transmit_receive_thread (void *arg)
 
     transmit_receive_initialise (context);
 
+    rc = rte_eth_stats_reset (context->port_id);
+    CHECK_ASSERT (rc == 0);
+
     /* Run test until requested to exit.
      * This gives preference to polling for receipt of test frames, and when no available frame transmits the next test frame.
      * This tries to send frames at the maximum possible rate, and relies upon the poll for frame receipt not causing any
@@ -1503,6 +1508,9 @@ static int transmit_receive_thread (void *arg)
             context->test_interval_end_time += (arg_test_interval_secs * NSECS_PER_SEC);
         }
     }
+
+    rc = rte_eth_stats_get (context->port_id, &context->eth_stats);
+    CHECK_ASSERT (rc == 0);
 
     return 0;
 }
@@ -1880,6 +1888,26 @@ int main (int argc, char *argv[])
 
         console_printf ("Max pending rx frames = %" PRIu32 " out of %" PRIu32 "\n",
                 tx_rx_thread_context->statistics.max_pending_rx_frames, tx_rx_thread_context->pending_rx_sequence_numbers_length);
+
+        /* Display the per device DPDK Ethernet statistics over the duration of the test.
+         * Since only a single queue is used by the test, no need to display per-queue statistics. */
+        console_printf ("\nDPDK Ethernet statistics:\n");
+        console_printf ("  Total number of successfully received packets    : %" PRIu64 "\n",
+                tx_rx_thread_context->eth_stats.ipackets);
+        console_printf ("  Total number of successfully transmitted packets : %" PRIu64 "\n",
+                tx_rx_thread_context->eth_stats.opackets);
+        console_printf ("  Total number of successfully received bytes      : %" PRIu64 "\n",
+                tx_rx_thread_context->eth_stats.ibytes);
+        console_printf ("  Total number of successfully transmitted bytes   : %" PRIu64 "\n",
+                tx_rx_thread_context->eth_stats.obytes);
+        console_printf ("  Total of Rx packets dropped by the HW            : %" PRIu64 "\n",
+                tx_rx_thread_context->eth_stats.imissed);
+        console_printf ("  Total number of erroneous received packets       : %" PRIu64 "\n",
+                tx_rx_thread_context->eth_stats.ierrors);
+        console_printf ("  Total number of failed transmitted packets       : %" PRIu64 "\n",
+                tx_rx_thread_context->eth_stats.oerrors);
+        console_printf ("  Total number of Rx mbuf allocation failures      : %" PRIu64 "\n",
+                tx_rx_thread_context->eth_stats.rx_nombuf);
 
         /* Write the debug frame recording information if enabled */
         if (arg_frame_debug_enabled)
