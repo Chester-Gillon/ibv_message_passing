@@ -968,6 +968,22 @@ static uint32_t get_rate_mbps (const frame_tx_rx_thread_context_t *const context
         }
     } while (!link_speed_valid && !test_stop_requested);
 
+    if (!first_wait)
+    {
+        /* The reason for this delay is that with an Ethernet connection to a tp-link T1700G-28TQ switch,
+         * if the test was started as soon as the link had come up missed frames were reported for the first
+         * ~0.4 seconds of the test.
+         *
+         * Comparing the statistics packet counts in switch and those for the DPDK Ethernet device it
+         * appears the switch wasn't receiving packets immediately after the link appeared up to the
+         * DPDK Ethernet device. */
+        console_printf ("Waiting 2 seconds after link came up for switch to accept packets\n");
+        for (uint32_t delay_iter = 0; delay_iter < 20; delay_iter++)
+        {
+            clock_nanosleep (CLOCK_MONOTONIC, 0, &hold_off, NULL);
+        }
+    }
+
     return link_speed_valid ? link.link_speed : RTE_ETH_SPEED_NUM_UNKNOWN;
 }
 

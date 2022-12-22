@@ -1,0 +1,835 @@
+0. Introduction
+~~~~~~~~~~~~~~~
+
+For this using:
+a. HP Z4 G4 PC
+b. AlmaLinux 8.7
+c. DPDK 21.11.0 packaged by AlmaLinux
+
+When booted temporarily added intel_iommu=on to the command line, to allow DPDK to use vfio-pci to bind to a QL41112HxCU-DE:
+[mr_halfword@skylake-alma release]$ cat /proc/cmdline 
+BOOT_IMAGE=(hd1,gpt2)/vmlinuz-4.18.0-425.3.1.el8.x86_64 root=/dev/mapper/almalinux_skylake--alma-root ro resume=/dev/mapper/almalinux_skylake--alma-swap rd.lvm.lv=almalinux_skylake-alma/root rd.lvm.lv=almalinux_skylake-alma/swap rhgb quiet intel_iommu=on
+
+
+State of the network devices, after binding vfio-pci to some:
+[mr_halfword@skylake-alma switch_test]$ dpdk-devbind.py --status
+
+Network devices using DPDK-compatible driver
+============================================
+0000:02:00.0 'I210 Gigabit Network Connection 1533' drv=vfio-pci unused=igb
+0000:2d:00.0 'FastLinQ QL41000 Series 10/25/40/50GbE Controller 8070' drv=vfio-pci unused=qede
+0000:2d:00.1 'FastLinQ QL41000 Series 10/25/40/50GbE Controller 8070' drv=vfio-pci unused=qede
+
+Network devices using kernel driver
+===================================
+0000:00:1f.6 'Ethernet Connection (2) I219-LM 15b7' if=eno1 drv=e1000e unused=vfio-pci *Active*
+0000:21:00.0 'MT27710 Family [ConnectX-4 Lx] 1015' if=ens1f0 drv=mlx5_core unused=vfio-pci 
+0000:21:00.1 'MT27710 Family [ConnectX-4 Lx] 1015' if=ens1f1 drv=mlx5_core unused=vfio-pci 
+
+No 'Baseband' devices detected
+==============================
+
+No 'Crypto' devices detected
+============================
+
+DMA devices using kernel driver
+===============================
+0000:00:04.0 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=vfio-pci 
+0000:00:04.1 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=vfio-pci 
+0000:00:04.2 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=vfio-pci 
+0000:00:04.3 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=vfio-pci 
+0000:00:04.4 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=vfio-pci 
+0000:00:04.5 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=vfio-pci 
+0000:00:04.6 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=vfio-pci 
+0000:00:04.7 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=vfio-pci 
+
+No 'Eventdev' devices detected
+==============================
+
+No 'Mempool' devices detected
+=============================
+
+No 'Compress' devices detected
+==============================
+
+No 'Misc (rawdev)' devices detected
+===================================
+
+No 'Regex' devices detected
+===========================
+
+Where:
+a. I219-LM and I210 are onboard 1G network interfaces
+b. MT27710 Family [ConnectX-4 Lx] 1015' is a dual port ConnectX-4 Lx En with 10G ports
+c. 'FastLinQ QL41000 Series 10/25/40/50GbE Controller 8070' is a dual port QL41112HxCU-DE with 10G ports
+
+For these initial tests just using the 10G ports 25 and 26 looped-back on a tp-link T1700G-28TQ switch.
+
+Huge pages had been configured:
+[mr_halfword@skylake-alma switch_test]$ dpdk-hugepages.py --show
+Node Pages Size Total
+0    512   2Mb    1Gb
+
+Hugepages mounted on /dev/hugepages
+
+
+1. I210 on-board 1G error free when using huge pages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test -l 3-4 -a 0000:02:00.0 -- -p 25-26 -r 1000 
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: No available 1048576 kB hugepages reported
+EAL: VFIO support initialized
+EAL: Using IOMMU type 1 (Type 1)
+EAL: Ignore mapping IO port bar(2)
+EAL: Probe PCI driver: net_e1000_igb (8086:1533) device: 0000:02:00.0 (socket 0)
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=net_e1000_igb device_name=0000:02:00.0
+tx_num_descriptors : desired=2 actual=32
+rx_num_descriptors : desired=3312 actual=3312
+Waiting to get link speed (link needs to be up). Press Ctrl-C to abort.
+Waiting 2 seconds after link came up for switch to accept packets
+Bit rate on interface to injection switch = 1000 (Mbps)
+Requested bit rate to be generated on each switch port under test = 1000.00 (Mbps)
+Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test
+Writing per-port counts to 20221221T224401_per_port_counts_linux.csv
+Test interval = 10 (secs)
+Frame debug enabled = No
+Press Ctrl-C to stop test at end of next test interval
+
+22:44:16.190
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810668         810626              0              0              6              0        81066.8         500.02
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:44:26.190
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810641              0              0              5              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:44:36.190
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810641              0              0              5              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:44:46.190
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810641              0              0              5              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:44:56.190
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810640         810641              0              0              5              0        81064.0         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:45:06.190
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810641              0              0              5              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+^C
+22:45:16.190
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810641              0              0              5              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+Max pending rx frames = 21 out of 1656
+
+DPDK Ethernet statistics:
+  Total number of successfully received packets    : 5674519
+  Total number of successfully transmitted packets : 5674486
+  Total number of successfully received bytes      : 8613870334
+  Total number of successfully transmitted bytes   : 8613871270
+  Total of Rx packets dropped by the HW            : 0
+  Total number of erroneous received packets       : 0
+  Total number of failed transmitted packets       : 0
+  Total number of Rx mbuf allocation failures      : 0
+
+
+
+2. I210 on-board 1G error free when not using huge pages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test --no-huge -m 1024m -l 3-4 -a 0000:02:00.0 -- -p 25-26 -r 1000 
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: VFIO support initialized
+EAL: Using IOMMU type 1 (Type 1)
+EAL: Ignore mapping IO port bar(2)
+EAL: Probe PCI driver: net_e1000_igb (8086:1533) device: 0000:02:00.0 (socket 0)
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=net_e1000_igb device_name=0000:02:00.0
+tx_num_descriptors : desired=2 actual=32
+rx_num_descriptors : desired=3312 actual=3312
+Waiting to get link speed (link needs to be up). Press Ctrl-C to abort.
+Waiting 2 seconds after link came up for switch to accept packets
+Bit rate on interface to injection switch = 1000 (Mbps)
+Requested bit rate to be generated on each switch port under test = 1000.00 (Mbps)
+Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test
+Writing per-port counts to 20221221T224622_per_port_counts_linux.csv
+Test interval = 10 (secs)
+Frame debug enabled = No
+Press Ctrl-C to stop test at end of next test interval
+
+22:46:37.463
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810668         810603              0              0            102              0        81066.8         500.02
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:46:47.463
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810643              0              0              6              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:46:57.463
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810644              0              0              5              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:47:07.463
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810643              0              0              6              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:47:17.463
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810644              0              0              7              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:47:27.463
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810640         810643              0              0              5              0        81064.0         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+^C
+22:47:37.463
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810643              0              0             10              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+Max pending rx frames = 34 out of 1656
+
+DPDK Ethernet statistics:
+  Total number of successfully received packets    : 5674611
+  Total number of successfully transmitted packets : 5674486
+  Total number of successfully received bytes      : 8613895609
+  Total number of successfully transmitted bytes   : 8613871270
+  Total of Rx packets dropped by the HW            : 0
+  Total number of erroneous received packets       : 0
+  Total number of failed transmitted packets       : 0
+  Total number of Rx mbuf allocation failures      : 0
+
+
+3. ConnectX-4 Lx error free when using huge pages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test -l 3-4 -a 0000:21:00.1 -- -p 25-26 -r 10000
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: No available 1048576 kB hugepages reported
+EAL: VFIO support initialized
+EAL: Probe PCI driver: mlx5_pci (15b3:1015) device: 0000:21:00.1 (socket 0)
+mlx5_net: No available register for sampler.
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=mlx5_pci device_name=0000:21:00.1
+mlx5_net: port 0 number of descriptors requested for Tx queue 0 must be higher than MLX5_TX_COMP_THRESH, using 33 instead of 2
+mlx5_net: port 0 increased number of descriptors in Tx queue 0 to the next power of two (64)
+rte_eth_tx_queue_info_get() changed number of Tx descriptors from 2 to 64
+tx_num_descriptors : desired=2 actual=64
+rx_num_descriptors : desired=3312 actual=4096
+Bit rate on interface to injection switch = 10000 (Mbps)
+Requested bit rate to be generated on each switch port under test = 10000.00 (Mbps)
+Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test
+Writing per-port counts to 20221221T224908_per_port_counts_linux.csv
+Test interval = 10 (secs)
+Frame debug enabled = No
+Press Ctrl-C to stop test at end of next test interval
+
+22:49:18.993
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8100484        8100401              0              0              5              0       810048.4        4996.38
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:49:28.993
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8101396        8101400              0              0              5              0       810139.6        4996.94
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:49:38.993
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8101448        8101439              0              0              9              0       810144.8        4996.97
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:49:48.993
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8100424        8100426              0              0              8              0       810042.4        4996.34
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:49:58.993
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8101005        8101015              0              0              5              0       810100.5        4996.70
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:50:08.993
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8101339        8101333              0              0              5              0       810133.9        4996.91
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:50:18.993
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8101553        8101556              0              0              5              0       810155.3        4997.04
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+^C
+22:50:28.993
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8101501        8101511              0              0              5              0       810150.1        4997.01
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+Max pending rx frames = 45 out of 1656
+
+DPDK Ethernet statistics:
+  Total number of successfully received packets    : 64809128
+  Total number of successfully transmitted packets : 64809150
+  Total number of successfully received bytes      : 98380188408
+  Total number of successfully transmitted bytes   : 98380289700
+  Total of Rx packets dropped by the HW            : 0
+  Total number of erroneous received packets       : 0
+  Total number of failed transmitted packets       : 0
+  Total number of Rx mbuf allocation failures      : 0
+
+
+4. ConnectX-4 Lx error free when not using huge pages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test --no-huge -m 1024m -l 3-4 -a 0000:21:00.1 -- -p 25-26 -r 10000
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: VFIO support initialized
+EAL: Probe PCI driver: mlx5_pci (15b3:1015) device: 0000:21:00.1 (socket 0)
+mlx5_net: No available register for sampler.
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=mlx5_pci device_name=0000:21:00.1
+mlx5_net: port 0 number of descriptors requested for Tx queue 0 must be higher than MLX5_TX_COMP_THRESH, using 33 instead of 2
+mlx5_net: port 0 increased number of descriptors in Tx queue 0 to the next power of two (64)
+rte_eth_tx_queue_info_get() changed number of Tx descriptors from 2 to 64
+tx_num_descriptors : desired=2 actual=64
+rx_num_descriptors : desired=3312 actual=4096
+Bit rate on interface to injection switch = 10000 (Mbps)
+Requested bit rate to be generated on each switch port under test = 10000.00 (Mbps)
+Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test
+Writing per-port counts to 20221221T225200_per_port_counts_linux.csv
+Test interval = 10 (secs)
+Frame debug enabled = No
+Press Ctrl-C to stop test at end of next test interval
+
+22:52:10.565
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8100512        8100442              0              0              5              0       810051.2        4996.40
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:52:20.565
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8101509        8101505              0              0              5              0       810150.9        4997.01
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:52:30.565
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8101731        8101724              0              0              5              0       810173.1        4997.15
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:52:40.565
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8102021        8102044              0              0              5              0       810202.1        4997.33
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:52:50.565
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8102002        8101971              0              0              5              0       810200.2        4997.31
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+22:53:00.565
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8101991        8101995              0              0              5              0       810199.1        4997.31
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+^C
+22:53:10.565
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8102140        8102157              0              0            101              0       810214.0        4997.40
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+Max pending rx frames = 45 out of 1656
+
+DPDK Ethernet statistics:
+  Total number of successfully received packets    : 56711969
+  Total number of successfully transmitted packets : 56711906
+  Total number of successfully received bytes      : 86088611583
+  Total number of successfully transmitted bytes   : 86088673308
+  Total of Rx packets dropped by the HW            : 0
+  Total number of erroneous received packets       : 0
+  Total number of failed transmitted packets       : 0
+  Total number of Rx mbuf allocation failures      : 0
+
+
+5. QL41112HxCU-DE errors when using huge pages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Looks like something goes wrong with the receive ring:
+a. Stop receiving any more packets after almost 4096 (the number of descriptors)
+b. Looks like receive the expected packet, followed by a packet of the write length but with the data
+   of the previous packet shifted. Perhaps a bug in segmented packets?
+
+   Debugging shows can get a segmented packet, which dpdk_switch_test is not currently written to handle:
+rx_pkt  const struct rte_mbuf * const   0x13e8a9040 
+    cacheline0  RTE_MARKER  [0] 
+    buf_addr    void *  0x13e8a90c0 
+    buf_iova    rte_iova_t  5344235712  
+    rearm_data  RTE_MARKER64    [0] 
+    data_off    uint16_t    128 
+    refcnt  uint16_t    1   
+    nb_segs uint16_t    2   
+    port    uint16_t    0   
+    ol_flags    uint64_t    385 
+    rx_descriptor_fields1   RTE_MARKER  [0] 
+    packet_type uint32_t    0   
+    l2_type uint8_t 0 '\0'  
+    l3_type uint8_t 0 '\0'  
+    l4_type uint8_t 0 '\0'  
+    tun_type    uint8_t 0 '\0'  
+    inner_esp_next_proto    uint8_t 0 '\0'  
+    inner_l2_type   uint8_t 0 '\0'  
+    inner_l3_type   uint8_t 0 '\0'  
+    inner_l4_type   uint8_t 0 '\0'  
+    pkt_len uint32_t    1518    
+    data_len    uint16_t    1472    
+    vlan_tci    uint16_t    0   
+    hash    union {...} {...}   
+    vlan_tci_outer  uint16_t    0   
+    buf_len uint16_t    2176    
+    pool    struct rte_mempool *    0x1408bb3c0 
+    cacheline1  RTE_MARKER  [0] 
+    next    struct rte_mbuf *   0x0 
+    tx_offload  uint64_t    0   
+    l2_len  uint64_t    0   
+    l3_len  uint64_t    0   
+    l4_len  uint64_t    0   
+    tso_segsz   uint64_t    0   
+    outer_l3_len    uint64_t    0   
+    outer_l2_len    uint64_t    0   
+    shinfo  struct rte_mbuf_ext_shared_info *   0x0 
+    priv_size   uint16_t    0   
+    timesync    uint16_t    0   
+    dynfield1   uint32_t [9]    0x13e8a909c 
+
+
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test -l 3-4 -a 0000:2d:00.0 -- -p 25-26 -r 10000 -d
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: No available 1048576 kB hugepages reported
+EAL: VFIO support initialized
+EAL: Using IOMMU type 1 (Type 1)
+EAL: Ignore mapping IO port bar(1)
+EAL: Ignore mapping IO port bar(3)
+EAL: Ignore mapping IO port bar(5)
+EAL: Probe PCI driver: net_qede (1077:8070) device: 0000:2d:00.0 (socket 0)
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=net_qede device_name=0000:2d:00.0
+tx_num_descriptors : desired=2 actual=256
+rx_num_descriptors : desired=3312 actual=4096
+Waiting to get link speed (link needs to be up). Press Ctrl-C to abort.
+Waiting 2 seconds after link came up for switch to accept packets
+Bit rate on interface to injection switch = 10000 (Mbps)
+Requested bit rate to be generated on each switch port under test = 10000.00 (Mbps)
+Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test
+Writing per-port counts to 20221221T225605_per_port_counts_linux.csv
+Test interval = 10 (secs)
+Frame debug enabled = Yes
+Running for a single test interval to collect debug information
+
+22:56:17.513
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106140           2042              2              0           2047        8100786       810614.0        4999.87
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   S
+    26  S 
+Total test intervals with failures = 1 : last failure NOW
+Max pending rx frames = 1656 out of 1656
+
+DPDK Ethernet statistics:
+  Total number of successfully received packets    : 4090
+  Total number of successfully transmitted packets : 8105996
+  Total number of successfully received bytes      : 6223522
+  Total number of successfully transmitted bytes   : 12337321346
+  Total of Rx packets dropped by the HW            : 8101848
+  Total number of erroneous received packets       : 0
+  Total number of failed transmitted packets       : 0
+  Total number of Rx mbuf allocation failures      : 8101848
+[qede_drain_txq:964(2d:00.0:dpdk-port-0)]Tx queue[0] is stuck,requesting MCP to drain
+[qede_drain_txq:973(2d:00.0:dpdk-port-0)]Timeout waiting for tx queue[0]:PROD=45211, CONS=155
+[QEDE PMD: (2d:00.0:dpdk-port-0-0)]ecore_spq_block:Ramrod is stuck [CID ff000000 cmd 03 proto 04 echo 000d]
+[qede_hw_err_notify:330(2d:00.0:dpdk-port-0-0)]HW error occurred [Ramrod Failure]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs_len:Calculating idle_chk and grcdump register length for current engine
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs_len:Total length = 2356504
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:obtaining idle_chk and grcdump for current engine
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:Idle Check1 feature_size 2732
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:Idle Check2 feature_size 2732
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["reg_fifo"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:Reg fifo feature_size 5792
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["igu_fifo"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:IGU fifo feature_size 240
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["protection_override"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:Protection override feature_size 2380
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["fw_asserts"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:FW assert feature_size 788
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["grc"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:GRC dump feature_size 2119996
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["mcp_trace"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_nvram_read:nvram_read: reading image of size 108336 bytes from NVRAM
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:MCP trace feature_size 14840
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_save_fw_dump:FW dump written to qede_pmd_dump_12-21-2022_22-56-28.bin file
+[qede_stop_vport:458(2d:00.0:dpdk-port-0)]Stop V-PORT failed rc = -2
+[QEDE PMD: (2d:00.0:dpdk-port-0-0)]ecore_spq_block:Ramrod is stuck [CID ff000000 cmd 02 proto 08 echo 000e]
+[qede_hw_err_notify:330(2d:00.0:dpdk-port-0-0)]HW error occurred [Ramrod Failure]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs_len:Calculating idle_chk and grcdump register length for current engine
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs_len:Total length = 2356504
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:obtaining idle_chk and grcdump for current engine
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:Idle Check1 feature_size 3640
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:Idle Check2 feature_size 3640
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["reg_fifo"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:Reg fifo feature_size 5792
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["igu_fifo"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:IGU fifo feature_size 240
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["protection_override"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:Protection override feature_size 2380
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["fw_asserts"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:FW assert feature_size 788
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["grc"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:GRC dump feature_size 2119996
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["mcp_trace"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_nvram_read:nvram_read: reading image of size 108336 bytes from NVRAM
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:MCP trace feature_size 14860
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_save_fw_dump:FW dump written to qede_pmd_dump_12-21-2022_22-56-32.bin file
+[QEDE PMD: (2d:00.0:dpdk-port-0-0)]ecore_hw_stop:Failed to close PF against FW [rc = -2]. Continue to stop HW to prevent illegal host access by the device.
+
+
+6. QL41112HxCU-DE errors when using not using huge pages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test --no-huge -m 1024m -l 3-4 -a 0000:2d:00.0 -- -p 25-26 -r 10000 -d
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: VFIO support initialized
+EAL: Using IOMMU type 1 (Type 1)
+EAL: Ignore mapping IO port bar(1)
+EAL: Ignore mapping IO port bar(3)
+EAL: Ignore mapping IO port bar(5)
+EAL: Probe PCI driver: net_qede (1077:8070) device: 0000:2d:00.0 (socket 0)
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=net_qede device_name=0000:2d:00.0
+tx_num_descriptors : desired=2 actual=256
+rx_num_descriptors : desired=3312 actual=4096
+Waiting to get link speed (link needs to be up). Press Ctrl-C to abort.
+Waiting 2 seconds after link came up for switch to accept packets
+Bit rate on interface to injection switch = 10000 (Mbps)
+Requested bit rate to be generated on each switch port under test = 10000.00 (Mbps)
+Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test
+Writing per-port counts to 20221221T225812_per_port_counts_linux.csv
+Test interval = 10 (secs)
+Frame debug enabled = Yes
+Running for a single test interval to collect debug information
+
+22:58:24.425
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106111           2042              2              0           2047        8100757       810611.1        4999.85
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   S
+    26  S 
+Total test intervals with failures = 1 : last failure NOW
+Max pending rx frames = 1656 out of 1656
+
+DPDK Ethernet statistics:
+  Total number of successfully received packets    : 4090
+  Total number of successfully transmitted packets : 8105994
+  Total number of successfully received bytes      : 6223522
+  Total number of successfully transmitted bytes   : 12337316780
+  Total of Rx packets dropped by the HW            : 8101846
+  Total number of erroneous received packets       : 0
+  Total number of failed transmitted packets       : 0
+  Total number of Rx mbuf allocation failures      : 8101846
+[qede_drain_txq:964(2d:00.0:dpdk-port-0)]Tx queue[0] is stuck,requesting MCP to drain
+[qede_drain_txq:973(2d:00.0:dpdk-port-0)]Timeout waiting for tx queue[0]:PROD=45183, CONS=127
+[QEDE PMD: (2d:00.0:dpdk-port-0-0)]ecore_spq_block:Ramrod is stuck [CID ff000000 cmd 03 proto 04 echo 000d]
+[qede_hw_err_notify:330(2d:00.0:dpdk-port-0-0)]HW error occurred [Ramrod Failure]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs_len:Calculating idle_chk and grcdump register length for current engine
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs_len:Total length = 2356504
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:obtaining idle_chk and grcdump for current engine
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:Idle Check1 feature_size 2732
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:Idle Check2 feature_size 2732
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["reg_fifo"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:Reg fifo feature_size 5792
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["igu_fifo"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:IGU fifo feature_size 240
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["protection_override"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:Protection override feature_size 2380
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["fw_asserts"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:FW assert feature_size 788
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["grc"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:GRC dump feature_size 2119996
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["mcp_trace"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_nvram_read:nvram_read: reading image of size 108336 bytes from NVRAM
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:MCP trace feature_size 14640
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_save_fw_dump:FW dump written to qede_pmd_dump_12-21-2022_22-58-35.bin file
+[qede_stop_vport:458(2d:00.0:dpdk-port-0)]Stop V-PORT failed rc = -2
+[QEDE PMD: (2d:00.0:dpdk-port-0-0)]ecore_spq_block:Ramrod is stuck [CID ff000000 cmd 02 proto 08 echo 000e]
+[qede_hw_err_notify:330(2d:00.0:dpdk-port-0-0)]HW error occurred [Ramrod Failure]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs_len:Calculating idle_chk and grcdump register length for current engine
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs_len:Total length = 2356504
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:obtaining idle_chk and grcdump for current engine
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:Idle Check1 feature_size 3640
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:Idle Check2 feature_size 3640
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["reg_fifo"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:Reg fifo feature_size 5792
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["igu_fifo"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:IGU fifo feature_size 240
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["protection_override"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:Protection override feature_size 2380
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["fw_asserts"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:FW assert feature_size 788
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["grc"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:GRC dump feature_size 2119996
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["mcp_trace"]
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qed_nvram_read:nvram_read: reading image of size 108336 bytes from NVRAM
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:MCP trace feature_size 14648
+[QEDE PMD: (2d:00.0:dpdk-port-0)]qede_save_fw_dump:FW dump written to qede_pmd_dump_12-21-2022_22-58-38.bin file
+[QEDE PMD: (2d:00.0:dpdk-port-0-0)]ecore_hw_stop:Failed to close PF against FW [rc = -2]. Continue to stop HW to prevent illegal host access by the device.
