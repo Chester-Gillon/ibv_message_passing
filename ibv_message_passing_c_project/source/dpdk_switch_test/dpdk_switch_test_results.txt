@@ -893,7 +893,7 @@ DPDK Ethernet statistics:
   Total number of failed transmitted packets       : 0
   Total number of Rx mbuf allocation failures      : 0
 
-"bad nb_segs" is reported because rx_pkt->nb_segs uint16_t==2 but rx_pkt->next==NULL (meaning no next segment).
+"bad nb_segs" is reported because rx_pkt->nb_segs==2 but rx_pkt->next==NULL (meaning no next segment).
 Therefore, doesn't doesn't appear to be dpdk_switch_test not having code to handle segmented frames.
 
 
@@ -1297,3 +1297,408 @@ DPDK Ethernet statistics:
   Total number of failed transmitted packets       : 0
   Total number of Rx mbuf allocation failures      : 0
 EAL: Error disabling MSI-X interrupts for fd 20
+
+
+9. QL41112HxCU-DE fails in the first iteration errors when not using huge pages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A run after increasing the mtu to avoid issues with receiving segmented. Sanity check no longer fails, but
+after 696310 frames seems to get stuck and receive no more:
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test --no-huge -m 1024m -l 3-4 -a 0000:2d:00.1 -- -p 25-26 -r 10000 -s
+[sudo] password for mr_halfword: 
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: VFIO support initialized
+EAL: Using IOMMU type 1 (Type 1)
+EAL: Ignore mapping IO port bar(1)
+EAL: Ignore mapping IO port bar(3)
+EAL: Ignore mapping IO port bar(5)
+EAL: Probe PCI driver: net_qede (1077:8070) device: 0000:2d:00.1 (socket 0)
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=net_qede device_name=0000:2d:00.1
+tx_num_descriptors : desired=2 actual=256
+rx_num_descriptors : desired=3312 actual=4096
+Waiting to get link speed (link needs to be up). Press Ctrl-C to abort.
+Waiting 2 seconds after link came up for switch to accept packets
+Bit rate on interface to injection switch = 10000 (Mbps)
+Requested bit rate to be generated on each switch port under test = 10000.00 (Mbps)
+Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test
+Writing per-port counts to 20221223T232018_per_port_counts_linux.csv
+Test interval = 10 (secs)
+Frame debug enabled = No
+Sanity checks enabled = Yes
+Press Ctrl-C to stop test at end of next test interval
+
+23:20:30.986
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106114         696310              0              0              0        7406492       810611.4        4999.85
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   S
+    26  S 
+Total test intervals with failures = 1 : last failure NOW
+
+23:20:40.986
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106048              0              0              0              0        8106048       810604.8        4999.81
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   A
+    26  A 
+Total test intervals with failures = 2 : last failure NOW
+^C
+23:20:50.986
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106057              0              0              0              0        8106057       810605.2        4999.81
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   A
+    26  A 
+Total test intervals with failures = 3 : last failure NOW
+Max pending rx frames = 1656 out of 1656
+
+DPDK Ethernet statistics:
+  Total number of successfully received packets    : 696310
+  Total number of successfully transmitted packets : 24318100
+  Total number of successfully received bytes      : 1059783820
+  Total number of successfully transmitted bytes   : 37012143634
+  Total of Rx packets dropped by the HW            : 23621727
+  Total number of erroneous received packets       : 0
+  Total number of failed transmitted packets       : 0
+  Total number of Rx mbuf allocation failures      : 23621727
+[qede_drain_txq:964(2d:00.1:dpdk-port-0)]Tx queue[0] is stuck,requesting MCP to drain
+[qede_drain_txq:973(2d:00.1:dpdk-port-0)]Timeout waiting for tx queue[0]:PROD=4363, CONS=11
+[QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_spq_block:Ramrod is stuck [CID ff100000 cmd 03 proto 04 echo 000d]
+[qede_hw_err_notify:330(2d:00.1:dpdk-port-0-0)]HW error occurred [Ramrod Failure]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Calculating idle_chk and grcdump register length for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Total length = 2356504
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:obtaining idle_chk and grcdump for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check1 feature_size 2328
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check2 feature_size 2328
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["reg_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Reg fifo feature_size 5792
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["igu_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:IGU fifo feature_size 240
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["protection_override"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Protection override feature_size 2380
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["fw_asserts"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:FW assert feature_size 788
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["grc"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:GRC dump feature_size 2119996
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["mcp_trace"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_nvram_read:nvram_read: reading image of size 108336 bytes from NVRAM
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:MCP trace feature_size 14608
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_save_fw_dump:FW dump written to qede_pmd_dump_12-23-2022_23-20-57.bin file
+[qede_stop_vport:458(2d:00.1:dpdk-port-0)]Stop V-PORT failed rc = -2
+[QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_spq_block:Ramrod is stuck [CID ff100000 cmd 02 proto 08 echo 000e]
+[qede_hw_err_notify:330(2d:00.1:dpdk-port-0-0)]HW error occurred [Ramrod Failure]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Calculating idle_chk and grcdump register length for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Total length = 2356504
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:obtaining idle_chk and grcdump for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check1 feature_size 3240
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check2 feature_size 3240
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["reg_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Reg fifo feature_size 5792
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["igu_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:IGU fifo feature_size 240
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["protection_override"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Protection override feature_size 2380
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["fw_asserts"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:FW assert feature_size 788
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["grc"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:GRC dump feature_size 2119996
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["mcp_trace"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_nvram_read:nvram_read: reading image of size 108336 bytes from NVRAM
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:MCP trace feature_size 14624
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_save_fw_dump:FW dump written to qede_pmd_dump_12-23-2022_23-21-01.bin file
+[QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_hw_stop:Failed to close PF against FW [rc = -2]. Continue to stop HW to prevent illegal host access by the device.
+
+
+10. QL41112HxCU-DE fails in the first iteration errors when using huge pages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Same code as in 9) but using huge pages and reception still stalls during the original test iteration: 
+[mr_halfword@skylake-alma ~]$ sudo dpdk-hugepages.py --pagesize 2048K --setup 1G
+[sudo] password for mr_halfword:
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test -l 3-4 -a 0000:2d:00.1 -- -p 25-26 -r 10000 -s
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: No available 1048576 kB hugepages reported
+EAL: VFIO support initialized
+EAL: Using IOMMU type 1 (Type 1)
+EAL: Ignore mapping IO port bar(1)
+EAL: Ignore mapping IO port bar(3)
+EAL: Ignore mapping IO port bar(5)
+EAL: Probe PCI driver: net_qede (1077:8070) device: 0000:2d:00.1 (socket 0)
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=net_qede device_name=0000:2d:00.1
+tx_num_descriptors : desired=2 actual=256
+rx_num_descriptors : desired=3312 actual=4096
+Waiting to get link speed (link needs to be up). Press Ctrl-C to abort.
+Waiting 2 seconds after link came up for switch to accept packets
+Bit rate on interface to injection switch = 10000 (Mbps)
+Requested bit rate to be generated on each switch port under test = 10000.00 (Mbps)
+Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test
+Writing per-port counts to 20221223T232542_per_port_counts_linux.csv
+Test interval = 10 (secs)
+Frame debug enabled = No
+Sanity checks enabled = Yes
+Press Ctrl-C to stop test at end of next test interval
+
+23:25:54.485
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106129         569340              0              0              0        7533477       810612.9        4999.86
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   S
+    26  S 
+Total test intervals with failures = 1 : last failure NOW
+
+23:26:04.485
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106072              0              0              0              0        8106072       810607.2        4999.83
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   A
+    26  A 
+Total test intervals with failures = 2 : last failure NOW
+^C
+23:26:14.485
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106037              0              0              0              0        8106037       810603.7        4999.80
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   A
+    26  A 
+Total test intervals with failures = 3 : last failure NOW
+Max pending rx frames = 1656 out of 1656
+
+DPDK Ethernet statistics:
+  Total number of successfully received packets    : 569340
+  Total number of successfully transmitted packets : 24318088
+  Total number of successfully received bytes      : 866535480
+  Total number of successfully transmitted bytes   : 37012123848
+  Total of Rx packets dropped by the HW            : 23748684
+  Total number of erroneous received packets       : 0
+  Total number of failed transmitted packets       : 0
+  Total number of Rx mbuf allocation failures      : 23748684
+[qede_drain_txq:964(2d:00.1:dpdk-port-0)]Tx queue[0] is stuck,requesting MCP to drain
+[qede_drain_txq:973(2d:00.1:dpdk-port-0)]Timeout waiting for tx queue[0]:PROD=4382, CONS=30
+[QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_spq_block:Ramrod is stuck [CID ff100000 cmd 03 proto 04 echo 000d]
+[qede_hw_err_notify:330(2d:00.1:dpdk-port-0-0)]HW error occurred [Ramrod Failure]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Calculating idle_chk and grcdump register length for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Total length = 2356504
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:obtaining idle_chk and grcdump for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check1 feature_size 2328
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check2 feature_size 2328
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["reg_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Reg fifo feature_size 5792
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["igu_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:IGU fifo feature_size 240
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["protection_override"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Protection override feature_size 2380
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["fw_asserts"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:FW assert feature_size 788
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["grc"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:GRC dump feature_size 2119996
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["mcp_trace"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_nvram_read:nvram_read: reading image of size 108336 bytes from NVRAM
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:MCP trace feature_size 14668
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_save_fw_dump:FW dump written to qede_pmd_dump_12-23-2022_23-26-21.bin file
+[qede_stop_vport:458(2d:00.1:dpdk-port-0)]Stop V-PORT failed rc = -2
+[QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_spq_block:Ramrod is stuck [CID ff100000 cmd 02 proto 08 echo 000e]
+[qede_hw_err_notify:330(2d:00.1:dpdk-port-0-0)]HW error occurred [Ramrod Failure]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Calculating idle_chk and grcdump register length for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Total length = 2356504
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:obtaining idle_chk and grcdump for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check1 feature_size 3240
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check2 feature_size 3240
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["reg_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Reg fifo feature_size 5792
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["igu_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:IGU fifo feature_size 240
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["protection_override"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Protection override feature_size 2380
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["fw_asserts"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:FW assert feature_size 788
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["grc"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:GRC dump feature_size 2119996
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["mcp_trace"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_nvram_read:nvram_read: reading image of size 108336 bytes from NVRAM
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:MCP trace feature_size 14676
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_save_fw_dump:FW dump written to qede_pmd_dump_12-23-2022_23-26-24.bin file
+[QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_hw_stop:Failed to close PF against FW [rc = -2]. Continue to stop HW to prevent illegal host access by the device.
+
+
+11. QL41112HxCU-DE fails in the first iteration errors when using huge pages and physical addresses
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Same code as in 9) but selecting physical addresses instead of virtual,
+and reception still stalls during the original test iteration.
+
+Statistic counters on the switch show shows the frames continued to be transmitted and passed back to
+the QL41112HxCU-DE (which think means not flow-control related which is disabled in the switch).
+
+In the device statistics:
+a. "Total of Rx packets dropped by the HW" is the same as "Total number of Rx mbuf allocation failures"
+b. The total number of missed frames is a few thousand different from the "Total of Rx packets dropped by the HW"
+
+This sugguests something goes wrong such that receive descriptors are not being serviced.
+
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test --iova=pa -l 3-4 -a 0000:2d:00.1 -- -p 25-26 -r 10000 -s
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'PA'
+EAL: No available 1048576 kB hugepages reported
+EAL: VFIO support initialized
+EAL: Using IOMMU type 1 (Type 1)
+EAL: Ignore mapping IO port bar(1)
+EAL: Ignore mapping IO port bar(3)
+EAL: Ignore mapping IO port bar(5)
+EAL: Probe PCI driver: net_qede (1077:8070) device: 0000:2d:00.1 (socket 0)
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=net_qede device_name=0000:2d:00.1
+tx_num_descriptors : desired=2 actual=256
+rx_num_descriptors : desired=3312 actual=4096
+Waiting to get link speed (link needs to be up). Press Ctrl-C to abort.
+Waiting 2 seconds after link came up for switch to accept packets
+Bit rate on interface to injection switch = 10000 (Mbps)
+Requested bit rate to be generated on each switch port under test = 10000.00 (Mbps)
+Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test
+Writing per-port counts to 20221223T232956_per_port_counts_linux.csv
+Test interval = 10 (secs)
+Frame debug enabled = No
+Sanity checks enabled = Yes
+Press Ctrl-C to stop test at end of next test interval
+
+23:30:08.919
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106125         606200              0              0              0        7496613       810612.5        4999.86
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   S
+    26  S 
+Total test intervals with failures = 1 : last failure NOW
+
+23:30:18.919
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106084              0              0              0              0        8106084       810608.4        4999.83
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   A
+    26  A 
+Total test intervals with failures = 2 : last failure NOW
+^C
+23:30:28.919
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106048              0              0              0              0        8106048       810604.8        4999.81
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   A
+    26  A 
+Total test intervals with failures = 3 : last failure NOW
+Max pending rx frames = 1656 out of 1656
+
+DPDK Ethernet statistics:
+  Total number of successfully received packets    : 606200
+  Total number of successfully transmitted packets : 24318094
+  Total number of successfully received bytes      : 922636400
+  Total number of successfully transmitted bytes   : 37012134502
+  Total of Rx packets dropped by the HW            : 23711828
+  Total number of erroneous received packets       : 0
+  Total number of failed transmitted packets       : 0
+  Total number of Rx mbuf allocation failures      : 23711828
+[qede_drain_txq:964(2d:00.1:dpdk-port-0)]Tx queue[0] is stuck,requesting MCP to drain
+[qede_drain_txq:973(2d:00.1:dpdk-port-0)]Timeout waiting for tx queue[0]:PROD=4400, CONS=48
+[QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_spq_block:Ramrod is stuck [CID ff100000 cmd 03 proto 04 echo 000d]
+[qede_hw_err_notify:330(2d:00.1:dpdk-port-0-0)]HW error occurred [Ramrod Failure]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Calculating idle_chk and grcdump register length for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Total length = 2356504
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:obtaining idle_chk and grcdump for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check1 feature_size 3164
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check2 feature_size 3164
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["reg_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Reg fifo feature_size 5952
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["igu_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:IGU fifo feature_size 240
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["protection_override"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Protection override feature_size 2380
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["fw_asserts"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:FW assert feature_size 788
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["grc"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:GRC dump feature_size 2119996
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["mcp_trace"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_nvram_read:nvram_read: reading image of size 108336 bytes from NVRAM
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:MCP trace feature_size 14652
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_save_fw_dump:FW dump written to qede_pmd_dump_12-23-2022_23-30-35.bin file
+[qede_stop_vport:458(2d:00.1:dpdk-port-0)]Stop V-PORT failed rc = -2
+[ecore_int_deassertion_aeu_bit:1000(2d:00.1:dpdk-port-0-0)]`GRC' - Disabled future attentions
+[QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_spq_block:Ramrod is stuck [CID ff100000 cmd 02 proto 08 echo 000e]
+[qede_hw_err_notify:330(2d:00.1:dpdk-port-0-0)]HW error occurred [Ramrod Failure]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Calculating idle_chk and grcdump register length for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Total length = 2356504
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:obtaining idle_chk and grcdump for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check1 feature_size 4076
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check2 feature_size 3816
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["reg_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Reg fifo feature_size 5792
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["igu_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:IGU fifo feature_size 240
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["protection_override"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Protection override feature_size 2380
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["fw_asserts"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:FW assert feature_size 788
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["grc"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:GRC dump feature_size 2119996
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["mcp_trace"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_nvram_read:nvram_read: reading image of size 108336 bytes from NVRAM
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:MCP trace feature_size 14672
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_save_fw_dump:FW dump written to qede_pmd_dump_12-23-2022_23-30-38.bin file
+[QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_hw_stop:Failed to close PF against FW [rc = -2]. Continue to stop HW to prevent illegal host access by the device.

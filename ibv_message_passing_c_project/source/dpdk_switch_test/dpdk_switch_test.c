@@ -849,8 +849,19 @@ static void open_dpdk_device (frame_tx_rx_thread_context_t *const context)
                 context->worker_lcore_id, lcore_socket_id, device_socket_id);
     }
 
-    /* Configure device using defaults, and no offloads enabled */
+    /* Configure device using defaults where possible, and no offloads enabled */
     memset (&port_conf, 0, sizeof (port_conf));
+    if (strcmp (context->dev_info.driver_name, "net_qede") == 0)
+    {
+        /* As of DPDK 21.11.0 the net_qede driver function qede_calc_rx_buf_size() in driver/net/qede_rxtx.c
+         * calculates the buffer size in the ring buffer by rounding down to a cache line.
+         * With the default MTU this results in a buffer size to small for the maximum length standard Ethernet frame.
+         * This leads rte_eth_rx_burst() returning an invalid mbuf with
+         * rx_pkt->nb_segs==2 but rx_pkt->next==NULL (meaning no next segment) which rte_mbuf_check() rejects.
+         *
+         * As a work-around increase the MTU, using the value used to size the mbuf. */
+        port_conf.rxmode.mtu = RTE_MBUF_DEFAULT_DATAROOM;
+    }
     rc = rte_eth_dev_configure (context->port_id, NUM_RX_QUEUES, NUM_TX_QUEUES, &port_conf);
 
     /* Limit the burst which can be queued for transmission to the number of ports on the switch under test,
