@@ -280,6 +280,10 @@ static double arg_tested_port_mbps = DEFAULT_TESTED_PORT_MBPS;
 static bool arg_frame_debug_enabled = false;
 
 
+/* Command line argument which enables sanity checks */
+static bool arg_sanity_checks_enabled = false;
+
+
 /* Used to store pending receive frames for one source / destination port combination.
  * As frames are transmitted they are stored in, and then removed once received.
  *
@@ -478,6 +482,7 @@ static void stop_test_handler (const int sig)
 
 /*
  * @brief Exit after a fatal error, cleaning up the EAL.
+ * @todo The call to rte_eal_cleanup() hangs if this is called from a worker thread
  */
 static void exit_cleaning_up_eal (void)
 {
@@ -551,7 +556,7 @@ static void check_assert (const bool assertion, const char *format, ...)
 static void display_application_usage (const char *const program_name)
 {
     printf ("%s Application options:\n", program_name);
-    printf ("  [-t <duration_secs>] [-d] [-p <port_list>] [-r <rate_mbps>]\n");
+    printf ("  [-t <duration_secs>] [-d] [-p <port_list>] [-r <rate_mbps>] -s\n");
     printf ("\n");
     printf ("  -d enables debug mode, where runs just for a single test interval and creates\n");
     printf ("     a CSV file containing the frames sent/received.\n");
@@ -564,6 +569,7 @@ static void display_application_usage (const char *const program_name)
     printf ("     If not specified defaults to all %u defined ports\n", NUM_DEFINED_PORTS);
     printf ("  -r Specifies the bit rate generated on each port on the switch under test,\n");
     printf ("     as a floating point mega bits per second. Default is %g\n", DEFAULT_TESTED_PORT_MBPS);
+    printf ("  -s Enables sanity checks of mbufs\n");
 }
 
 
@@ -706,7 +712,7 @@ static void parse_tested_port_list (const char *const port_list_in)
 static void read_command_line_arguments (const int argc, char *argv[])
 {
     const char *const program_name = argv[0];
-    const char *const optstring = "dt:p:r:";
+    const char *const optstring = "dt:p:r:s";
     int option;
     char junk;
 
@@ -764,6 +770,10 @@ static void read_command_line_arguments (const int argc, char *argv[])
                 printf ("Error: Invalid <rate_mbps> %s\n", optarg);
                 exit_cleaning_up_eal ();
             }
+            break;
+
+        case 's':
+            arg_sanity_checks_enabled = true;
             break;
 
         default:
@@ -968,7 +978,7 @@ static uint32_t get_rate_mbps (const frame_tx_rx_thread_context_t *const context
         }
     } while (!link_speed_valid && !test_stop_requested);
 
-    if (!first_wait)
+    if (link_speed_valid && !first_wait)
     {
         /* The reason for this delay is that with an Ethernet connection to a tp-link T1700G-28TQ switch,
          * if the test was started as soon as the link had come up missed frames were reported for the first
@@ -1354,6 +1364,8 @@ static void handle_pending_rx_frame (frame_tx_rx_thread_context_t *const context
  */
 static void transmit_next_test_frame (frame_tx_rx_thread_context_t *const context)
 {
+    int rc;
+    const char *reason;
     uint16_t num_transmitted;
     const uint32_t source_tested_port_index =
             (context->destination_tested_port_index + context->source_port_offset) % num_tested_port_indices;
@@ -1373,6 +1385,12 @@ static void transmit_next_test_frame (frame_tx_rx_thread_context_t *const contex
     ethercat_frame_t *const tx_frame = rte_pktmbuf_mtod (context->tx_pkt, ethercat_frame_t *);
     create_test_frame (tx_frame, source_port_index, destination_port_index, context->next_tx_sequence_number);
     rte_pktmbuf_append (context->tx_pkt, sizeof (ethercat_frame_t));
+    if (arg_sanity_checks_enabled)
+    {
+        const int is_header = 1;
+        rc = rte_mbuf_check (context->tx_pkt, is_header, &reason);
+        check_assert (rc == 0, "tx_pkt invalid : %s", reason);
+    }
     num_transmitted = rte_eth_tx_burst (context->port_id, QUEUE_ID, &context->tx_pkt, 1);
     if (num_transmitted == 1)
     {
@@ -1444,6 +1462,7 @@ static int transmit_receive_thread (void *arg)
     frame_record_t frame_record;
     uint16_t num_transmitted;
     uint16_t num_received;
+    const char *reason;
 
     transmit_receive_initialise (context);
 
@@ -1466,6 +1485,13 @@ static int transmit_receive_thread (void *arg)
             {
                 const struct rte_mbuf *const rx_pkt = context->rx_pkts[rx_pkt_index];
                 ethercat_frame_t *const rx_frame = rte_pktmbuf_mtod (rx_pkt, ethercat_frame_t *);
+
+                if (arg_sanity_checks_enabled)
+                {
+                    const int is_header = 1;
+                    rc = rte_mbuf_check (rx_pkt, is_header, &reason);
+                    check_assert (rc == 0, "rx_pkt invalid : %s", reason);
+                }
 
                 identify_frame (context, rx_pkt, rx_frame, &frame_record);
                 if (frame_record.frame_type != FRAME_RECORD_RX_OTHER)
@@ -1869,6 +1895,7 @@ int main (int argc, char *argv[])
         console_printf ("Writing per-port counts to %s\n", results_summary.per_port_counts_csv_filename);
         console_printf ("Test interval = %" PRIi64 " (secs)\n", arg_test_interval_secs);
         console_printf ("Frame debug enabled = %s\n", arg_frame_debug_enabled ? "Yes" : "No");
+        console_printf ("Sanity checks enabled = %s\n", arg_sanity_checks_enabled ? "Yes" : "No");
 
         /* Start the transmit/receive thread running */
         rc = rte_eal_remote_launch (transmit_receive_thread, tx_rx_thread_context, tx_rx_thread_context->worker_lcore_id);

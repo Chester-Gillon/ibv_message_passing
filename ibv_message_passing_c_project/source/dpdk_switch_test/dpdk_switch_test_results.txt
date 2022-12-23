@@ -588,6 +588,43 @@ a. Stop receiving any more packets after almost 4096 (the number of descriptors)
 b. Looks like receive the expected packet, followed by a packet of the write length but with the data
    of the previous packet shifted. Perhaps a bug in segmented packets?
 
+Debugging, with the switch ports used for the test not being a member of the system VLAN to isolate them
+from next test trafic shows the sequence:
+1. Zero mbufs from rte_eth_rx_burst ()
+2. Transmit frame with sequence number 1.
+3. One mbuf from rte_eth_rx_burst (), which is test frame with sequence number 1.
+rx_pkt->data_len    uint16_t    1472    
+rx_pkt->pkt_len uint32_t    1518    
+rx_pkt->nb_segs uint16_t    2   
+rx_pkt->next    struct rte_mbuf *   0x0 
+rx_pkt->data_off    uint16_t    128 
+4. Transmit frame with sequence number 2.
+5. One mbuf from rte_eth_rx_burst (), which has the expected pkt_len but the contents aren't a test frame.
+   frame->Length=1460. Expected Length is 1498.
+rx_pkt->data_len    uint16_t    1472    
+rx_pkt->pkt_len uint32_t    1518    
+rx_pkt->nb_segs uint16_t    2   
+rx_pkt->next    struct rte_mbuf *   0x0 
+rx_pkt->data_off    uint16_t    128 
+6. Transmit frame with sequence number 3.
+7. One mbuf from rte_eth_rx_burst (), which is test frame with sequence number 2.
+rx_pkt->data_len    uint16_t    1472    
+rx_pkt->pkt_len uint32_t    1518    
+rx_pkt->nb_segs uint16_t    1   
+rx_pkt->next    struct rte_mbuf *   0x0 
+rx_pkt->data_off    uint16_t    128 
+8. Transmit frame with sequence number 4.
+9. One mbuf from rte_eth_rx_burst (), which has the expected pkt_len but the contents aren't a test frame.
+   The contents looks to be offset from the test pattern, based on a sample of fields.
+10. Transmit frame with sequehce number 5.
+11. One mbuf from rte_eth_rx_burst (), which is test frame with sequence number 2.
+rx_pkt->data_len    uint16_t    1472    
+rx_pkt->pkt_len uint32_t    1518    
+rx_pkt->nb_segs uint16_t    2   
+rx_pkt->next    struct rte_mbuf *   0x0 
+rx_pkt->data_off    uint16_t    128 
+
+
    Debugging shows can get a segmented packet, which dpdk_switch_test is not currently written to handle:
 rx_pkt  const struct rte_mbuf * const   0x13e8a9040 
     cacheline0  RTE_MARKER  [0] 
