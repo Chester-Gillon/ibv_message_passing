@@ -981,6 +981,15 @@ static uint32_t get_rate_mbps (const frame_tx_rx_thread_context_t *const context
         link_speed_valid = (link.link_status == RTE_ETH_LINK_UP) &&
                 (link.link_speed != RTE_ETH_SPEED_NUM_NONE) && (link.link_speed != RTE_ETH_SPEED_NUM_UNKNOWN);
 
+        if (first_wait && (strcmp (context->dev_info.driver_name, "net_e1000_em") == 0))
+        {
+            /* With a net_e1000_em driver the rte_eth_dev_start() can take the link down and then back up,
+             * such that this function could sample the link speed before the switch was ready.
+             * Force the first link speed to be considered invalid to activate the additional delay
+             * at the end of this function. */
+            link_speed_valid = false;
+        }
+
         if (!link_speed_valid)
         {
             if (first_wait)
@@ -1299,6 +1308,14 @@ static void identify_frame (const frame_tx_rx_thread_context_t *const context,
         is_test_frame = (ether_type == ETH_P_8021Q) && (vlan_ether_type == ETH_P_ETHERCAT) &&
                 get_port_index_from_mac_addr (frame_record->source_mac_addr, &frame_record->source_port_index) &&
                 get_port_index_from_mac_addr (frame_record->destination_mac_addr, &frame_record->destination_port_index);
+    }
+
+    if (rx_pkt != NULL)
+    {
+        /* Perform an additional test that have been packed a mbuf which contains the entire packet
+         * without being segmented. This is because the program has been written assuming received
+         * packets won't be segmented. */
+        is_test_frame = is_test_frame && (rx_pkt->nb_segs == 1) && (rx_pkt->data_len == rx_pkt->pkt_len);
     }
 
     /* Set the initial identified frame type. FRAME_RECORD_RX_TEST_FRAME may be modified following
