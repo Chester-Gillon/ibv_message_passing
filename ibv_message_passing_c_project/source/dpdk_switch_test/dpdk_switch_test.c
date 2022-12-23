@@ -16,6 +16,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <math.h>
+#include <setjmp.h>
 
 #include <unistd.h>
 #include <limits.h>
@@ -470,6 +471,10 @@ static sem_t test_statistics_populated;
 static volatile bool test_stop_requested;
 
 
+/* Used to allow an assertion failure in a worker thread to exit and allow the main thread to perform cleanup */
+RTE_DEFINE_PER_LCORE(jmp_buf, worker_thread_jmp_buf);
+
+
 /**
  * @brief Signal handler to request a running test stops
  * @param[in] sig Not used
@@ -482,12 +487,21 @@ static void stop_test_handler (const int sig)
 
 /*
  * @brief Exit after a fatal error, cleaning up the EAL.
- * @todo The call to rte_eal_cleanup() hangs if this is called from a worker thread
  */
 static void exit_cleaning_up_eal (void)
 {
-    (void) rte_eal_cleanup();
-    exit (EXIT_FAILURE);
+    if (rte_lcore_id () == rte_get_main_lcore ())
+    {
+        /* In the main thread perform the cleanup directly */
+        (void) rte_eal_cleanup();
+        exit (EXIT_FAILURE);
+    }
+    else
+    {
+        /* Cause the worker thread to exit, to allow the main thread to perform the cleanup.
+         * This is because rte_eal_cleanup() hangs if called from a worker thread. */
+        longjmp (RTE_PER_LCORE (worker_thread_jmp_buf), EXIT_FAILURE);
+    }
 }
 
 
@@ -1463,6 +1477,17 @@ static int transmit_receive_thread (void *arg)
     uint16_t num_transmitted;
     uint16_t num_received;
     const char *reason;
+
+    rc = setjmp (RTE_PER_LCORE (worker_thread_jmp_buf));
+    if (rc != 0)
+    {
+        /* Assertion failure occurred. Attempt to allow main thread to perform cleanup */
+        context->statistics.final_statistics = true;
+        test_statistics = context->statistics;
+        (void) sem_post (&test_statistics_populated);
+
+        return 0;
+    }
 
     transmit_receive_initialise (context);
 

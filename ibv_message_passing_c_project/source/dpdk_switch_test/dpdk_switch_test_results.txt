@@ -870,3 +870,62 @@ DPDK Ethernet statistics:
 [QEDE PMD: (2d:00.0:dpdk-port-0)]qede_get_regs:MCP trace feature_size 14648
 [QEDE PMD: (2d:00.0:dpdk-port-0)]qede_save_fw_dump:FW dump written to qede_pmd_dump_12-21-2022_22-58-38.bin file
 [QEDE PMD: (2d:00.0:dpdk-port-0-0)]ecore_hw_stop:Failed to close PF against FW [rc = -2]. Continue to stop HW to prevent illegal host access by the device.
+
+
+7. QL41112HxCU-DE rte_mbuf_check() reports error on 1st received packet
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When the -s command line option was used to enable calls to rte_mbuf_check() then fails on the first packet received:
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test --no-huge -m 1024m -l 3-4 -a 0000:2d:00.0 -- -p 25-26 -r 10000 -s
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: VFIO support initialized
+EAL: Using IOMMU type 1 (Type 1)
+EAL: Ignore mapping IO port bar(1)
+EAL: Ignore mapping IO port bar(3)
+EAL: Ignore mapping IO port bar(5)
+EAL: Probe PCI driver: net_qede (1077:8070) device: 0000:2d:00.0 (socket 0)
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=net_qede device_name=0000:2d:00.0
+tx_num_descriptors : desired=2 actual=256
+rx_num_descriptors : desired=3312 actual=4096
+Waiting to get link speed (link needs to be up). Press Ctrl-C to abort.
+Waiting 2 seconds after link came up for switch to accept packets
+Bit rate on interface to injection switch = 10000 (Mbps)
+Requested bit rate to be generated on each switch port under test = 10000.00 (Mbps)
+Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test
+Writing per-port counts to 20221223T155846_per_port_counts_linux.csv
+Test interval = 10 (secs)
+Frame debug enabled = No
+Sanity checks enabled = Yes
+Press Ctrl-C to stop test at end of next test interval
+Assertion failed : rx_pkt invalid : bad nb_segs
+
+15:58:48.704
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+           37              0              0              0              0              0           -0.0          -0.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+Max pending rx frames = 19 out of 1656
+
+DPDK Ethernet statistics:
+  Total number of successfully received packets    : 0
+  Total number of successfully transmitted packets : 0
+  Total number of successfully received bytes      : 0
+  Total number of successfully transmitted bytes   : 0
+  Total of Rx packets dropped by the HW            : 0
+  Total number of erroneous received packets       : 0
+  Total number of failed transmitted packets       : 0
+  Total number of Rx mbuf allocation failures      : 0
+
+"bad nb_segs" is reported because rx_pkt->nb_segs uint16_t==2 but rx_pkt->next==NULL (meaning no next segment).
+Therefore, doesn't doesn't appear to be dpdk_switch_test not having code to handle segmented frames.
