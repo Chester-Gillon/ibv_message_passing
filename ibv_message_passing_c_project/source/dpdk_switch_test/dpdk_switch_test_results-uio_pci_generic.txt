@@ -1,0 +1,3116 @@
+0. Introduction
+~~~~~~~~~~~~~~~
+
+For this using:
+a. HP Z4 G4 PC
+b. AlmaLinux 8.7
+c. DPDK 21.11.0 packaged by AlmaLinux
+
+Booted with the standard command line, which has no iommu related option:
+[mr_halfword@skylake-alma ~]$ cat /proc/cmdline 
+BOOT_IMAGE=(hd1,gpt2)/vmlinuz-4.18.0-425.3.1.el8.x86_64 root=/dev/mapper/almalinux_skylake--alma-root ro resume=/dev/mapper/almalinux_skylake--alma-swap rd.lvm.lv=almalinux_skylake-alma/root rd.lvm.lv=almalinux_skylake-alma/swap rhgb quiet
+
+And no iommu_groups:
+[mr_halfword@skylake-alma ~]$ find /sys/kernel/iommu_groups/ -type l
+<<no output>>
+
+In the Network Manager turned all six interfaces off.
+
+Loaded the uio_pci_generic module:
+[mr_halfword@skylake-alma ~]$ sudo modprobe uio_pci_generic
+[sudo] password for mr_halfword: 
+
+And in turn bind DPDK to the network interfaces, which causes the links on these interfaces to go down:
+[mr_halfword@skylake-alma ~]$ sudo dpdk-devbind.py --bind=uio_pci_generic 0000:00:1f.6
+[mr_halfword@skylake-alma ~]$ sudo dpdk-devbind.py --bind=uio_pci_generic 0000:02:00.0
+[mr_halfword@skylake-alma ~]$ sudo dpdk-devbind.py --bind=uio_pci_generic 0000:2d:00.0
+[mr_halfword@skylake-alma ~]$ sudo dpdk-devbind.py --bind=uio_pci_generic 0000:2d:00.1
+
+Allocate huge pages:
+[mr_halfword@skylake-alma ~]$ sudo dpdk-hugepages.py --pagesize 2048K --setup 1G
+
+[mr_halfword@skylake-alma ~]$ dpdk-devbind.py --status
+
+And the I219-LM, I210 and QL41112HxCU-DE then show as using a DPDK-compatible driver:
+Network devices using DPDK-compatible driver
+============================================
+0000:00:1f.6 'Ethernet Connection (2) I219-LM 15b7' drv=uio_pci_generic unused=e1000e
+0000:02:00.0 'I210 Gigabit Network Connection 1533' drv=uio_pci_generic unused=igb
+0000:2d:00.0 'FastLinQ QL41000 Series 10/25/40/50GbE Controller 8070' drv=uio_pci_generic unused=qede
+0000:2d:00.1 'FastLinQ QL41000 Series 10/25/40/50GbE Controller 8070' drv=uio_pci_generic unused=qede
+
+Network devices using kernel driver
+===================================
+0000:21:00.0 'MT27710 Family [ConnectX-4 Lx] 1015' if=ens1f0 drv=mlx5_core unused=uio_pci_generic 
+0000:21:00.1 'MT27710 Family [ConnectX-4 Lx] 1015' if=ens1f1 drv=mlx5_core unused=uio_pci_generic 
+
+No 'Baseband' devices detected
+==============================
+
+No 'Crypto' devices detected
+============================
+
+DMA devices using kernel driver
+===============================
+0000:00:04.0 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=uio_pci_generic 
+0000:00:04.1 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=uio_pci_generic 
+0000:00:04.2 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=uio_pci_generic 
+0000:00:04.3 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=uio_pci_generic 
+0000:00:04.4 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=uio_pci_generic 
+0000:00:04.5 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=uio_pci_generic 
+0000:00:04.6 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=uio_pci_generic 
+0000:00:04.7 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=uio_pci_generic 
+
+No 'Eventdev' devices detected
+==============================
+
+No 'Mempool' devices detected
+=============================
+
+No 'Compress' devices detected
+==============================
+
+No 'Misc (rawdev)' devices detected
+===================================
+
+No 'Regex' devices detected
+===========================
+
+
+1. QL41112HxCU-DE unable to obtain link speed automatically
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When attempted to use the QL41112HxCU-DE, with huge pages, were unable to get the link speed using rte_eth_link_get_nowait():
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test -l 3-4 -a 0000:2d:00.1 -- -p 25-26 -r 10000 -s -d 
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'PA'
+EAL: No available 1048576 kB hugepages reported
+EAL: Probe PCI driver: net_qede (1077:8070) device: 0000:2d:00.1 (socket 0)
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=net_qede device_name=0000:2d:00.1
+tx_num_descriptors : desired=2 actual=256
+rx_num_descriptors : desired=3312 actual=4096
+Waiting to get link speed (link needs to be up). Press Ctrl-C to abort.
+^CTest aborted while waiting to obtain the link speed
+
+The switch showed the link was up.
+The same issue with being unable to obtain the link speed was seen with the dpdk_information_program.
+This some issue with interrupts when using net_qede with the uio_pci_generic module.
+
+Trying to use rte_eth_link_get() instead results in the same issue.
+
+When the vfio-pci module was used net_qede was able to obtain the link speed.
+
+
+2. QL41112HxCU-DE fails in the first iteration, when transmitting at a 10G rate
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The -i option was used to specify the link speed manually, to overcome the issue with rte_eth_link_get_nowait()
+being unable to obtain the link speed. No limit was applied to the transmit rate, and used the 10G port bandwidth.
+
+The test received ~600,000 frames before the receiption stopped. This is a similar failure mechanism to
+when the vfio-pci module was used, in that the reception seems to stop due to issues with the receive descriptors
+not been read:
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test -l 3-4 -a 0000:2d:00.1 -- -p 25-26 -r 10000 -s -d -i 10000
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'PA'
+EAL: No available 1048576 kB hugepages reported
+EAL: Probe PCI driver: net_qede (1077:8070) device: 0000:2d:00.1 (socket 0)
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=net_qede device_name=0000:2d:00.1
+tx_num_descriptors : desired=2 actual=256
+rx_num_descriptors : desired=3312 actual=4096
+Bit rate on interface to injection switch = 10000 (Mbps) as defined on command line
+Requested bit rate to be generated on each switch port under test = 10000.00 (Mbps)
+Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test
+Writing per-port counts to 20221224T150247_per_port_counts_linux.csv
+Test interval = 10 (secs)
+Frame debug enabled = Yes
+Sanity checks enabled = Yes
+Running for a single test interval to collect debug information
+
+15:02:57.110
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8167949         598010              0              0              0        7566627       816794.9        5037.99
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   S
+    26  S 
+Total test intervals with failures = 1 : last failure NOW
+Max pending rx frames = 1656 out of 1656
+
+DPDK Ethernet statistics:
+  Total number of successfully received packets    : 598010
+  Total number of successfully transmitted packets : 8167826
+  Total number of successfully received bytes      : 910171220
+  Total number of successfully transmitted bytes   : 12431426606
+  Total of Rx packets dropped by the HW            : 7067245
+  Total number of erroneous received packets       : 0
+  Total number of failed transmitted packets       : 0
+  Total number of Rx mbuf allocation failures      : 7067245
+[qede_drain_txq:964(2d:00.1:dpdk-port-0)]Tx queue[0] is stuck,requesting MCP to drain
+[qede_drain_txq:973(2d:00.1:dpdk-port-0)]Timeout waiting for tx queue[0]:PROD=41484, CONS=12
+[QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_spq_block:Ramrod is stuck [CID ff100000 cmd 03 proto 04 echo 000d]
+[qede_hw_err_notify:330(2d:00.1:dpdk-port-0-0)]HW error occurred [Ramrod Failure]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Calculating idle_chk and grcdump register length for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Total length = 2356504
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:obtaining idle_chk and grcdump for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check1 feature_size 2732
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check2 feature_size 2732
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["reg_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Reg fifo feature_size 5792
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["igu_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:IGU fifo feature_size 240
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["protection_override"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Protection override feature_size 2380
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["fw_asserts"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:FW assert feature_size 788
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["grc"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:GRC dump feature_size 2119996
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["mcp_trace"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_nvram_read:nvram_read: reading image of size 108336 bytes from NVRAM
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:MCP trace feature_size 14580
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_save_fw_dump:FW dump written to qede_pmd_dump_12-24-2022_15-03-07.bin file
+[qede_stop_vport:458(2d:00.1:dpdk-port-0)]Stop V-PORT failed rc = -2
+[QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_spq_block:Ramrod is stuck [CID ff100000 cmd 02 proto 08 echo 000e]
+[qede_hw_err_notify:330(2d:00.1:dpdk-port-0-0)]HW error occurred [Ramrod Failure]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Calculating idle_chk and grcdump register length for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Total length = 2356504
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:obtaining idle_chk and grcdump for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check1 feature_size 3644
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check2 feature_size 3644
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["reg_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Reg fifo feature_size 5792
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["igu_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:IGU fifo feature_size 240
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["protection_override"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Protection override feature_size 2380
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["fw_asserts"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:FW assert feature_size 788
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["grc"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:GRC dump feature_size 2119996
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["mcp_trace"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_nvram_read:nvram_read: reading image of size 108336 bytes from NVRAM
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:MCP trace feature_size 14596
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_save_fw_dump:FW dump written to qede_pmd_dump_12-24-2022_15-03-11.bin file
+[QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_hw_stop:Failed to close PF against FW [rc = -2]. Continue to stop HW to prevent illegal host access by the device.
+
+
+3. QL41112HxCU-DE works when transmitting at a 200M rate
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The -i option was used to specify the link speed manually, to overcome the issue with rte_eth_link_get_nowait()
+being unable to obtain the link speed. A 100M per port limit was used, so with the two ports tested
+a transmit rate of 200M.
+
+When left running for 28 minutes there were no failures during the test, which suggests the issue with the
+reception stopping at the 10G line rate is timing sensitive. Haven't attempted to see at what transmit rate
+the reception stops.
+Although at shutdown still got "Tx queue[0] is stuck,requesting MCP to drain" and following messages:
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test -l 3-4 -a 0000:2d:00.1 -- -p 25-26 -r 100 -s -i 10000
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'PA'
+EAL: No available 1048576 kB hugepages reported
+EAL: Probe PCI driver: net_qede (1077:8070) device: 0000:2d:00.1 (socket 0)
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=net_qede device_name=0000:2d:00.1
+tx_num_descriptors : desired=2 actual=256
+rx_num_descriptors : desired=3312 actual=4096
+Waiting 2 seconds after ethernet device started for switch to accept packets
+Bit rate on interface to injection switch = 10000 (Mbps) as defined on command line
+Requested bit rate to be generated on each switch port under test = 100.00 (Mbps)
+Limiting max frame rate to 16212.7 Hz, as bit-rate on interface to injection switch exceeds that across all switch ports under test
+Writing per-port counts to 20221224T153559_per_port_counts_linux.csv
+Test interval = 10 (secs)
+Frame debug enabled = No
+Sanity checks enabled = Yes
+Press Ctrl-C to stop test at end of next test interval
+
+15:36:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             18              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:36:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             18              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:36:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             21              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:36:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:36:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:37:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:37:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:37:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:37:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:37:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             15              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:37:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:38:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             27              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:38:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:38:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:38:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             24              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:38:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:38:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:39:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:39:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             15              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:39:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:39:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             18              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:39:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:39:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:40:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             27              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:40:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:40:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:40:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             24              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:40:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             15              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:40:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:41:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0            303              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:41:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:41:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:41:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:41:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:41:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:42:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             27              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:42:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:42:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             15              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:42:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:42:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             24              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:42:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:43:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:43:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:43:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:43:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:43:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:43:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             15              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:44:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             27              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:44:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:44:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:44:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:44:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             21              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:44:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             18              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:45:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:45:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:45:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             15              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:45:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             18              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:45:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:45:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             18              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:46:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             30              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:46:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:46:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:46:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:46:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:46:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             27              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:47:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             15              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:47:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:47:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:47:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:47:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0            309              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:47:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:48:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             27              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:48:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:48:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:48:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             15              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:48:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:48:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             18              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:49:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             21              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:49:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:49:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:49:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:49:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:49:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:50:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             30              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:50:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:50:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:50:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:50:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:50:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:51:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             24              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:51:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:51:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:51:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             15              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:51:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:51:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:52:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             27              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:52:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:52:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:52:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:52:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:52:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:53:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             21              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:53:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             18              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:53:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:53:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:53:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:53:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:54:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             27              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:54:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:54:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0            303              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:54:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:54:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             15              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:54:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:55:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:55:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             24              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:55:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:55:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:55:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:55:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:56:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             27              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:56:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             15              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:56:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:56:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:56:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:56:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             18              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:57:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:57:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             21              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:57:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             18              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:57:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:57:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:57:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             15              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:58:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             27              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:58:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:58:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:58:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:58:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:58:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:59:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:59:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:59:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             24              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:59:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:59:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             21              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+15:59:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:00:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             27              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:00:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:00:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:00:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:00:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             18              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:00:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             15              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:01:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0            303              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:01:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:01:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             24              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:01:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             21              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:01:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:01:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             18              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:02:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             27              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:02:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:02:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             15              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:02:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:02:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:02:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:03:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:03:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:03:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:03:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             24              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:03:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             14              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:03:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             16              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:04:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             27              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:04:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:04:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:04:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:04:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:04:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             14              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:05:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             16              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:05:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:05:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:05:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             24              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:05:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:05:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:06:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             27              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:06:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:06:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:06:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:06:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:06:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:07:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162128         162127              0              0             15              0        16212.8         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:07:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             21              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:07:21.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162128              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:07:31.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:07:41.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0            312              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:07:51.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             15              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:08:01.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             27              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+^C
+16:08:11.748
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       162127         162127              0              0             14              0        16212.7         100.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+Max pending rx frames = 2 out of 1656
+
+DPDK Ethernet statistics:
+  Total number of successfully received packets    : 31295253
+  Total number of successfully transmitted packets : 31290532
+  Total number of successfully received bytes      : 47625034719
+  Total number of successfully transmitted bytes   : 47624189704
+  Total of Rx packets dropped by the HW            : 0
+  Total number of erroneous received packets       : 0
+  Total number of failed transmitted packets       : 0
+  Total number of Rx mbuf allocation failures      : 0
+[qede_drain_txq:964(2d:00.1:dpdk-port-0)]Tx queue[0] is stuck,requesting MCP to drain
+[qede_drain_txq:973(2d:00.1:dpdk-port-0)]Timeout waiting for tx queue[0]:PROD=29860, CONS=164
+[QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_spq_block:Ramrod is stuck [CID ff100000 cmd 03 proto 04 echo 000d]
+[qede_hw_err_notify:330(2d:00.1:dpdk-port-0-0)]HW error occurred [Ramrod Failure]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Calculating idle_chk and grcdump register length for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Total length = 2356504
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:obtaining idle_chk and grcdump for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check1 feature_size 2732
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check2 feature_size 2732
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["reg_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Reg fifo feature_size 5792
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["igu_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:IGU fifo feature_size 240
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["protection_override"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Protection override feature_size 2380
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["fw_asserts"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:FW assert feature_size 788
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["grc"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:GRC dump feature_size 2119996
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["mcp_trace"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_nvram_read:nvram_read: reading image of size 108336 bytes from NVRAM
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:MCP trace feature_size 14672
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_save_fw_dump:FW dump written to qede_pmd_dump_12-24-2022_16-08-18.bin file
+[qede_stop_vport:458(2d:00.1:dpdk-port-0)]Stop V-PORT failed rc = -2
+[QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_spq_block:Ramrod is stuck [CID ff100000 cmd 02 proto 08 echo 000e]
+[qede_hw_err_notify:330(2d:00.1:dpdk-port-0-0)]HW error occurred [Ramrod Failure]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Calculating idle_chk and grcdump register length for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs_len:Total length = 2356504
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:obtaining idle_chk and grcdump for current engine
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check1 feature_size 3644
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["idle_chk"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Idle Check2 feature_size 3644
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["reg_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Reg fifo feature_size 5792
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["igu_fifo"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:IGU fifo feature_size 240
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["protection_override"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:Protection override feature_size 2380
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["fw_asserts"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:FW assert feature_size 788
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["grc"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:GRC dump feature_size 2119996
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_dbg_dump:Collecting a debug feature ["mcp_trace"]
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qed_nvram_read:nvram_read: reading image of size 108336 bytes from NVRAM
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:MCP trace feature_size 14652
+[QEDE PMD: (2d:00.1:dpdk-port-0)]qede_save_fw_dump:FW dump written to qede_pmd_dump_12-24-2022_16-08-21.bin file
+[QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_hw_stop:Failed to close PF against FW [rc = -2]. Continue to stop HW to prevent illegal host access by the device.
+
+
+4. I219-LM works when transmitting at 1G rate and using huge pages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+No errors seen:
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test -l 3-4 -a 0000:00:1f.6 -- -p 25-26 -r 1000 -s 
+[sudo] password for mr_halfword: 
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'PA'
+EAL: No available 1048576 kB hugepages reported
+EAL: Probe PCI driver: net_e1000_em (8086:15b7) device: 0000:00:1f.6 (socket 0)
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=net_e1000_em device_name=0000:00:1f.6
+tx_num_descriptors : desired=2 actual=32
+rx_num_descriptors : desired=3312 actual=3312
+Waiting to get link speed (link needs to be up). Press Ctrl-C to abort.
+Waiting 2 seconds after link came up for switch to accept packets
+Bit rate on interface to injection switch = 1000 (Mbps) as read using DPDK
+Requested bit rate to be generated on each switch port under test = 1000.00 (Mbps)
+Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test
+Writing per-port counts to 20221224T165242_per_port_counts_linux.csv
+Test interval = 10 (secs)
+Frame debug enabled = No
+Sanity checks enabled = Yes
+Press Ctrl-C to stop test at end of next test interval
+
+16:53:02.607
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       806688         806651              0              0             18              0        80668.8         497.57
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:53:12.606
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       806656         806662              0              0             15              0        80665.6         497.55
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:53:22.607
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       806664         806662              0              0             15              0        80666.4         497.55
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:53:32.607
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       806664         806663              0              0             24              0        80666.4         497.55
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+16:53:42.607
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       806664         806662              0              0             15              0        80666.4         497.55
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+^C
+16:53:52.607
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       806656         806662              0              0             15              0        80665.6         497.55
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+Max pending rx frames = 19 out of 1656
+
+DPDK Ethernet statistics:
+  Total number of successfully received packets    : 4840065
+  Total number of successfully transmitted packets : 4839968
+  Total number of successfully received bytes      : 7366436164
+  Total number of successfully transmitted bytes   : 7366431296
+  Total of Rx packets dropped by the HW            : 0
+  Total number of erroneous received packets       : 0
+  Total number of failed transmitted packets       : 0
+  Total number of Rx mbuf allocation failures      : 0
+
+
+5. I210 works when transmitting at 1G rate and using huge pages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+No errors seen:
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test -l 3-4 -a 0000:02:00.0 -- -p 25-26 -r 1000 -s 
+[sudo] password for mr_halfword: 
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'PA'
+EAL: No available 1048576 kB hugepages reported
+EAL: Probe PCI driver: net_e1000_igb (8086:1533) device: 0000:02:00.0 (socket 0)
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=net_e1000_igb device_name=0000:02:00.0
+tx_num_descriptors : desired=2 actual=32
+rx_num_descriptors : desired=3312 actual=3312
+Waiting to get link speed (link needs to be up). Press Ctrl-C to abort.
+Waiting 2 seconds after link came up for switch to accept packets
+Bit rate on interface to injection switch = 1000 (Mbps) as read using DPDK
+Requested bit rate to be generated on each switch port under test = 1000.00 (Mbps)
+Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test
+Writing per-port counts to 20221224T171355_per_port_counts_linux.csv
+Test interval = 10 (secs)
+Frame debug enabled = No
+Sanity checks enabled = Yes
+Press Ctrl-C to stop test at end of next test interval
+
+17:14:11.076
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810667         810626              0              0             18              0        81066.7         500.02
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+17:14:21.076
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810560              0              0            309              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+17:14:31.076
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810643              0              0             18              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+17:14:41.076
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810643              0              0             15              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+17:14:51.076
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810643              0              0             15              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+17:15:01.076
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810642              0              0             15              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+17:15:11.076
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810643              0              0             15              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+17:15:21.076
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810643              0              0             15              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+17:15:31.076
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810643              0              0             15              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+17:15:41.076
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810643              0              0             15              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+^C
+17:15:51.076
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+       810641         810643              0              0             15              0        81064.1         500.00
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+Max pending rx frames = 62 out of 1656
+
+DPDK Ethernet statistics:
+  Total number of successfully received packets    : 8917441
+  Total number of successfully transmitted packets : 8917047
+  Total number of successfully received bytes      : 13536109669
+  Total number of successfully transmitted bytes   : 13536078868
+  Total of Rx packets dropped by the HW            : 0
+  Total number of erroneous received packets       : 0
+  Total number of failed transmitted packets       : 0
+  Total number of Rx mbuf allocation failures      : 0
+
+
+6. I210, I219-LM and QL41112HxCU-DE fails to initialise when attempt to not use huge pages without IOMMU
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Attempting to use the I210 withoout huge pages fails:
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test --no-huge -m 1024m -l 3-4 -a 0000:02:00.0 -- -p 25-26 -r 1000 -s 
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: FATAL: Cannot use IOVA as 'PA' since physical addresses are not available
+EAL: Cannot use IOVA as 'PA' since physical addresses are not available
+rte_eal_init() failed : Operation not permitted
+
+Debugging shows the following function in eal_memory.c only allows using physical addresses when huge pages are used:
+int
+rte_eal_using_phys_addrs(void)
+{
+    if (phys_addrs_available == -1) {
+        uint64_t tmp = 0;
+
+        if (rte_eal_has_hugepages() != 0 &&
+            rte_mem_virt2phy(&tmp) != RTE_BAD_PHYS_ADDR)
+            phys_addrs_available = 1;
+        else
+            phys_addrs_available = 0;
+    }
+    return phys_addrs_available;
+}
+
+I219-LM and QL41112HxCU-DE also fail in the same way when attempt to not use huge pages without IOMMU.
+
+
+7. ConnectX-4 Lx works when specify to not use huge pages without IOMMU
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ConnectX-4 Lx allows not using huge pages without IOMMU, since can select IOVA mode as 'VA'.
+Given DPDK can use the Kernel driver for a ConnectX, not sure if the IOVA mode selection has any effect:
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test --no-huge -m 1024m -l 3-4 -a 0000:21:00.1 -- -p 25-26 -r 10000 -s  
+[sudo] password for mr_halfword: 
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: Probe PCI driver: mlx5_pci (15b3:1015) device: 0000:21:00.1 (socket 0)
+mlx5_net: No available register for sampler.
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=mlx5_pci device_name=0000:21:00.1
+mlx5_net: port 0 number of descriptors requested for Tx queue 0 must be higher than MLX5_TX_COMP_THRESH, using 33 instead of 2
+mlx5_net: port 0 increased number of descriptors in Tx queue 0 to the next power of two (64)
+rte_eth_tx_queue_info_get() changed number of Tx descriptors from 2 to 64
+tx_num_descriptors : desired=2 actual=64
+rx_num_descriptors : desired=3312 actual=4096
+Bit rate on interface to injection switch = 10000 (Mbps) as read using DPDK
+Requested bit rate to be generated on each switch port under test = 10000.00 (Mbps)
+Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test
+Writing per-port counts to 20221224T200118_per_port_counts_linux.csv
+Test interval = 10 (secs)
+Frame debug enabled = No
+Sanity checks enabled = Yes
+Press Ctrl-C to stop test at end of next test interval
+
+20:01:29.280
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8103592        8103523              0              0              5              0       810359.2        4998.30
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+20:01:39.280
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8104632        8104632              0              0              5              0       810463.2        4998.94
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+20:01:49.280
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8104662        8104659              0              0              5              0       810466.2        4998.96
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+20:01:59.280
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8104506        8104511              0              0              8              0       810450.6        4998.86
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+^C
+20:02:09.280
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8104768        8104748              0              0              6              0       810476.8        4999.02
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+Max pending rx frames = 45 out of 1656
+
+DPDK Ethernet statistics:
+  Total number of successfully received packets    : 40522102
+  Total number of successfully transmitted packets : 40522159
+  Total number of successfully received bytes      : 61512509174
+  Total number of successfully transmitted bytes   : 61512637362
+  Total of Rx packets dropped by the HW            : 0
+  Total number of erroneous received packets       : 0
+  Total number of failed transmitted packets       : 0
+  Total number of Rx mbuf allocation failures      : 0
+
+
+7. ConnectX-4 Lx works when specify use huge pages without IOMMU
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ConnectX-4 works when specify to use huge pages without IOMMU, and selected the IOVA mode as 'PA':
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test -l 3-4 -a 0000:21:00.1 -- -p 25-26 -r 10000 -s 
+[sudo] password for mr_halfword: 
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'PA'
+EAL: No available 1048576 kB hugepages reported
+EAL: Probe PCI driver: mlx5_pci (15b3:1015) device: 0000:21:00.1 (socket 0)
+mlx5_net: No available register for sampler.
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=mlx5_pci device_name=0000:21:00.1
+mlx5_net: port 0 number of descriptors requested for Tx queue 0 must be higher than MLX5_TX_COMP_THRESH, using 33 instead of 2
+mlx5_net: port 0 increased number of descriptors in Tx queue 0 to the next power of two (64)
+rte_eth_tx_queue_info_get() changed number of Tx descriptors from 2 to 64
+tx_num_descriptors : desired=2 actual=64
+rx_num_descriptors : desired=3312 actual=4096
+Bit rate on interface to injection switch = 10000 (Mbps) as read using DPDK
+Requested bit rate to be generated on each switch port under test = 10000.00 (Mbps)
+Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test
+Writing per-port counts to 20221224T201418_per_port_counts_linux.csv
+Test interval = 10 (secs)
+Frame debug enabled = No
+Sanity checks enabled = Yes
+Press Ctrl-C to stop test at end of next test interval
+
+20:14:28.674
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8103504        8103416              0              0             67              0       810350.4        4998.24
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+
+20:14:38.674
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8104824        8104828              0              0              5              0       810482.4        4999.06
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+^C
+20:14:48.674
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8103611        8103622              0              0              5              0       810361.1        4998.31
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port  22
+        56
+    25   .
+    26  . 
+Total test intervals with failures = 0
+Max pending rx frames = 45 out of 1656
+
+DPDK Ethernet statistics:
+  Total number of successfully received packets    : 24311943
+  Total number of successfully transmitted packets : 24311939
+  Total number of successfully received bytes      : 36905438964
+  Total number of successfully transmitted bytes   : 36905523402
+  Total of Rx packets dropped by the HW            : 0
+  Total number of erroneous received packets       : 0
+  Total number of failed transmitted packets       : 0
+  Total number of Rx mbuf allocation failures      : 0

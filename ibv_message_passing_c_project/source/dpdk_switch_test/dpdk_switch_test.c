@@ -285,6 +285,12 @@ static bool arg_frame_debug_enabled = false;
 static bool arg_sanity_checks_enabled = false;
 
 
+/* Command line argument which can optionally specify the speed of the injection port,
+ * rather than using DPDP to obtain the speed which involves waiting for the link to come up. */
+static uint32_t arg_injection_port_mbps;
+static bool arg_injection_port_mbps_specified = false;
+
+
 /* Used to store pending receive frames for one source / destination port combination.
  * As frames are transmitted they are stored in, and then removed once received.
  *
@@ -473,6 +479,7 @@ static volatile bool test_stop_requested;
 
 /* Used to allow an assertion failure in a worker thread to exit and allow the main thread to perform cleanup */
 RTE_DEFINE_PER_LCORE(jmp_buf, worker_thread_jmp_buf);
+RTE_DEFINE_PER_LCORE(bool, worker_thread_jmp_buf_set) = false;
 
 
 /**
@@ -490,17 +497,17 @@ static void stop_test_handler (const int sig)
  */
 static void exit_cleaning_up_eal (void)
 {
-    if (rte_lcore_id () == rte_get_main_lcore ())
-    {
-        /* In the main thread perform the cleanup directly */
-        (void) rte_eal_cleanup();
-        exit (EXIT_FAILURE);
-    }
-    else
+    if (RTE_PER_LCORE (worker_thread_jmp_buf_set))
     {
         /* Cause the worker thread to exit, to allow the main thread to perform the cleanup.
          * This is because rte_eal_cleanup() hangs if called from a worker thread. */
         longjmp (RTE_PER_LCORE (worker_thread_jmp_buf), EXIT_FAILURE);
+    }
+    else
+    {
+        /* In the main thread perform the cleanup directly */
+        (void) rte_eal_cleanup();
+        exit (EXIT_FAILURE);
     }
 }
 
@@ -570,7 +577,7 @@ static void check_assert (const bool assertion, const char *format, ...)
 static void display_application_usage (const char *const program_name)
 {
     printf ("%s Application options:\n", program_name);
-    printf ("  [-t <duration_secs>] [-d] [-p <port_list>] [-r <rate_mbps>] -s\n");
+    printf ("  [-t <duration_secs>] [-d] [-p <port_list>] [-r <rate_mbps>] -s [-i <rate_mbps>]\n");
     printf ("\n");
     printf ("  -d enables debug mode, where runs just for a single test interval and creates\n");
     printf ("     a CSV file containing the frames sent/received.\n");
@@ -584,6 +591,9 @@ static void display_application_usage (const char *const program_name)
     printf ("  -r Specifies the bit rate generated on each port on the switch under test,\n");
     printf ("     as a floating point mega bits per second. Default is %g\n", DEFAULT_TESTED_PORT_MBPS);
     printf ("  -s Enables sanity checks of mbufs\n");
+    printf ("  -i Specifies the bit rate for the network interface to the injection switch,\n");
+    printf ("     in mega bits per second. If not specified automatically obtains the\n");
+    printf ("     bit rate, which involves waiting for the link to come up.\n");
 }
 
 
@@ -726,7 +736,7 @@ static void parse_tested_port_list (const char *const port_list_in)
 static void read_command_line_arguments (const int argc, char *argv[])
 {
     const char *const program_name = argv[0];
-    const char *const optstring = "dt:p:r:s";
+    const char *const optstring = "dt:p:r:si:";
     int option;
     char junk;
 
@@ -788,6 +798,15 @@ static void read_command_line_arguments (const int argc, char *argv[])
 
         case 's':
             arg_sanity_checks_enabled = true;
+            break;
+
+        case 'i':
+            if (sscanf (optarg, "%" SCNu32 "%c", &arg_injection_port_mbps, &junk) != 1)
+            {
+                printf ("Error: Invalid <rate_mbps> %s\n", optarg);
+                exit_cleaning_up_eal ();
+            }
+            arg_injection_port_mbps_specified = true;
             break;
 
         default:
@@ -1507,7 +1526,11 @@ static int transmit_receive_thread (void *arg)
     const char *reason;
 
     rc = setjmp (RTE_PER_LCORE (worker_thread_jmp_buf));
-    if (rc != 0)
+    if (rc == 0)
+    {
+        RTE_PER_LCORE (worker_thread_jmp_buf_set) = true;
+    }
+    else
     {
         /* Assertion failure occurred. Attempt to allow main thread to perform cleanup */
         context->statistics.final_statistics = true;
@@ -1918,12 +1941,30 @@ int main (int argc, char *argv[])
     CHECK_ASSERT (rc == 0);
 
     /* Get the bit rate of the Ethernet link used by this program */
-    const uint32_t injection_port_bit_rate_mbps = get_rate_mbps (tx_rx_thread_context);
+    const uint32_t injection_port_bit_rate_mbps = arg_injection_port_mbps_specified ?
+            arg_injection_port_mbps : get_rate_mbps (tx_rx_thread_context);
+    if (arg_injection_port_mbps_specified)
+    {
+        const struct timespec hold_off =
+        {
+            .tv_sec = 0,
+            .tv_nsec = 100000000 /* 100 milliseconds */
+        };
+
+        /* Apply the same wait as get_rate_mbps() uses when the link wasn't initially up,
+         * when using the bit rate specified on the command line. */
+        console_printf ("Waiting 2 seconds after ethernet device started for switch to accept packets\n");
+        for (uint32_t delay_iter = 0; delay_iter < 20; delay_iter++)
+        {
+            clock_nanosleep (CLOCK_MONOTONIC, 0, &hold_off, NULL);
+        }
+    }
 
     if (injection_port_bit_rate_mbps != RTE_ETH_SPEED_NUM_UNKNOWN)
     {
         const int64_t injection_port_bit_rate = 1000000L * (int64_t) injection_port_bit_rate_mbps;
-        console_printf ("Bit rate on interface to injection switch = %d (Mbps)\n", injection_port_bit_rate_mbps);
+        console_printf ("Bit rate on interface to injection switch = %d (Mbps) %s\n", injection_port_bit_rate_mbps,
+                arg_injection_port_mbps_specified ? "as defined on command line" : "as read using DPDK");
 
         /* The requested bit rate to be generated across all the switch ports under test */
         const int64_t requested_switch_under_test_bit_rate = lround (arg_tested_port_mbps * 1E6) * num_tested_port_indices;

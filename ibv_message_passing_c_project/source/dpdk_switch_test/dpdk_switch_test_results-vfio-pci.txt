@@ -1430,8 +1430,8 @@ DPDK Ethernet statistics:
 [QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_hw_stop:Failed to close PF against FW [rc = -2]. Continue to stop HW to prevent illegal host access by the device.
 
 
-10. QL41112HxCU-DE fails in the first iteration errors when using huge pages
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+10. QL41112HxCU-DE fails in the first iteration when using huge pages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Same code as in 9) but using huge pages and reception still stalls during the original test iteration: 
 [mr_halfword@skylake-alma ~]$ sudo dpdk-hugepages.py --pagesize 2048K --setup 1G
@@ -1562,8 +1562,8 @@ DPDK Ethernet statistics:
 [QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_hw_stop:Failed to close PF against FW [rc = -2]. Continue to stop HW to prevent illegal host access by the device.
 
 
-11. QL41112HxCU-DE fails in the first iteration errors when using huge pages and physical addresses
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+11. QL41112HxCU-DE fails in the first iteration when using huge pages and physical addresses
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Same code as in 9) but selecting physical addresses instead of virtual,
 and reception still stalls during the original test iteration.
