@@ -111,7 +111,7 @@ When the vfio-pci module was used net_qede was able to obtain the link speed.
 The -i option was used to specify the link speed manually, to overcome the issue with rte_eth_link_get_nowait()
 being unable to obtain the link speed. No limit was applied to the transmit rate, and used the 10G port bandwidth.
 
-The test received ~600,000 frames before the receiption stopped. This is a similar failure mechanism to
+The test received ~600,000 frames before the reception stopped. This is a similar failure mechanism to
 when the vfio-pci module was used, in that the reception seems to stop due to issues with the receive descriptors
 not been read:
 [mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test -l 3-4 -a 0000:2d:00.1 -- -p 25-26 -r 10000 -s -d -i 10000
