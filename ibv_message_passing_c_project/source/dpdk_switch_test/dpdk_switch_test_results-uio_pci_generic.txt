@@ -3114,3 +3114,86 @@ DPDK Ethernet statistics:
   Total number of erroneous received packets       : 0
   Total number of failed transmitted packets       : 0
   Total number of Rx mbuf allocation failures      : 0
+
+
+8. uio_pci_generic is not usable when secure boot is enabled
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The above tests were done with secure boot disabled.
+For this test booted with secure boot enabled and using the default command line, i.e. IOMMU disabled.
+
+Was able to load the module, bind the network devices and create huge pages without error:
+[mr_halfword@skylake-alma ~]$ sudo modprobe uio_pci_generic
+[sudo] password for mr_halfword: 
+[mr_halfword@skylake-alma ~]$ sudo dpdk-devbind.py --bind=uio_pci_generic 0000:02:00.0
+[mr_halfword@skylake-alma ~]$ sudo dpdk-devbind.py --bind=uio_pci_generic 0000:2d:00.0
+[mr_halfword@skylake-alma ~]$ sudo dpdk-devbind.py --bind=uio_pci_generic 0000:2d:00.1
+[mr_halfword@skylake-alma ~]$ sudo dpdk-hugepages.py --pagesize 2048K --setup 1G
+[mr_halfword@skylake-alma ~]$ dpdk-devbind.py --status
+
+Network devices using DPDK-compatible driver
+============================================
+0000:02:00.0 'I210 Gigabit Network Connection 1533' drv=uio_pci_generic unused=igb
+0000:2d:00.0 'FastLinQ QL41000 Series 10/25/40/50GbE Controller 8070' drv=uio_pci_generic unused=qede
+0000:2d:00.1 'FastLinQ QL41000 Series 10/25/40/50GbE Controller 8070' drv=uio_pci_generic unused=qede
+
+Network devices using kernel driver
+===================================
+0000:00:1f.6 'Ethernet Connection (2) I219-LM 15b7' if=eno1 drv=e1000e unused=uio_pci_generic *Active*
+0000:21:00.0 'MT27710 Family [ConnectX-4 Lx] 1015' if=ens1f0 drv=mlx5_core unused=uio_pci_generic 
+0000:21:00.1 'MT27710 Family [ConnectX-4 Lx] 1015' if=ens1f1 drv=mlx5_core unused=uio_pci_generic 
+
+No 'Baseband' devices detected
+==============================
+
+No 'Crypto' devices detected
+============================
+
+DMA devices using kernel driver
+===============================
+0000:00:04.0 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=uio_pci_generic 
+0000:00:04.1 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=uio_pci_generic 
+0000:00:04.2 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=uio_pci_generic 
+0000:00:04.3 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=uio_pci_generic 
+0000:00:04.4 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=uio_pci_generic 
+0000:00:04.5 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=uio_pci_generic 
+0000:00:04.6 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=uio_pci_generic 
+0000:00:04.7 'Sky Lake-E CBDMA Registers 2021' drv=ioatdma unused=uio_pci_generic 
+
+No 'Eventdev' devices detected
+==============================
+
+No 'Mempool' devices detected
+=============================
+
+No 'Compress' devices detected
+==============================
+
+No 'Misc (rawdev)' devices detected
+===================================
+
+No 'Regex' devices detected
+===========================
+
+However, attempting to run dpdk_switch_test failed with "Cannot write command to PCI config space!":
+[mr_halfword@skylake-alma release]$ sudo dpdk_switch_test/dpdk_switch_test -l 3-4 -a 0000:2d:00.1 -- -p 25-26 -r 100 -s 
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'PA'
+EAL: No available 1048576 kB hugepages reported
+EAL: Cannot write command to PCI config space!
+EAL: Cannot set up bus mastering!
+EAL: Requested device 0000:2d:00.1 cannot be used
+EAL: Bus (pci) probe failed.
+TELEMETRY: No legacy callbacks, legacy socket not created
+Error: the EAL options must specify only one available Ethernet device, actual number is 0
+
+Which caused the following to appear in dmesg:
+[  462.937691] Lockdown: dpdk_switch_tes: iopl is restricted; see man kernel_lockdown.7
+[  470.228469] Lockdown: dpdk_switch_tes: Direct PCI access is restricted; see man kernel_lockdown.7
+
+The above matches the following note in https://doc.dpdk.org/guides/linux_gsg/linux_drivers.html#uio :
+  If UEFI secure boot is enabled, the Linux kernel may disallow the use of UIO on the system.
+  Therefore, devices for use by DPDK should be bound to the vfio-pci kernel module rather than any UIO-based module. 
