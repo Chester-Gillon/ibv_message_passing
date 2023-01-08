@@ -153,6 +153,7 @@ add_subdirectory ("${PROJECT_SOURCE_DIR}/bind_local")
 if (${DPDK_FOUND})
     add_subdirectory ("${PROJECT_SOURCE_DIR}/dpdk_switch_test")
 endif()
+add_subdirectory ("${PROJECT_SOURCE_DIR}/read_smi_count")
 
 # Location of the source code for the linuxptp package, to gain access to the phc.[ch]
 set (LINUXPTP_ROOT "$ENV{HOME}/linuxptp-1.6")
