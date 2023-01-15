@@ -8,33 +8,64 @@
  */
 
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
 
 #include <sys/types.h>
-#include <regex.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+
+/**
+ * @brief Determine if the start of text string matches an ANSI CSI (Control Sequence Introducer) sequence
+ * @details The sequence to match was taken from:
+ *             https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_(Control_Sequence_Introducer)_sequences
+ * @param[in] text The text to match against an ANSI CSI
+ * @param[out] csi_len The number of bytes in the matched ANSI CSI
+ * @return Returns true if the start of text string matches an ANSI CSI
+ */
+static bool ansi_csi_match (const char *const text, size_t *const csi_len)
+{
+    const char *const ansi_csi_start = "\e[";
+    bool matches_ansi_csi = false;
+
+    *csi_len = 0;
+    if (strncmp (text, ansi_csi_start, strlen (ansi_csi_start)) == 0)
+    {
+        /* Skip start of the CSI */
+        (*csi_len) += strlen (ansi_csi_start);
+
+        /* Skip parameter bytes */
+        while ((text[*csi_len] >= 0x30) && (text[*csi_len] <= 0x3f))
+        {
+            (*csi_len)++;
+        }
+
+        /* Skip intermediate bytes */
+        while ((text[*csi_len] >= 0x20) && (text[*csi_len] <= 0x2f))
+        {
+            (*csi_len)++;
+        }
+
+        /* Check the sequence ends with a "final byte" */
+        if ((text[*csi_len] >= 0x40) && (text[*csi_len] <= 0x7e))
+        {
+            (*csi_len)++;
+            matches_ansi_csi = true;
+        }
+    }
+
+    return matches_ansi_csi;
+}
 
 int main (int argc, char *argv[])
 {
     int rc;
-    regex_t ansi_reg;
-    char errbuf[1024];
     FILE *log_file;
-    regmatch_t match;
 
+    const char *const switch_to_utf8 = "\e%G";
     const char *const erase_line = "\e[K";
-
-    /* Compile a regex for an ANSI Control Sequence Introducer */
-    const char *const regex_expression = "\e\\[[0-9;]*[a-zA-Z]";
-    rc = regcomp (&ansi_reg, regex_expression, REG_EXTENDED);
-    if (rc != 0)
-    {
-        regerror (rc, &ansi_reg, errbuf, sizeof (errbuf));
-        printf ("regcomp() failed : %s\n", errbuf);
-        exit (EXIT_FAILURE);
-    }
 
     if (argc == 1)
     {
@@ -74,22 +105,19 @@ int main (int argc, char *argv[])
     (void) fclose (log_file);
 
     /* Process the log file, writing its cleaned contents to standard output */
-    off_t file_pos = 0;
+    size_t file_pos = 0;
+    size_t ansi_csi_len = 0;
     while (file_pos < stat_buf.st_size)
     {
-        rc = regexec (&ansi_reg, &log_file_contents[file_pos], 1, &match, 0);
-        if (rc == 0)
+        if (strncmp (&log_file_contents[file_pos], switch_to_utf8, strlen (switch_to_utf8)) == 0)
         {
-            /* Output characters up until the start of the ANSI escape sequence */
-            for (regoff_t start_offset = 0; start_offset < match.rm_so; start_offset++)
-            {
-                if (log_file_contents[file_pos + start_offset] != '\r')
-                {
-                    printf ("%c", log_file_contents[file_pos + start_offset]);
-                }
-            }
-
-            if (strncmp (&log_file_contents[file_pos + match.rm_so], erase_line, strlen (erase_line)) == 0)
+            /* Skip the escape sequence to switch to UFT-8, which CentOS 6 can output */
+            file_pos += strlen (switch_to_utf8);
+        }
+        else if (ansi_csi_match (&log_file_contents[file_pos], &ansi_csi_len))
+        {
+            if ((ansi_csi_len == strlen (erase_line)) &&
+                (strncmp (&log_file_contents[file_pos], erase_line, strlen (erase_line)) == 0))
             {
                 /* If the ANSI escape sequence is an erase line, insert a new line in the output
                  * as the erase line is used is used to report progress for start jobs. */
@@ -97,7 +125,7 @@ int main (int argc, char *argv[])
             }
 
             /* Skip over the ANSI escape sequence */
-            file_pos += match.rm_eo;
+            file_pos += ansi_csi_len;
         }
         else if (log_file_contents[file_pos] == '\r')
         {
@@ -112,7 +140,6 @@ int main (int argc, char *argv[])
         }
     }
 
-    regfree (&ansi_reg);
     free (log_file_contents);
 
     return EXIT_SUCCESS;
