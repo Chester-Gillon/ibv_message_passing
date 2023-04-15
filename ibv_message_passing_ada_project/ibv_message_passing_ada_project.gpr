@@ -6,5 +6,6 @@ with "source/ibv_message_overlay_gdb_test/ibv_message_overlay_gdb_test.gpr";
 with "source/get_rdate/get_rdate.gpr";
 with "source/shared_file_io/shared_file_io.gpr";
 with "source/coverage_for_ada_task/coverage_for_ada_task.gpr";
+with "source/partial_thread_exit/partial_thread_exit.gpr";
 project Ibv_Message_Passing_Ada_Project is
 end Ibv_Message_Passing_Ada_Project;
