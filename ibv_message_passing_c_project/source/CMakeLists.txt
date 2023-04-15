@@ -155,6 +155,7 @@ if (${DPDK_FOUND})
 endif()
 add_subdirectory ("${PROJECT_SOURCE_DIR}/read_smi_count")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/convert_boot_log_to_clean_ascii")
+add_subdirectory ("${PROJECT_SOURCE_DIR}/find_processes_using_file")
 
 # Location of the source code for the linuxptp package, to gain access to the phc.[ch]
 set (LINUXPTP_ROOT "$ENV{HOME}/linuxptp-1.6")
