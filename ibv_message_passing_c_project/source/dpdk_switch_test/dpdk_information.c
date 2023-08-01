@@ -272,7 +272,7 @@ int main (int argc, char *argv[])
             if (link.link_status == RTE_ETH_LINK_DOWN)
             {
                 /* Wait with a timeout for the link to come up.
-                 * With the qede or net_e1000_igb driver the link is only enable to come up once
+                 * With the net_i40e, qede or net_e1000_igb driver the link is only enable to come up once
                  * rte_eth_dev_start() has been called, and then has to wait for the auto-negotiation to complete. */
                 const double start_time = get_monotonic_time ();
                 const double expiry_time = start_time + 15;
@@ -386,8 +386,10 @@ int main (int argc, char *argv[])
         rc = rte_eth_dev_stop (port_id);
         if (rc == 0)
         {
+            /* With the net_i40e driver the call rte_eth_dev_close() -> i40e_dev_close() can cause a positive number to be returned,
+             * which is the number of interrupt callbacks unregistered. Therefore, only consider negative values as an error. */
             rc = rte_eth_dev_close (port_id);
-            if (rc != 0)
+            if (rc < 0)
             {
                 printf ("rte_eth_dev_close() failed : %s\n", strerror (-rc));
             }

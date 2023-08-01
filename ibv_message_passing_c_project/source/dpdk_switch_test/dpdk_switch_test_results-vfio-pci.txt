@@ -1894,3 +1894,196 @@ DPDK Ethernet statistics:
 [QEDE PMD: (2d:00.1:dpdk-port-0)]qede_get_regs:MCP trace feature_size 14872
 [QEDE PMD: (2d:00.1:dpdk-port-0)]qede_save_fw_dump:FW dump written to qede_pmd_dump_12-25-2022_21-46-24.bin file
 [QEDE PMD: (2d:00.1:dpdk-port-0-0)]ecore_hw_stop:Failed to close PF against FW [rc = -2]. Continue to stop HW to prevent illegal host access by the device.
+
+
+13. Intel X710 working with 10 ports at 1G each
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+These tests were with secure boot and the IOMMU enabled. The Kernel wasn't tainted.
+After vfio-pci was bound to the device, gave the user rw access to the /dev/vfio/<iommu_group> file
+which allowed dpdk_switch_test to run without needing sudo permission in conjunction with --no-huge
+
+Ran for 47 minutes with no missed packets:
+[mr_halfword@skylake-alma release]$ dpdk_switch_test/dpdk_switch_test --no-huge -m 1024m -l 3-4 -a 0000:2d:00.1 -- -p 7-16 -r 1000
+EAL: Detected CPU lcores: 8
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /run/user/1000/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: VFIO support initialized
+EAL: Using IOMMU type 1 (Type 1)
+EAL: Ignore mapping IO port bar(1)
+EAL: Ignore mapping IO port bar(4)
+EAL: Probe PCI driver: net_i40e (8086:1572) device: 0000:2d:00.1 (socket 0)
+i40e_dcb_init_configure(): default dcb config fails. err = -53, aq_err = 1.
+TELEMETRY: No legacy callbacks, legacy socket not created
+Using DPDK driver_name=net_i40e device_name=0000:2d:00.1
+tx_num_descriptors : desired=10 actual=64
+rx_num_descriptors : desired=3312 actual=3328
+Waiting to get link speed (link needs to be up). Press Ctrl-C to abort.
+Waiting 2 seconds after link came up for switch to accept packets
+Bit rate on interface to injection switch = 10000 (Mbps) as read using DPDK
+Requested bit rate to be generated on each switch port under test = 1000.00 (Mbps)
+Not limiting frame rate, as bit-rate on interface to injection switch doesn't exceed the total across all switch ports under test
+Writing per-port counts to 20230801T215234_per_port_counts_linux.csv
+Test interval = 10 (secs)
+Frame debug enabled = No
+Sanity checks enabled = No
+Press Ctrl-C to stop test at end of next test interval
+
+21:52:46.672
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106464        8106336              0              0              0              0       810646.4        1000.01
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port     1111111
+        7890123456
+     7   .........
+     8  . ........
+     9  .. .......
+    10  ... ......
+    11  .... .....
+    12  ..... ....
+    13  ...... ...
+    14  ....... ..
+    15  ........ .
+    16  ......... 
+Total test intervals with failures = 0
+
+21:52:56.672
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106414        8106424              0              0              0              0       810641.4        1000.01
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port     1111111
+        7890123456
+     7   .........
+     8  . ........
+     9  .. .......
+    10  ... ......
+    11  .... .....
+    12  ..... ....
+    13  ...... ...
+    14  ....... ..
+    15  ........ .
+    16  ......... 
+Total test intervals with failures = 0
+
+21:53:06.672
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106418        8106424              0              0              0              0       810641.8        1000.01
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port     1111111
+        7890123456
+     7   .........
+     8  . ........
+     9  .. .......
+    10  ... ......
+    11  .... .....
+    12  ..... ....
+    13  ...... ...
+    14  ....... ..
+    15  ........ .
+    16  ......... 
+Total test intervals with failures = 0
+
+21:53:16.672
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106432        8106425              0              0              0              0       810643.2        1000.01
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port     1111111
+        7890123456
+     7   .........
+     8  . ........
+     9  .. .......
+    10  ... ......
+    11  .... .....
+    12  ..... ....
+    13  ...... ...
+    14  ....... ..
+    15  ........ .
+    16  ......... 
+Total test intervals with failures = 0
+<<snip>>
+
+22:39:26.672
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106432        8106424              0              0              0              0       810643.2        1000.01
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port     1111111
+        7890123456
+     7   .........
+     8  . ........
+     9  .. .......
+    10  ... ......
+    11  .... .....
+    12  ..... ....
+    13  ...... ...
+    14  ....... ..
+    15  ........ .
+    16  ......... 
+Total test intervals with failures = 0
+
+22:39:36.672
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106407        8106424              0              0              0              0       810640.7        1000.01
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port     1111111
+        7890123456
+     7   .........
+     8  . ........
+     9  .. .......
+    10  ... ......
+    11  .... .....
+    12  ..... ....
+    13  ...... ...
+    14  ....... ..
+    15  ........ .
+    16  ......... 
+Total test intervals with failures = 0
+^C
+22:39:46.672
+      Tx Test        Rx Test  Rx Unexpected     Rx Flooded       Rx Other  missed frames   tx rate (Hz)  per port Mbps
+      8106425        8106424              0              0              0              0       810642.5        1000.01
+
+Summary of missed frames : '.' none missed 'S' some missed 'A' all missed
+Source  Destination ports --->
+  port     1111111
+        7890123456
+     7   .........
+     8  . ........
+     9  .. .......
+    10  ... ......
+    11  .... .....
+    12  ..... ....
+    13  ...... ...
+    14  ....... ..
+    15  ........ .
+    16  ......... 
+Total test intervals with failures = 0
+Max pending rx frames = 2 out of 36
+
+DPDK Ethernet statistics:
+  Total number of successfully received packets    : 2294117391
+  Total number of successfully transmitted packets : 2294117387
+  Total number of successfully received bytes      : 3482470198016
+  Total number of successfully transmitted bytes   : 3482470195622
+  Total of Rx packets dropped by the HW            : 0
+  Total number of erroneous received packets       : 0
+  Total number of failed transmitted packets       : 0
+  Total number of Rx mbuf allocation failures      : 0
+[mr_halfword@skylake-alma release]$ 
+
+
+"i40e_dcb_init_configure(): default dcb config fails. err = -53, aq_err = 1" is reported during initialisation,
+but that doesn't seem to have any effect on the test.

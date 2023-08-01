@@ -2065,7 +2065,9 @@ int main (int argc, char *argv[])
     rc = rte_eth_dev_stop (tx_rx_thread_context->port_id);
     CHECK_ASSERT (rc == 0);
     rc = rte_eth_dev_close (tx_rx_thread_context->port_id);
-    CHECK_ASSERT (rc == 0);
+    /* With the net_i40e driver the call rte_eth_dev_close() -> i40e_dev_close() can cause a positive number to be returned,
+     * which is the number of interrupt callbacks unregistered. Therefore, only consider negative values as an error. */
+    CHECK_ASSERT (rc >= 0);
 
     /* clean up the EAL */
     rc = rte_eal_cleanup();
