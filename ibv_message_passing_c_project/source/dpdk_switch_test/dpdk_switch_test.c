@@ -1011,12 +1011,16 @@ static uint32_t get_rate_mbps (const frame_tx_rx_thread_context_t *const context
         link_speed_valid = (link.link_status == RTE_ETH_LINK_UP) &&
                 (link.link_speed != RTE_ETH_SPEED_NUM_NONE) && (link.link_speed != RTE_ETH_SPEED_NUM_UNKNOWN);
 
-        if (first_wait && (strcmp (context->dev_info.driver_name, "net_e1000_em") == 0))
+        if (first_wait && ((strcmp (context->dev_info.driver_name, "net_e1000_em") == 0) ||
+                           (strcmp (context->dev_info.driver_name, "net_i40e"    ) == 0)   ))
         {
             /* With a net_e1000_em driver the rte_eth_dev_start() can take the link down and then back up,
              * such that this function could sample the link speed before the switch was ready.
              * Force the first link speed to be considered invalid to activate the additional delay
-             * at the end of this function. */
+             * at the end of this function.
+             *
+             * Have intermittently seen the same failure symptom with the net_i40e driver, but have't debugged
+             * to confirm at what point during the initialisation the link changes state. */
             link_speed_valid = false;
         }
 
