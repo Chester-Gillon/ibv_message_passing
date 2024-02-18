@@ -1,7 +1,5 @@
 # Top level CMake file
 
-project (ibv_message_passing C CXX)
-
 # This project was originally created in CentOS 6 with cmake 2.18.12.2, and the minimum version specified below
 # was 2.8.
 #
@@ -14,6 +12,8 @@ project (ibv_message_passing C CXX)
 # @todo on the effect of compatiblity between different CMake versions and the functionality in the different CMake
 # files.
 cmake_minimum_required (VERSION 2.8.12)
+
+project (ibv_message_passing C CXX)
 
 include (CheckStructHasMember)
 include (CheckSymbolExists)
