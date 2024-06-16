@@ -114,7 +114,6 @@ int main (int argc, char *argv[])
             rte_exit(EXIT_FAILURE, "Error during getting device (port %u) info: %s\n", port_id, strerror(-rc));
         }
         printf ("\nport_id=%" PRIu16 " driver_name=%s\n", port_id, dev_info.driver_name);
-        printf ("  device.name=%s\n", dev_info.device->name);
 
         printf ("  if_index=%u", dev_info.if_index);
         if (dev_info.if_index != 0)

@@ -856,8 +856,7 @@ static void open_dpdk_device (frame_tx_rx_thread_context_t *const context)
     /* Get the device information for information about descriptor limits */
     rc = rte_eth_dev_info_get (context->port_id, &context->dev_info);
     CHECK_ASSERT (rc == 0);
-    console_printf ("Using DPDK driver_name=%s device_name=%s\n",
-            context->dev_info.driver_name, context->dev_info.device->name);
+    console_printf ("Using DPDK driver_name=%s\n", context->dev_info.driver_name);
 
     /* Warn if the worker lcore and Ethernet device are on different sockets (NUMA nodes) as may impact performance */
     const int lcore_socket_id = rte_lcore_to_socket_id (context->worker_lcore_id);
