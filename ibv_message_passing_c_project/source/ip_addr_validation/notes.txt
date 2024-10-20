@@ -1,0 +1,69 @@
+0. Introduction
+===============
+
+Looks at alternatives to regex to validate IPV4 numeric address with optional prefix for:
+https://askubuntu.com/questions/1530594/how-to-check-allowed-characters-in-bash-with-regex
+
+
+1. getaddrinfo()
+================
+
+This uses is_ipv4.c which calls getaddrinfo() with options to only accept numeric IPv4 addresses.
+
+Accepts an IPv4 without prefix:
+$ ./is_ipv4 127.0.0.1
+yes, 127.0.0.1 is allowed
+
+Rejcts an IPv4 without prefix:
+$ ./is_ipv4 ::1/128
+<<no output>>
+
+But rejects an IPv4 with prefix:
+$ ./is_ipv4 127.0.0.1/24
+<<no output>>
+
+
+2. ipcalc in AlmaLinux 8.10
+===========================
+
+AlmaLinux 8.10 has ipcalc-0.2.4-4.el8 from https://gitlab.com/ipcalc/ipcalc
+
+Using the -c option to validate the IP address, and -4 to specific IPv4 this accepts the IPv4 IP address with a valid prefix:
+$ ipcalc -c -4 127.0.0.1/24
+<<no output>>
+
+Rejects the IPv4 IP address with an invalid prefix:
+$ ipcalc -c -4 127.0.0.1#24
+ipcalc: bad IPv4 address: 127.0.0.1#24
+
+And rejects the IPv6 IP address:
+$ ipcalc -c -4 ::1/128
+ipcalc: bad IPv4 prefix: 128
+
+Which matches the behaviour requested in the ask Ubuntu question
+
+
+3. ipcalc in Ubuntu 24.04.1 LTS is different
+============================================
+
+On a Ubuntu 24.04.1 LTS system installed the ipcalc package:
+$ sudo apt install ipcalc
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following NEW packages will be installed
+  ipcalc
+0 to upgrade, 1 to newly install, 0 to remove and 6 not to upgrade.
+Need to get 24.5 kB of archives.
+After this operation, 72.7 kB of additional disk space will be used.
+Get:1 http://gb.archive.ubuntu.com/ubuntu noble/universe amd64 ipcalc all 0.51-1 [24.5 kB]
+Fetched 24.5 kB in 0s (250 kB/s)
+Selecting previously unselected package ipcalc.
+(Reading database ... 334730 files and directories currently installed.)
+Preparing to unpack .../archives/ipcalc_0.51-1_all.deb ...
+Unpacking ipcalc (0.51-1) ...
+Setting up ipcalc (0.51-1) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+
+However, the ipcalc under Ubuntu has different options to the same program under AlmaLinux and doesn't support validating
+IP addresses.
