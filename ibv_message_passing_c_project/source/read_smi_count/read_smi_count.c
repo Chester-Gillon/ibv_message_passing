@@ -3,6 +3,12 @@
  * @date 8 Jan 2023
  * @author Chester Gillon
  * @brief Display the current SMI count, which is the number of System Management Interrupts which have occurred
+ * @details
+ *   This was written for an Intel processor.
+ *   Running on a AMD Ryzen 5 2400G causes the pread() to fail with EIO
+ *
+ *   https://stackoverflow.com/questions/51055831/is-there-an-equivalent-register-to-intels-msr-smi-count-on-amd-architecture
+ *   says on AMD processors says need to use a performance counter to get a SMI count.
  */
 
 #include <stdlib.h>
