@@ -157,6 +157,7 @@ add_subdirectory ("${PROJECT_SOURCE_DIR}/read_smi_count")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/convert_boot_log_to_clean_ascii")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/find_processes_using_file")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/ip_addr_validation")
+add_subdirectory ("${PROJECT_SOURCE_DIR}/disk_test")
 
 # Location of the source code for the linuxptp package, to gain access to the phc.[ch]
 set (LINUXPTP_ROOT "$ENV{HOME}/linuxptp-1.6")
