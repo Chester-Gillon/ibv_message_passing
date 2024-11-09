@@ -28,6 +28,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <sys/time.h>
+#include <libudev.h>
 
 
 /* Format of the filenames used for disk tests */
@@ -182,6 +183,8 @@ typedef struct
  * important for throughput. */
 typedef struct
 {
+    /* The name of the block device which contains the file system used by the disk test */
+    char block_device[PATH_MAX];
     /* The total number of blocks used for the test, based upon the amount of free space in the directory */
     size_t total_test_blocks;
     /* The size of each block written or read at once */
@@ -961,9 +964,29 @@ static void initialise_disk_test (test_context_t *const context)
     DIR *const test_dir = opendir (arg_test_dir);
     if (test_dir == NULL)
     {
-        console_printf ("Error: opendir(%s) failed", arg_test_dir);
+        console_printf ("Error: opendir(%s) failed\n", arg_test_dir);
         exit (EXIT_FAILURE);
     }
+
+    /* Obtain the name of the block device which contains the test directory */
+    struct udev *const udev = udev_new();
+    CHECK_ASSERT (udev != NULL);
+
+    struct udev_device *const dev = udev_device_new_from_devnum (udev, 'b', test_dir_stat.st_dev);
+    if (dev == NULL)
+    {
+        console_printf ("Error: udev_device_new_from_devnum(%s) failed\n", arg_test_dir);
+        exit (EXIT_FAILURE);
+    }
+    const char *const block_device = udev_device_get_sysname (dev);
+    if (block_device == NULL)
+    {
+        console_printf ("Error udev_device_get_devnode(%s) failed\n", arg_test_dir);
+        exit (EXIT_FAILURE);
+    }
+    snprintf (context->block_device, sizeof (context->block_device), "%s", block_device);
+    udev_unref (udev);
+    console_printf ("Block device %s\n", context->block_device);
 
     volatile size_t num_chars;
     char existing_test_file_pathname[PATH_MAX];

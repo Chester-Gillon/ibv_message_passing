@@ -18,6 +18,7 @@ project (ibv_message_passing C CXX)
 include (CheckStructHasMember)
 include (CheckSymbolExists)
 include (FindPkgConfig)
+include (CheckIncludeFile)
 
 # If a local rdma-core build directory has been specified, use that instead of the system installed version.
 # This causes CMake to set a rpath in the executables to the absolute path of the libraries in the local rdma-core
