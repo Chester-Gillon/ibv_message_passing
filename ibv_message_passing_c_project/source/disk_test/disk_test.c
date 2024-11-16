@@ -2,6 +2,25 @@
  * @file disk_test.c
  * @date 7 Sep 2024
  * @author Chester Gillon
+ * @brief Perform a disk test at the file system level
+ * @details
+ *   Designed to test a disk by performing file I/O with equal write and read bandwidth.
+ *   Test files are created containing a test pattern which is verified when read back.
+ *   Blocking I/O calls are used with separate threads to:
+ *   - Populate test buffers with a test pattern, and report regular test progress.
+ *   - Write data to files.
+ *   - Read data from files.
+ *   - Verify the test pattern read from the files.
+ *
+ *   Should cause the data which is written and then read to actually occur on the disk by:
+ *   a. Using O_DIRECT to bypass the Linux file system cache.
+ *   b. Command line option which specifies a "write ahead" which is larger than the disk cache, so reads should be from the
+ *      physical disk sectors, rather than the disk cache.
+ *
+ *   Statistics are reported as both:
+ *   1. The file write and read data rate as seen by the program.
+ *   2. Individual disk write and read data rates from the I/O statistics maintained by Linux for the block device
+ *      which the directory used for test files is mounted on.
  */
 
 #define _GNU_SOURCE /* For O_DIRECT */
@@ -83,6 +102,31 @@ static FILE *console_file;
 static volatile bool test_stop_requested;
 
 
+/* Contains the sampled disk statistics for one block device */
+typedef struct
+{
+    /* Set true when the following statistics are valid */
+    bool valid;
+    /* The sysfs I/O statistics as defined by https://www.kernel.org/doc/Documentation/iostats.txt, in the order the fields
+     * are read from the sysfs file */
+    unsigned long num_reads_completed;
+    unsigned long num_reads_merged;
+    unsigned long num_sectors_read;
+    unsigned long num_milliseconds_spent_reading;
+    unsigned long num_writes_completed;
+    unsigned long num_writes_merged;
+    unsigned long num_sectors_written;
+    unsigned long num_milliseconds_spent_writing;
+    unsigned long num_ios_currently_in_progress;
+    unsigned long num_milliseconds_spent_doing_ios;
+    unsigned long weighted_num_milliseconds_spent_doing_ios;
+    unsigned long num_discards_completed;
+    unsigned long num_discards_merged;
+    unsigned long num_sectors_discarded;
+    unsigned long num_milliseconds_spent_discarding;
+} sysfs_diskstats_t;
+
+
 /* Defines one block used to write and then readback contents of test files */
 typedef struct
 {
@@ -140,6 +184,10 @@ typedef struct
     size_t previous_file_num;
     /* The total number of words with data verification failures during the test */
     size_t total_verification_failures;
+    /* The disk statistics sampled at the start of the test, used to report overall disk data rate */
+    sysfs_diskstats_t disk_stats_test_start;
+    /* The disk statistics sampled at the start of the current report interval, used to report disk data rate during the interval */
+    sysfs_diskstats_t disk_stats_report_interval_start;
 } test_populate_context_t;
 
 
@@ -183,8 +231,9 @@ typedef struct
  * important for throughput. */
 typedef struct
 {
-    /* The name of the block device which contains the file system used by the disk test */
-    char block_device[PATH_MAX];
+    /* The name of the block device which contains the file system used by the disk test.
+     * If NULL unable to determine the block device and therefore disk statistics can't be reported. */
+    const char *block_device;
     /* The total number of blocks used for the test, based upon the amount of free space in the directory */
     size_t total_test_blocks;
     /* The size of each block written or read at once */
@@ -458,29 +507,131 @@ static void parse_command_line_arguments (const int argc, char *argv[])
 
 
 /**
- * @brief Calculate a data rate in megabytes/second
+ * @brief Read the disk statistics for one block device
+ * @param[in] block_device The name of the block device to read the statistics for.
+ *                         If NULL no statistics can be read.
+ * @param[out] disk_stats The statistics read, and a validity status.
+ */
+static void read_sysfs_diskstats (const char *const block_device, sysfs_diskstats_t *const disk_stats)
+{
+    char stats_pathname[PATH_MAX];
+    FILE *stats_file;
+    int rc;
+
+    disk_stats->valid = false;
+    if (block_device != NULL)
+    {
+        snprintf (stats_pathname, sizeof (stats_pathname), "/sys/block/%s/stat", block_device);
+        stats_file = fopen (stats_pathname, "r");
+        if (stats_file != NULL)
+        {
+            const int num_expected_fields = 15;
+            const int num_actual_fields = fscanf (stats_file, "%lu%lu%lu%lu%lu%lu%lu%lu%lu%lu%lu%lu%lu%lu%lu",
+                    &disk_stats->num_reads_completed,
+                    &disk_stats->num_reads_merged,
+                    &disk_stats->num_sectors_read,
+                    &disk_stats->num_milliseconds_spent_reading,
+                    &disk_stats->num_writes_completed,
+                    &disk_stats->num_writes_merged,
+                    &disk_stats->num_sectors_written,
+                    &disk_stats->num_milliseconds_spent_writing,
+                    &disk_stats->num_ios_currently_in_progress,
+                    &disk_stats->num_milliseconds_spent_doing_ios,
+                    &disk_stats->weighted_num_milliseconds_spent_doing_ios,
+                    &disk_stats->num_discards_completed,
+                    &disk_stats->num_discards_merged,
+                    &disk_stats->num_sectors_discarded,
+                    &disk_stats->num_milliseconds_spent_discarding);
+            disk_stats->valid = num_actual_fields == num_expected_fields;
+
+            rc = fclose (stats_file);
+            CHECK_ASSERT (rc == 0);
+        }
+    }
+}
+
+
+/**
+ * @brief Calculate a floating point duration in seconds from two timestamps
  * @param[in] start_time The start time of the measurement
  * @param[in] end_time The end time of the measurement
+ * @return The duration between start_time and end_time
+ */
+static double calculate_duration_secs (const struct timespec *const start_time, const struct timespec *const stop_time)
+{
+    const int64_t nsecs_per_sec = 1000000000;
+    const int64_t start_nsecs = (start_time->tv_sec * nsecs_per_sec) + start_time->tv_nsec;
+    const int64_t stop_nsecs = (stop_time->tv_sec * nsecs_per_sec) + stop_time->tv_nsec;
+    const double duration_secs = (double) (stop_nsecs - start_nsecs) / 1E9;
+
+    return duration_secs;
+}
+
+
+/**
+ * @brief Calculate a file data rate in megabytes/second
+ * @details This is the data rate of the file IO performed, and therefore doesn't include file system metadata overheads.
+ * @param[in] duration_secs The duration in seconds of the measurement interval
  * @param[in] context Used to get the block size
  * @param[in] num_blocks The number of block transferred during the measurement interval
  * @param[out] duration_secs The duration in seconds
  * @param[out] mbytes_per_sec The data rate
  */
-static void data_rate_mbytes_per_sec (const struct timespec *const start_time, const struct timespec *const stop_time,
-                                      const test_context_t *const context, const size_t num_blocks,
-                                      double *const duration_secs, double *const mbytes_per_sec)
+static void file_data_rate_mbytes_per_sec (const double duration_secs,
+                                           const test_context_t *const context, const size_t num_blocks,
+                                           double *const mbytes_per_sec)
 {
-    const int64_t nsecs_per_sec = 1000000000;
-    const int64_t start_nsecs = (start_time->tv_sec * nsecs_per_sec) + start_time->tv_nsec;
-    const int64_t stop_nsecs = (stop_time->tv_sec * nsecs_per_sec) + stop_time->tv_nsec;
     const double mbytes = (double) (context->io_block_size_bytes * num_blocks) / 1E6;
-    *duration_secs = (double) (stop_nsecs - start_nsecs) / 1E9;
-    *mbytes_per_sec = mbytes / *duration_secs;
+    *mbytes_per_sec = mbytes / duration_secs;
+}
+
+
+/**
+ * @brief Calculate a disk data rate in megabytes/second
+ * @param[in] duration_secs The duration in seconds of the measurement interval
+ * @param[in] start_stats The disk statistics at the start of the measurement interval
+ * @param[in] end_stats The disk statistics at the end of the measurement interval
+ * @param[out] read_mbytes_per_sec The disk read data rate
+ * @param[out] write_mbytes_per_sec The disk write date rate
+ * @return Returns true if the data rate measurement is valid, or false if failed to read the statistics
+ */
+static bool disk_data_rate_mbytes_per_sec (const double duration_secs,
+                                           const sysfs_diskstats_t *const start_stats, const sysfs_diskstats_t *const end_stats,
+                                           double *const read_mbytes_per_sec, double *const write_mbytes_per_sec)
+{
+    const bool measurement_valid = start_stats->valid && end_stats->valid;
+
+    *read_mbytes_per_sec = 0.0;
+    *write_mbytes_per_sec = 0.0;
+    if (measurement_valid)
+    {
+        /* https://stackoverflow.com/questions/37248948/how-to-get-disk-read-write-bytes-per-second-from-proc-in-programming-on-linux
+         * says /sys/block/sdX/stat always reports 512 byte sectors.
+         *
+         * See also https://github.com/sysstat/sysstat/blob/master/iostat.c */
+        const double num_bytes_per_sector = 512.0;
+
+        const unsigned long num_read_sectors = end_stats->num_sectors_read - start_stats->num_sectors_read;
+        const unsigned long num_write_sectors = end_stats->num_sectors_written - start_stats->num_sectors_written;
+        const double num_read_mbytes = (num_bytes_per_sector * (double) num_read_sectors) / 1E6;
+        const double num_write_mbytes = (num_bytes_per_sector * (double) num_write_sectors) / 1E6;
+
+        *read_mbytes_per_sec = num_read_mbytes / duration_secs;
+        *write_mbytes_per_sec = num_write_mbytes / duration_secs;
+    }
+
+    return measurement_valid;
 }
 
 
 /**
  * @brief Thread entry point to populate buffers with test data to be written to files.
+ * @details This also:
+ *          a. Reports regular progress of the test. Assumes the console IO and reading of disk statistics doesn't significantly
+ *             slow down the populating of buffers. For additional complexity could write the regular progress to the context
+ *             and post a semaphore to make the main thread display the regular progress.
+ *          b. Handles a request to stop the test, and exits once the final blocks have been processed. There is no way to force
+ *             the program to exit cleanly if the write or read threads get blocked in a file I/O call.
  * @param[in/out] arg Test context
  * @return Not used
  */
@@ -496,8 +647,11 @@ static void *populate_data_thread (void *const arg)
     struct timeval tod;
     double reporting_interval_duration_secs;
     double overall_duration_secs;
-    double reporting_interval_data_rate;
-    double overall_data_rate;
+    double reporting_interval_file_data_rate;
+    double overall_file_data_rate;
+    double disk_read_mbytes_per_sec;
+    double disk_write_mbytes_per_sec;
+    sysfs_diskstats_t current_disk_stats;
     bool test_complete = false;
 
     context->populate.test_stopping = false;
@@ -511,6 +665,9 @@ static void *populate_data_thread (void *const arg)
     context->populate.total_verification_failures = 0;
 
     console_printf ("Press Ctrl-C to stop test\n");
+    read_sysfs_diskstats (context->block_device, &current_disk_stats);
+    context->populate.disk_stats_test_start = current_disk_stats;
+    context->populate.disk_stats_report_interval_start = current_disk_stats;
     rc = clock_gettime (CLOCK_REALTIME, &context->populate.start_time);
     context->populate.report_start_time = context->populate.start_time;
     CHECK_ASSERT (rc == 0);
@@ -594,12 +751,15 @@ static void *populate_data_thread (void *const arg)
         if (((now.tv_sec == report_progress_abs_time.tv_sec) && (now.tv_nsec >= report_progress_abs_time.tv_nsec)) ||
              (now.tv_sec > report_progress_abs_time.tv_sec))
         {
+            read_sysfs_diskstats (context->block_device, &current_disk_stats);
             context->populate.total_test_blocks += context->populate.blocks_in_report_interval;
 
-            data_rate_mbytes_per_sec (&context->populate.report_start_time, &now, context, context->populate.blocks_in_report_interval,
-                    &reporting_interval_duration_secs, &reporting_interval_data_rate);
-            data_rate_mbytes_per_sec (&context->populate.start_time, &now, context, context->populate.total_test_blocks,
-                    &overall_duration_secs, &overall_data_rate);
+            reporting_interval_duration_secs = calculate_duration_secs (&context->populate.report_start_time, &now);
+            file_data_rate_mbytes_per_sec (reporting_interval_duration_secs, context, context->populate.blocks_in_report_interval,
+                    &reporting_interval_file_data_rate);
+            overall_duration_secs = calculate_duration_secs (&context->populate.start_time, &now);
+            file_data_rate_mbytes_per_sec (overall_duration_secs, context, context->populate.total_test_blocks,
+                    &overall_file_data_rate);
 
             /* Display time when these statistics are reported */
             gettimeofday (&tod, NULL);
@@ -611,17 +771,36 @@ static void *populate_data_thread (void *const arg)
             snprintf (&time_str[str_len], sizeof (time_str) - str_len, ".%03" PRIi64, tod_msec);
 
             console_printf ("\n%s\n", time_str);
-            console_printf ("  Data rates (MB/s) interval: %.2f over %.3f secs  overall: %.2f over %.3f secs\n",
-                    reporting_interval_data_rate, reporting_interval_duration_secs,
-                    overall_data_rate, overall_duration_secs);
+            console_printf ("  Currently %s block %zu in file %zu\n",
+                    context->populate.overwriting_files ? "overwriting" : "writing",
+                    context->populate.overall_block_number,
+                    (context->populate.overall_block_number / context->file_size_blocks) + 1);
+            console_printf ("  File data rates (MB/s) interval: %.2f over %.3f secs  overall: %.2f over %.3f secs\n",
+                    reporting_interval_file_data_rate, reporting_interval_duration_secs,
+                    overall_file_data_rate, overall_duration_secs);
             if (context->populate.total_verification_failures > 0)
             {
                 console_printf ("  total_verification_failures: %zu\n", context->populate.total_verification_failures);
+            }
+            if (disk_data_rate_mbytes_per_sec (reporting_interval_duration_secs,
+                    &context->populate.disk_stats_report_interval_start, &current_disk_stats,
+                    &disk_read_mbytes_per_sec, &disk_write_mbytes_per_sec))
+            {
+                console_printf ("  Disk data rates (MB/s) interval: Read %.2f  Write %.2f\n",
+                        disk_read_mbytes_per_sec, disk_write_mbytes_per_sec);
+            }
+            if (disk_data_rate_mbytes_per_sec (overall_duration_secs,
+                    &context->populate.disk_stats_test_start, &current_disk_stats,
+                    &disk_read_mbytes_per_sec, &disk_write_mbytes_per_sec))
+            {
+                console_printf ("  Disk data rates (MB/s) overall: Read %.2f  Write %.2f\n",
+                        disk_read_mbytes_per_sec, disk_write_mbytes_per_sec);
             }
 
             report_progress_abs_time.tv_sec += arg_report_interval_secs;
             context->populate.report_start_time = now;
             context->populate.blocks_in_report_interval = 0;
+            context->populate.disk_stats_report_interval_start = current_disk_stats;
         }
     } while (!test_complete && context->success);
 
@@ -629,12 +808,19 @@ static void *populate_data_thread (void *const arg)
     CHECK_ASSERT (rc == 0);
 
     /* Report test overall data rate */
-    data_rate_mbytes_per_sec (&context->populate.start_time, &context->populate.stop_time, context,
-            context->populate.total_test_blocks,
-            &overall_duration_secs, &overall_data_rate);
-    console_printf ("\n Overall Data rate (MB/s) %.2f over %.3f secs\n",
-            overall_data_rate, overall_duration_secs);
+    read_sysfs_diskstats (context->block_device, &current_disk_stats);
+    overall_duration_secs = calculate_duration_secs (&context->populate.start_time, &context->populate.stop_time);
+    file_data_rate_mbytes_per_sec (overall_duration_secs, context, context->populate.total_test_blocks, &overall_file_data_rate);
+    console_printf ("\nOverall file data rate (MB/s) %.2f over %.3f secs\n",
+            overall_file_data_rate, overall_duration_secs);
     console_printf ("total_verification_failures: %zu\n", context->populate.total_verification_failures);
+    if (disk_data_rate_mbytes_per_sec (overall_duration_secs,
+            &context->populate.disk_stats_test_start, &current_disk_stats,
+            &disk_read_mbytes_per_sec, &disk_write_mbytes_per_sec))
+    {
+        console_printf ("Disk data rates (MB/s) overall: Read %.2f  Write %.2f\n",
+                disk_read_mbytes_per_sec, disk_write_mbytes_per_sec);
+    }
 
     return NULL;
 }
@@ -968,25 +1154,43 @@ static void initialise_disk_test (test_context_t *const context)
         exit (EXIT_FAILURE);
     }
 
-    /* Obtain the name of the block device which contains the test directory */
+    /* Obtain the name of the block device which contains the test directory.
+     * The sysname returned for arg_test_dir might be for a  partition, e.g. of the form sdb2.
+     * Try and locate the partent device for which sysfs disk statstics can be obtained. */
+    sysfs_diskstats_t probe_diskstats;
     struct udev *const udev = udev_new();
     CHECK_ASSERT (udev != NULL);
+    const char *block_device = NULL;
+    struct udev_device *dev = udev_device_new_from_devnum (udev, 'b', test_dir_stat.st_dev);
+    probe_diskstats.valid = false;
+    while ((dev != NULL) && (!probe_diskstats.valid))
+    {
+        block_device = udev_device_get_sysname (dev);
+        if (block_device != NULL)
+        {
+            read_sysfs_diskstats (block_device, &probe_diskstats);
+            if (!probe_diskstats.valid)
+            {
+                dev = udev_device_get_parent (dev);
+            }
+        }
+        else
+        {
+            dev = NULL;
+        }
+    }
 
-    struct udev_device *const dev = udev_device_new_from_devnum (udev, 'b', test_dir_stat.st_dev);
-    if (dev == NULL)
+    if (block_device != NULL)
     {
-        console_printf ("Error: udev_device_new_from_devnum(%s) failed\n", arg_test_dir);
-        exit (EXIT_FAILURE);
+        context->block_device = strdup (block_device);
+        console_printf ("Block device %s\n", context->block_device);
     }
-    const char *const block_device = udev_device_get_sysname (dev);
-    if (block_device == NULL)
+    else
     {
-        console_printf ("Error udev_device_get_devnode(%s) failed\n", arg_test_dir);
-        exit (EXIT_FAILURE);
+        context->block_device = NULL;
+        console_printf ("Unable to determine block device for %s, no disk statistics will be reported\n", arg_test_dir);
     }
-    snprintf (context->block_device, sizeof (context->block_device), "%s", block_device);
     udev_unref (udev);
-    console_printf ("Block device %s\n", context->block_device);
 
     volatile size_t num_chars;
     char existing_test_file_pathname[PATH_MAX];
