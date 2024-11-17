@@ -1,0 +1,144 @@
+Running ALmaLinux 8.10
+
+Disk is a 2TB Hitachi HMRSK000
+
+Formatted as a vfat and ext4 partitions of the same size:
+$ lsblk -f
+NAME FSTYPE LABEL              UUID                                   MOUNTPOINT
+sdb                                                                   
+├─sdb1
+│    vfat   FAT_DISK           3983-B070                              /run/media
+└─sdb2
+     ext4   EXT4_DISK          d7b069cf-3866-49f0-84c7-ac6bee6ed208   /run/media
+
+$ lsblk
+NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+sdb           8:16   0   1.8T  0 disk 
+├─sdb1        8:17   0 931.3G  0 part /run/media/mr_halfword/FAT_DISK
+└─sdb2        8:18   0 931.7G  0 part /run/media/mr_halfword/EXT4_DISK
+
+
+On the FAT partition successfully filled the partition, before starting to overwrite the existing files when the test was stopped:
+$ disk_test/disk_test --test_dir /run/media/mr_halfword/FAT_DISK/
+Disk test using:
+  test_dir /run/media/mr_halfword/FAT_DISK/
+  io_block_size 262144
+  max_file_size_blocks 8192
+  write_ahead_blocks 512
+File system Optimal block size for I/O 32768
+Block device sdb
+Removed 3 test files from previous run
+Press Ctrl-C to stop test
+
+07:00:31.361
+  Currently writing block 2845 in file 1
+  File data rates (MB/s) interval: 61.05 over 10.000 secs  overall: 61.05 over 10.000 secs
+  Disk data rates (MB/s) interval: Read 61.05  Write 74.58
+  Disk data rates (MB/s) overall: Read 61.05  Write 74.58
+
+07:00:41.361
+  Currently writing block 5458 in file 1
+  File data rates (MB/s) interval: 68.50 over 10.000 secs  overall: 64.78 over 20.000 secs
+  Disk data rates (MB/s) interval: Read 68.50  Write 68.47
+  Disk data rates (MB/s) overall: Read 64.78  Write 71.53
+
+07:00:51.361
+  Currently writing block 8061 in file 1
+  File data rates (MB/s) interval: 68.24 over 10.000 secs  overall: 65.93 over 30.000 secs
+  Disk data rates (MB/s) interval: Read 68.24  Write 68.21
+  Disk data rates (MB/s) overall: Read 65.93  Write 70.42
+<<snip>>
+
+11:17:31.361
+  Currently writing block 3796939 in file 464
+  File data rates (MB/s) interval: 68.03 over 10.000 secs  overall: 64.50 over 15430.000 secs
+  Disk data rates (MB/s) interval: Read 68.05  Write 68.03
+  Disk data rates (MB/s) overall: Read 64.50  Write 64.52
+
+11:17:41.361
+  Currently overwriting block 2169 in file 1
+  File data rates (MB/s) interval: 68.50 over 10.000 secs  overall: 64.50 over 15440.000 secs
+  Disk data rates (MB/s) interval: Read 68.47  Write 68.53
+  Disk data rates (MB/s) overall: Read 64.50  Write 64.53
+
+11:17:51.361
+  Currently overwriting block 4810 in file 1
+  File data rates (MB/s) interval: 69.23 over 10.000 secs  overall: 64.50 over 15450.000 secs
+  Disk data rates (MB/s) interval: Read 69.23  Write 69.23
+  Disk data rates (MB/s) overall: Read 64.50  Write 64.53
+<<snip>>
+
+11:23:11.361
+  Currently overwriting block 88974 in file 11
+  File data rates (MB/s) interval: 69.60 over 10.000 secs  overall: 64.59 over 15770.000 secs
+  Disk data rates (MB/s) interval: Read 69.60  Write 69.55
+  Disk data rates (MB/s) overall: Read 64.59  Write 64.62
+
+11:23:21.361
+  Currently overwriting block 91602 in file 12
+  File data rates (MB/s) interval: 68.89 over 10.000 secs  overall: 64.60 over 15780.000 secs
+  Disk data rates (MB/s) interval: Read 68.89  Write 68.94
+  Disk data rates (MB/s) overall: Read 64.60  Write 64.62
+
+Overall file data rate (MB/s) 64.60 over 15784.930 secs
+total_verification_failures: 0
+Disk data rates (MB/s) overall: Read 64.60  Write 64.62
+
+
+On the EXT4 partition stopped with an error due to "No space left on device":
+$ disk_test/disk_test --test_dir /run/media/mr_halfword/EXT4_DISK/
+Disk test using:
+  test_dir /run/media/mr_halfword/EXT4_DISK/
+  io_block_size 262144
+  max_file_size_blocks 8192
+  write_ahead_blocks 512
+File system Optimal block size for I/O 4096
+Block device sdb
+Removed 71 test files from previous run
+Press Ctrl-C to stop test
+
+11:23:50.263
+  Currently writing block 2450 in file 1
+  File data rates (MB/s) interval: 50.70 over 10.000 secs  overall: 50.70 over 10.000 secs
+  Disk data rates (MB/s) interval: Read 50.70  Write 64.39
+  Disk data rates (MB/s) overall: Read 50.70  Write 64.39
+
+11:24:00.263
+  Currently writing block 4734 in file 1
+  File data rates (MB/s) interval: 59.87 over 10.000 secs  overall: 55.29 over 20.000 secs
+  Disk data rates (MB/s) interval: Read 59.87  Write 59.86
+  Disk data rates (MB/s) overall: Read 55.29  Write 62.12
+<<snip>>
+
+16:44:20.263
+  Currently writing block 3556124 in file 435
+  File data rates (MB/s) interval: 58.77 over 10.000 secs  overall: 48.44 over 19240.000 secs
+  Disk data rates (MB/s) interval: Read 58.77  Write 58.78
+  Disk data rates (MB/s) overall: Read 48.45  Write 48.46
+
+16:44:30.263
+  Currently writing block 3558381 in file 435
+  File data rates (MB/s) interval: 59.17 over 10.000 secs  overall: 48.45 over 19250.000 secs
+  Disk data rates (MB/s) interval: Read 59.17  Write 59.18
+  Disk data rates (MB/s) overall: Read 48.45  Write 48.47
+
+16:44:40.263
+  Currently writing block 3560620 in file 435
+  File data rates (MB/s) interval: 58.69 over 10.000 secs  overall: 48.46 over 19260.000 secs
+  Disk data rates (MB/s) interval: Read 58.69  Write 58.70
+  Disk data rates (MB/s) overall: Read 48.46  Write 48.47
+/run/media/mr_halfword/EXT4_DISK//disk_test_000435.dat fd 4 only wrote -1 out of 262144 bytes : No space left on device
+
+Overall file data rate (MB/s) 48.45 over 19261.801 secs
+total_verification_failures: 0
+Disk data rates (MB/s) overall: Read 48.46  Write 48.47
+
+
+Free disk space after had stopped:
+$ df -h
+/dev/sdb1                                 932G  932G  192K 100% /run/media/mr_halfword/FAT_DISK
+/dev/sdb2                                 916G  870G  120K 100% /run/media/mr_halfword/EXT4_DISK
+
+FAT_DISK had 465 test files, and a 4G filler.dat left over from previous attempt to fill the disk.
+
+EXT4_DISK had 436 test files.

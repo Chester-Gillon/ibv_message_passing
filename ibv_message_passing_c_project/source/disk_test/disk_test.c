@@ -1156,7 +1156,7 @@ static void initialise_disk_test (test_context_t *const context)
 
     /* Obtain the name of the block device which contains the test directory.
      * The sysname returned for arg_test_dir might be for a  partition, e.g. of the form sdb2.
-     * Try and locate the partent device for which sysfs disk statstics can be obtained. */
+     * Try and locate the parent device for which sysfs disk statistics can be obtained. */
     sysfs_diskstats_t probe_diskstats;
     struct udev *const udev = udev_new();
     CHECK_ASSERT (udev != NULL);
