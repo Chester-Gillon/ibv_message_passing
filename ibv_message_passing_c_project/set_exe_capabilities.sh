@@ -48,4 +48,13 @@ do
     # To create raw Ethernet Queue-Pair
     adjust_capabilities ibv_switch_test/ibv_raw_packet_tx cap_net_raw=ep
     adjust_capabilities ibv_switch_test/ibv_raw_packet_switch_test cap_net_raw=ep
+    # When using the mlx5 driver:
+    # a. cap_net_raw is required to prevent attempting to open the device failing with:
+    #     mlx5_common: DevX create TIS failed errno=121 status=0x3 syndrome=0x6a6678
+    #     mlx5_net: Failed to create TIS 0/0 for [bonding] device rocep33s0f0.
+    #     mlx5_net: TIS allocation failure
+    # b. cap_net_admin is required to allow rte_eth_dev_get_module_info() and
+    #    rte_eth_dev_get_module_eeprom() calls
+    adjust_capabilities dpdk_switch_test/dpdk_information cap_net_raw,cap_net_admin=ep
+    adjust_capabilities dpdk_switch_test/dpdk_switch_test cap_net_raw=ep
 done

@@ -50,6 +50,7 @@ int main (int argc, char *argv[])
     char mbuf_pool_name[64];
     struct rte_eth_rxq_info rx_qinfo;
     struct rte_eth_txq_info tx_qinfo;
+    struct rte_eth_dev_module_info mod_info;
 
     /* Only need a single queue per device to be able to initialise the device to determine
      * the available fast-path operations. */
@@ -169,6 +170,90 @@ int main (int argc, char *argv[])
             }
         }
         printf ("\n");
+
+        /* Display the device EEPROM length */
+        rc = rte_eth_dev_get_eeprom_length (port_id);
+        if (rc >= 0)
+        {
+            printf ("  rte_eth_dev_get_eeprom_length() = %d\n", rc);
+        }
+        else
+        {
+            printf ("rte_eth_dev_get_eeprom_length() failed : %s\n", strerror (-rc));
+        }
+
+        /* Display the module EEPROM information.
+         * The functions are marked as __rte_experimental so suppress the warnings */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+        memset (&mod_info, 0, sizeof (mod_info));
+        rc = rte_eth_dev_get_module_info (port_id, &mod_info);
+        if (rc == 0)
+        {
+            char type_name[32];
+
+            switch (mod_info.type)
+            {
+            case RTE_ETH_MODULE_SFF_8079:
+                snprintf (type_name, sizeof (type_name), "SFF_8079");
+                break;
+
+            case RTE_ETH_MODULE_SFF_8472:
+                snprintf (type_name, sizeof (type_name), "SFF_8472");
+                break;
+
+            case RTE_ETH_MODULE_SFF_8636:
+                snprintf (type_name, sizeof (type_name), "SFF_8636");
+                break;
+
+            case RTE_ETH_MODULE_SFF_8436:
+                snprintf (type_name, sizeof (type_name), "SFF_8436");
+                break;
+
+            default:
+                snprintf (type_name, sizeof (type_name), "%u", mod_info.type);
+            }
+
+            printf ("  rte_eth_dev_get_module_info() module type=%s eeprom_len=%u\n", type_name, mod_info.eeprom_len);
+
+            /* Read and display the module data */
+            uint8_t *const module_data = calloc (mod_info.eeprom_len, sizeof (uint8_t));
+            struct rte_dev_eeprom_info eeprom_info =
+            {
+                .data = module_data,
+                .offset = 0,
+                .length = mod_info.eeprom_len
+            };
+
+            rc = rte_eth_dev_get_module_eeprom (port_id, &eeprom_info);
+            if (rc == 0)
+            {
+                uint32_t offset = 0;
+
+                printf ("     Offset     Values\n");
+                printf ("     ------     ------\n");
+                while (offset < eeprom_info.length)
+                {
+                    printf ("     0x%04x:     ", offset);
+                    for (uint32_t col = 0; (col < 16) && (offset < eeprom_info.length); col++)
+                    {
+                        printf ("%02x ", module_data[offset]);
+                        offset++;
+                    }
+                    printf ("\n");
+                }
+            }
+            else
+            {
+                printf ("rte_eth_dev_get_module_eeprom() failed : %s\n", strerror (-rc));
+            }
+            free (module_data);
+        }
+        else
+        {
+            printf ("rte_eth_dev_get_module_info() failed : %s\n", strerror (-rc));
+        }
+#pragma GCC diagnostic pop
 
         /* Configure device using defaults */
         memset (&port_conf, 0, sizeof (port_conf));
