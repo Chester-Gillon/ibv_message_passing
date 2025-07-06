@@ -1,4 +1,4 @@
-# Build the test_test program
+# Build the disk_test program
 
 project (disk_test C)
 
