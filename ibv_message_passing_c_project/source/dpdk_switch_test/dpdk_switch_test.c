@@ -38,7 +38,7 @@
 
 /* Ethernet frame types */
 #define ETH_P_8021Q    0x8100
-#define ETH_P_ETHERCAT 0x88a4
+#define ETH_P_ETHERCAT 0x88A4
 
 
 #define ETHER_MAC_ADDRESS_LEN 6
