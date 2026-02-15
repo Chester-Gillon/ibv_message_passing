@@ -137,6 +137,9 @@ typedef struct
     /* The source and destination ports used for this context */
     uint8_t source_port;
     uint8_t destination_port;
+    /* The source and destination GIDs when using Ethernet as the link layer (i.e. RoCE) */
+    struct ibv_gid_entry source_gid_entry;
+    struct ibv_gid_entry destination_gid_entry;
     /* The zero-based index of this RDMA device used when setting the wr_id for the transfers */
     uint32_t device_index;
     /* The allocated buffers this connection. Tx and Rx buffers are different allocations as may be for devices on different
@@ -204,6 +207,21 @@ static volatile bool stop_transmission;
 /* Command line argument which defines the offset between the RDMA device NUMA node and the NUMA node in which the
  * RDMA buffers are placed. */
 static int arg_numa_node_offset;
+
+
+/* Command line argument which defines which GID index is used for an Ethernet link layer.
+ * Used to allow selection of the RoCE protocol version. */
+static uint8_t arg_ethernet_gid_index = 0;
+
+
+/* Names displayed for ibv_gid_type */
+static const char *const gid_type_names[] =
+{
+    [IBV_GID_TYPE_IB     ] = "IB",
+    [IBV_GID_TYPE_ROCE_V1] = "RoCE V1",
+    [IBV_GID_TYPE_ROCE_V2] = "RoCE V2"
+
+};
 
 
 /**
@@ -386,7 +404,7 @@ static void allocate_connection_buffers (rdma_test_device_t *const test_device,
 
     if (test_device->buffers_numa_mask != NULL)
     {
-        /* When the computer has multiple NUMA nodes, bind the  buffers to a NUMA node
+        /* When the computer has multiple NUMA nodes, bind the buffers to a NUMA node
          * with a relative offset to that of the NUMA node local to the RDMA device. */
         lrc = mbind (*buffers, sizeof (test_connection_buffers_t), MPOL_F_STATIC_NODES | MPOL_BIND,
                 test_device->buffers_numa_mask->maskp, test_device->buffers_numa_mask->size, MPOL_MF_STRICT | MPOL_MF_MOVE);
@@ -500,27 +518,22 @@ static void initialise_connection_transfers (test_load_context_t *const context,
     qp_attr.min_rnr_timer = 0;
     if (connection->rx_port_attributes.link_layer == IBV_LINK_LAYER_ETHERNET)
     {
-        /* @todo When the link level is Ethernet assume GID index zero is for RoCEv1.
-         *       Support for RoCE was tested on Mellanox Connect-X2 VPI cards which only support RoCEv1.
-         *
-         *       Later versions of rdma-core have ibv_query_gid_type() which could be used to search for a specific RoCE version.
-         *
-         *       There is also /sys/class/infiniband/<device>/ports/<port_number>/gid_attrs/types/<gid_index> which has a string
-         *       for the RoCE version for the GID index on a given index of a port.
-         *       Older Kernels, e.g. 3.10.33-rt32.33.el6rt.x86_64, may not have the gid_attrs files in which only RoCEv1
-         *       is supported.
-         */
+        /* When the link later is Ethernet use the GID index specified by the command line argument.
+         * Diagnostic error reported upon failure, since failure may be caused by an out-of-range GID index command line argument. */
         qp_attr.ah_attr.is_global = true;
-        qp_attr.ah_attr.grh.sgid_index = 0;
-        rc = ibv_query_gid (connection->destination_device->context, destination_port, qp_attr.ah_attr.grh.sgid_index,
-                &qp_attr.ah_attr.grh.dgid);
-        CHECK_ASSERT (rc == 0);
+        qp_attr.ah_attr.grh.sgid_index = arg_ethernet_gid_index;
+        rc = ibv_query_gid_ex (connection->destination_device->context, destination_port, qp_attr.ah_attr.grh.sgid_index,
+                &connection->destination_gid_entry, 0);
+        check_assert (rc == 0, "ibv_query_gid_ex() for %s port %u GID index %u failed with %s\n",
+                connection->destination_device->device->name, destination_port, qp_attr.ah_attr.grh.sgid_index, strerror (rc));
+        qp_attr.ah_attr.grh.dgid = connection->destination_gid_entry.gid;
         qp_attr.ah_attr.grh.hop_limit = 1;
     }
     else
     {
         /* For Infiniband use LID addressing */
         qp_attr.ah_attr.is_global = false;
+        connection->destination_gid_entry.gid_type = IBV_GID_TYPE_IB;
     }
     qp_attr.ah_attr.dlid = connection->rx_port_attributes.lid;
     qp_attr.ah_attr.sl = 0;
@@ -534,6 +547,14 @@ static void initialise_connection_transfers (test_load_context_t *const context,
                         IBV_QP_RQ_PSN             |
                         IBV_QP_MAX_DEST_RD_ATOMIC |
                         IBV_QP_MIN_RNR_TIMER);
+    if (connection->rx_port_attributes.link_layer == IBV_LINK_LAYER_ETHERNET)
+    {
+        /* Diagnostic error reported upon failure, since failure may be caused by a GID using an address not on the underlying
+         * interface. */
+        check_assert (rc == 0, "ibv_modify_qp() IBV_QPS_RTR for %s port %u GID index %u type %s failed with %s\n",
+                connection->destination_device->device->name, destination_port, qp_attr.ah_attr.grh.sgid_index,
+                gid_type_names[connection->destination_gid_entry.gid_type], strerror (rc));
+    }
     CHECK_ASSERT (rc == 0);
 
     memset (&qp_attr, 0, sizeof (qp_attr));
@@ -545,27 +566,21 @@ static void initialise_connection_transfers (test_load_context_t *const context,
     qp_attr.min_rnr_timer = 0;
     if (connection->tx_port_attributes.link_layer == IBV_LINK_LAYER_ETHERNET)
     {
-        /* @todo When the link level is Ethernet assume GID index zero is for RoCEv1.
-         *       Support for RoCE was tested on Mellanox Connect-X2 VPI cards which only support RoCEv1.
-         *
-         *       Later versions of rdma-core have ibv_query_gid_type() which could be used to search for a specific RoCE version.
-         *
-         *       There is also /sys/class/infiniband/<device>/ports/<port_number>/gid_attrs/types/<gid_index> which has a string
-         *       for the RoCE version for the GID index on a given index of a port.
-         *       Older Kernels, e.g. 3.10.33-rt32.33.el6rt.x86_64, may not have the gid_attrs files in which only RoCEv1
-         *       is supported.
-         */
+        /* When the link later is Ethernet use the GID index specified by the command line argument */
         qp_attr.ah_attr.is_global = true;
-        qp_attr.ah_attr.grh.sgid_index = 0;
-        rc = ibv_query_gid (connection->source_device->context, source_port, qp_attr.ah_attr.grh.sgid_index,
-                &qp_attr.ah_attr.grh.dgid);
-        CHECK_ASSERT (rc == 0);
+        qp_attr.ah_attr.grh.sgid_index = arg_ethernet_gid_index;
+        rc = ibv_query_gid_ex (connection->source_device->context, source_port, qp_attr.ah_attr.grh.sgid_index,
+                &connection->source_gid_entry, 0);
+        check_assert (rc == 0, "ibv_query_gid_ex() for %s port %u GID index %u failed with %s\n",
+                connection->source_device->device->name, source_port, qp_attr.ah_attr.grh.sgid_index, strerror (rc));
+        qp_attr.ah_attr.grh.dgid = connection->source_gid_entry.gid;
         qp_attr.ah_attr.grh.hop_limit = 1;
     }
     else
     {
         /* For Infiniband use LID addressing */
         qp_attr.ah_attr.is_global = false;
+        connection->source_gid_entry.gid_type = IBV_GID_TYPE_IB;
     }
     qp_attr.ah_attr.dlid = connection->tx_port_attributes.lid;
     qp_attr.ah_attr.sl = 0;
@@ -579,6 +594,12 @@ static void initialise_connection_transfers (test_load_context_t *const context,
                         IBV_QP_RQ_PSN             |
                         IBV_QP_MAX_DEST_RD_ATOMIC |
                         IBV_QP_MIN_RNR_TIMER);
+    if (connection->tx_port_attributes.link_layer == IBV_LINK_LAYER_ETHERNET)
+    {
+        check_assert (rc == 0, "ibv_modify_qp() IBV_QPS_RTR for %s port %u GID index %u type %s failed with %s\n",
+                connection->source_device->device->name, source_port, qp_attr.ah_attr.grh.sgid_index,
+                gid_type_names[connection->source_gid_entry.gid_type], strerror (rc));
+    }
     CHECK_ASSERT (rc == 0);
 
     /* Transition the queue-pairs to the Ready-to-Send state */
@@ -906,11 +927,13 @@ static void display_test_summary (const test_load_context_t *const context)
                 total_rdma_bytes, duration_secs, (total_rdma_bytes / duration_secs) / 1E6);
 
         /* Display the amount of bytes transmitted and received on the RDMA ports, which includes overheads */
-        printf ("%s port %" PRIu32 " transmitted %" PRIu64 " bytes in %.6f seconds, %.1f Mbytes/sec\n",
+        printf ("%s port %" PRIu32 " type %s transmitted %" PRIu64 " bytes in %.6f seconds, %.1f Mbytes/sec\n",
                 connection->source_device->device->name, connection->source_port,
+                gid_type_names[connection->source_gid_entry.gid_type],
                 port_tx_bytes, duration_secs, (port_tx_bytes / duration_secs) / 1E6);
-        printf ("%s port %" PRIu32 " received %" PRIu64 " bytes in %.6f seconds, %.1f Mbytes/sec\n",
+        printf ("%s port %" PRIu32 " type %s received %" PRIu64 " bytes in %.6f seconds, %.1f Mbytes/sec\n",
                 connection->source_device->device->name, connection->source_port,
+                gid_type_names[connection->destination_gid_entry.gid_type],
                 port_rx_bytes, duration_secs, (port_rx_bytes / duration_secs) / 1E6);
     }
 }
@@ -932,9 +955,9 @@ int main (int argc, char *argv[])
     get_local_rdma_devices (&context);
 
     /* Parse command line arguments */
-    if (argc != 2)
+    if ((argc < 2) || (argc > 3))
     {
-        fprintf (stderr, "Usage: %s <numa_node_offset>\n", argv[0]);
+        fprintf (stderr, "Usage: %s <numa_node_offset> [<ethernet_gid_index>]\n", argv[0]);
         exit (EXIT_FAILURE);
     }
 
@@ -942,6 +965,18 @@ int main (int argc, char *argv[])
     {
         fprintf (stderr, "Out of range <numa_node_offset>\n");
         exit (EXIT_FAILURE);
+    }
+
+    if (argc == 3)
+    {
+        uint32_t gid_index;
+
+        if ((sscanf (argv[2], "%u%c", &gid_index, &junk) != 1) || (gid_index > UINT8_MAX))
+        {
+            fprintf (stderr, "Out of range <ethernet_gid_index>\n");
+            exit (EXIT_FAILURE);
+        }
+        arg_ethernet_gid_index = (uint8_t) gid_index;
     }
 
     add_connections_for_all_supported_rdma_ports (&context);
