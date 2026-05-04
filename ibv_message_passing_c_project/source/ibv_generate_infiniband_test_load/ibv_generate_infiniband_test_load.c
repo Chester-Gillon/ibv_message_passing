@@ -57,6 +57,7 @@
 #include <limits.h>
 #include <linux/mempolicy.h>
 #include <numaif.h>
+#include <getopt.h>
 
 #include <infiniband/verbs.h>
 
@@ -204,6 +205,16 @@ typedef struct
 static volatile bool stop_transmission;
 
 
+/** The command line options for this program, in the format passed to getopt_long().
+ *  Only long arguments are supported */
+static const struct option command_line_options[] =
+{
+    {"numa-node-offset", required_argument, NULL, 0},
+    {"ether-gid-index", required_argument, NULL, 0},
+    {NULL, 0, NULL, 0}
+};
+
+
 /* Command line argument which defines the offset between the RDMA device NUMA node and the NUMA node in which the
  * RDMA buffers are placed. */
 static int arg_numa_node_offset;
@@ -264,6 +275,82 @@ static void stop_transmission_handler (const int sig)
 static uint32_t get_random_psn (void)
 {
     return lrand48 () & 0xffffff;
+}
+
+
+/**
+ * @brief Display the usage for this program, and the exit
+ */
+static void display_usage (void)
+{
+    printf ("Usage ibv_generate_infiniband_test_load : [--numa-node-offset=<offset>] [--ether-gid-index=<idx>] [<port_pair1> ... <port_pairN>] \n");
+    printf ("\n");
+    printf ("--numa-node-offset Specifies the offset between the RDMA device NUMA node and\n");
+    printf ("  the NUMA node in which the RDMA buffers are placed\n");
+    printf ("--ether-gid-index defines which GID index is used for an Ethernet link layer.\n");
+    printf ("  Used to allow selection of the RoCE protocol version.\n");
+    printf ("<port_pair> is <end_a_rdma_device>:<end_a_rdma_port>,<end_b_rdma_device>:<end_b_rdma_port>\n");
+    printf ("  This gives a pair of RDMA devices and ports which are used to generate a full-duplex\n");
+    printf ("  RDMA test load on, with the assumption that are connected externally by a cable or switch.\n");
+    printf ("  Without any port pairs specified, attempts to automatically use all present RMDA devices,\n");
+    printf ("  albeit doesn't automatically detect the external connections.\n");
+
+    exit (EXIT_FAILURE);
+}
+
+
+/**
+ * @brief Parse command line arguments, storing the result in global variables
+ * @details Aborts the program if invalid arguments. Any non-argument options are parsed by the caller.
+ */
+static void parse_command_line_arguments (const int argc, char *argv[])
+{
+    int opt_status;
+    char junk;
+    uint32_t gid_index;
+
+    do
+    {
+        int option_index = 0;
+
+        opt_status = getopt_long (argc, argv, "", command_line_options, &option_index);
+        if (opt_status == '?')
+        {
+            display_usage ();
+        }
+        else if (opt_status >= 0)
+        {
+            const struct option *const optdef = &command_line_options[option_index];
+
+            if (optdef->flag != NULL)
+            {
+                /* Argument just sets a flag */
+            }
+            else if (strcmp (optdef->name, "numa-node-offset") == 0)
+            {
+                if (sscanf (optarg, "%d%c", &arg_numa_node_offset, &junk) != 1)
+                {
+                    fprintf (stderr, "Invalid %s %s\n", optdef->name, optarg);
+                    exit (EXIT_FAILURE);
+                }
+            }
+            else if (strcmp (optdef->name, "ether-gid-index") == 0)
+            {
+                if ((sscanf (optarg, "%u%c", &gid_index, &junk) != 1) || (gid_index > UINT8_MAX))
+                {
+                    fprintf (stderr, "Invalid %s %s\n", optdef->name, optarg);
+                    exit (EXIT_FAILURE);
+                }
+                arg_ethernet_gid_index = (uint8_t) gid_index;
+            }
+            else
+            {
+                /* This is a program error, and shouldn't be triggered by the command line options */
+                fprintf (stderr, "Unexpected argument definition %s\n", optdef->name);
+                exit (EXIT_FAILURE);
+            }
+        }
+    } while (opt_status != -1);
 }
 
 
@@ -665,9 +752,92 @@ static void initialise_connection_transfers (test_load_context_t *const context,
 }
 
 
+/**
+ * @brief Validate the RDMA device and port to be used for one end of a connection by this program
+ * @details Exits the program after reporting an error if the validation fails
+ * @param[in] context Contains all RDMA devices found on the local host
+ * @param[in] rdma_device Name of RDMA device to verify
+ * @param[in] rdma_port RDMA port number to verify
+ * @return Returns the index for rdma_device
+ */
+static uint32_t validate_connection_end (const test_load_context_t *const context,
+                                         const char *const rdma_device, const uint8_t rdma_port)
+{
+    const rdma_test_device_t *test_device = NULL;
+
+    uint32_t device_index = 0;
+    while ((test_device == NULL) && (device_index < context->num_rdma_devices))
+    {
+        if (strcmp (context->devices[device_index].device->name, rdma_device) == 0)
+        {
+            test_device = &context->devices[device_index];
+        }
+        else
+        {
+            device_index++;
+        }
+    }
+
+    if (test_device == NULL)
+    {
+        fprintf (stderr, "RDMA device %s not found\n", rdma_device);
+        exit (EXIT_FAILURE);
+    }
+    else if ((rdma_port < 1) || (rdma_port > test_device->device_attributes.phys_port_cnt))
+    {
+        fprintf (stderr, "RDMA device %s port %u outside of range range 1..%u\n",
+                test_device->device->name, rdma_port, test_device->device_attributes.phys_port_cnt);
+        exit (EXIT_FAILURE);
+    }
+    else if (test_device->device->transport_type != IBV_TRANSPORT_IB)
+    {
+        fprintf (stderr, "RDMA device %s has transport_type %u which isn't supported by this program\n",
+                test_device->device->name, test_device->device->transport_type);
+        exit (EXIT_FAILURE);
+    }
+
+    return device_index;
+}
+
+
+/**
+ * @brief Add test connections for the pairs of RDMA ports specified in the command line arguments
+ * @param[in/out] context The test context being initialised
+ * @param[in] argc Number of command line arguments
+ * @param[in] argv Command line arguments after have parsed the options.
+ *                 The non-arguments containing the port-pairs start at optind.
+ */
+static void add_connections_for_specified_rdma_ports (test_load_context_t *const context, const int argc, char *argv[])
+{
+    char end_a_device[64];
+    char end_b_device[64];
+    uint8_t end_a_port_num;
+    uint8_t end_b_port_num;
+    uint32_t end_a_device_index;
+    uint32_t end_b_device_index;
+
+    for (int arg_index = optind; arg_index < argc; arg_index++)
+    {
+        if (sscanf (argv[arg_index], "%63[^:]:%" SCNu8 ",%63[^:]:%" SCNu8,
+                end_a_device, &end_a_port_num, end_b_device, &end_b_port_num) != 4)
+        {
+            fprintf (stderr, "Invalid port pair %s\n", argv[arg_index]);
+            exit (EXIT_FAILURE);
+        }
+
+        end_a_device_index = validate_connection_end (context, end_a_device, end_a_port_num);
+        end_b_device_index = validate_connection_end (context, end_b_device, end_b_port_num);
+        initialise_connection_transfers (context, end_a_device_index, end_a_port_num, end_b_device_index, end_b_port_num);
+        initialise_connection_transfers (context, end_b_device_index, end_b_port_num, end_a_device_index, end_a_port_num);
+    }
+}
+
 
 /**
  * @brief Add test connections for all supported RDMA ports on the local host
+ * @details This can't tell which RDMA ports on the local host are connected externally.
+ *          As a result, RDMA transfers will time out if the automatically selected ports pairs for the connections are
+ *          not connected.
  * @param[in/out] context The test context being initialised
  */
 static void add_connections_for_all_supported_rdma_ports (test_load_context_t *const context)
@@ -941,7 +1111,6 @@ static void display_test_summary (const test_load_context_t *const context)
 
 int main (int argc, char *argv[])
 {
-    char junk;
     int rc;
     test_load_context_t context;
 
@@ -954,32 +1123,17 @@ int main (int argc, char *argv[])
 
     get_local_rdma_devices (&context);
 
-    /* Parse command line arguments */
-    if ((argc < 2) || (argc > 3))
+    parse_command_line_arguments (argc, argv);
+
+    if (optind < argc)
     {
-        fprintf (stderr, "Usage: %s <numa_node_offset> [<ethernet_gid_index>]\n", argv[0]);
-        exit (EXIT_FAILURE);
+        add_connections_for_specified_rdma_ports (&context, argc, argv);
     }
-
-    if (sscanf (argv[1], "%d%c", &arg_numa_node_offset, &junk) != 1)
+    else
     {
-        fprintf (stderr, "Out of range <numa_node_offset>\n");
-        exit (EXIT_FAILURE);
+        /* No arguments specifying pairs of RDMA ports to test */
+        add_connections_for_all_supported_rdma_ports (&context);
     }
-
-    if (argc == 3)
-    {
-        uint32_t gid_index;
-
-        if ((sscanf (argv[2], "%u%c", &gid_index, &junk) != 1) || (gid_index > UINT8_MAX))
-        {
-            fprintf (stderr, "Out of range <ethernet_gid_index>\n");
-            exit (EXIT_FAILURE);
-        }
-        arg_ethernet_gid_index = (uint8_t) gid_index;
-    }
-
-    add_connections_for_all_supported_rdma_ports (&context);
 
     /* To allow generation of random Packet Sequence numbers */
     srand48 (getpid() * time(NULL));
