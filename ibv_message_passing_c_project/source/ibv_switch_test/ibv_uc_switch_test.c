@@ -239,7 +239,7 @@ static uint8_t arg_rdma_ports[HOST_PORT_END_ARRAY_SIZE];
 /* Command line argument which controls how the test runs:
  * - When false the test runs until requested to stop, and only reports summary information for each test interval.
  * - When true the test runs for a single test interval, recording the transmitted/received frames in memory which are written
- *   to s CSV file at the end of the test interval. */
+ *   to a CSV file at the end of the test interval. */
 static bool arg_frame_debug_enabled = false;
 
 

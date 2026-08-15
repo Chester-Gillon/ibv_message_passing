@@ -278,8 +278,12 @@ static double arg_tested_port_mbps = DEFAULT_TESTED_PORT_MBPS;
 /* Command line argument which controls how the test runs:
  * - When false the test runs until requested to stop, and only reports summary information for each test interval.
  * - When true the test runs for a single test interval, recording the transmitted/received frames in memory which are written
- *   to s CSV file at the end of the test interval. */
+ *   to a CSV file at the end of the test interval. */
 static bool arg_frame_debug_enabled = false;
+
+
+/* Optional command line argument to test loopback on the RDMA port without needing a switch */
+static bool arg_expect_rdma_loopback;
 
 
 /* Used to store pending receive frames for one source / destination port combination.
@@ -573,6 +577,10 @@ static void display_usage (const char *const program_name)
     printf ("     If not specified defaults to all %u defined ports\n", NUM_DEFINED_PORTS);
     printf ("  -r Specifies the bit rate generated on each port on the switch under test,\n");
     printf ("     as a floating point mega bits per second. Default is %g\n", DEFAULT_TESTED_PORT_MBPS);
+    printf ("  -l Expect the transmit frames to be looped back at the RDMA port, rather\n");
+    printf ("     by the switch under test. This means expects to receive the test frames on\n");
+    printf ("     from the source VLAN, rather than destination VLAN.\n");
+    printf ("     This option allows testing of the RDMA port without needing a switch.\n");
 
     exit (EXIT_FAILURE);
 }
@@ -705,7 +713,7 @@ static void parse_tested_port_list (const char *const port_list_in)
 static void read_command_line_arguments (const int argc, char *argv[])
 {
     const char *const program_name = argv[0];
-    const char *const optstring = "i:n:dt:p:r:";
+    const char *const optstring = "i:n:dt:p:r:l";
     bool rdma_device_specified = false;
     bool rdma_port_specified = false;
     int option;
@@ -764,6 +772,10 @@ static void read_command_line_arguments (const int argc, char *argv[])
                 printf ("Error: Invalid <rate_mbps> %s\n", optarg);
                 exit (EXIT_FAILURE);
             }
+            break;
+
+        case 'l':
+            arg_expect_rdma_loopback = true;
             break;
 
         case '?':
@@ -1443,7 +1455,14 @@ static void handle_pending_rx_frame (frame_tx_rx_thread_context_t *const context
     port_frame_statistics_t *const port_stats =
             &context->statistics.port_frame_statistics[frame_record->source_port_index][frame_record->destination_port_index];
 
-    if (frame_record->vlan_id == test_ports[frame_record->destination_port_index].vlan)
+    const uint16_t expected_vlan = arg_expect_rdma_loopback ?
+            /* When testing RDMA loopback expect to receive on the source VLAN */
+            test_ports[frame_record->source_port_index].vlan :
+            /* When testing a switch expect to receive on the destination VLAN, as routing frames via the switch should
+             * have caused the switch to change the VLAN. */
+            test_ports[frame_record->destination_port_index].vlan;
+
+    if (frame_record->vlan_id == expected_vlan)
     {
         /* The frame was received with the VLAN ID for the expected destination port, compare against the pending frames */
         bool pending_match_found = false;
@@ -1992,6 +2011,7 @@ int main (int argc, char *argv[])
     console_printf ("Using interface %s port %u\n", arg_rdma_device_name, arg_rdma_port_num);
     console_printf ("Test interval = %" PRIi64 " (secs)\n", arg_test_interval_secs);
     console_printf ("Frame debug enabled = %s\n", arg_frame_debug_enabled ? "Yes" : "No");
+    console_printf ("Expect RDMA loopback = %s\n", arg_expect_rdma_loopback ? "Yes" : "No");
 
     /* Create the transmit_receive_thread */
     pthread_t tx_rx_thread_handle;
