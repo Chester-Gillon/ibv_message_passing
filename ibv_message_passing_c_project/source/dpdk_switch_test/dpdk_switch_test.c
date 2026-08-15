@@ -281,6 +281,10 @@ static double arg_tested_port_mbps = DEFAULT_TESTED_PORT_MBPS;
 static bool arg_frame_debug_enabled = false;
 
 
+/* Optional command line argument to test loopback on the injection port without needing a switch */
+static bool arg_expect_injection_loopback;
+
+
 /* Command line argument which enables sanity checks */
 static bool arg_sanity_checks_enabled = false;
 
@@ -594,6 +598,10 @@ static void display_application_usage (const char *const program_name)
     printf ("  -i Specifies the bit rate for the network interface to the injection switch,\n");
     printf ("     in mega bits per second. If not specified automatically obtains the\n");
     printf ("     bit rate, which involves waiting for the link to come up.\n");
+    printf ("  -l Expect the transmit frames to be looped back at the injection port, rather\n");
+    printf ("     by the switch under test. This means expects to receive the test frames on\n");
+    printf ("     from the source VLAN, rather than destination VLAN.\n");
+    printf ("     This option allows testing of the injection port without needing a switch.\n");
 }
 
 
@@ -736,7 +744,7 @@ static void parse_tested_port_list (const char *const port_list_in)
 static void read_command_line_arguments (const int argc, char *argv[])
 {
     const char *const program_name = argv[0];
-    const char *const optstring = "dt:p:r:si:";
+    const char *const optstring = "dt:p:r:si:l";
     int option;
     char junk;
 
@@ -807,6 +815,10 @@ static void read_command_line_arguments (const int argc, char *argv[])
                 exit_cleaning_up_eal ();
             }
             arg_injection_port_mbps_specified = true;
+            break;
+
+        case 'l':
+            arg_expect_injection_loopback = true;
             break;
 
         default:
@@ -1378,7 +1390,14 @@ static void handle_pending_rx_frame (frame_tx_rx_thread_context_t *const context
     port_frame_statistics_t *const port_stats =
             &context->statistics.port_frame_statistics[frame_record->source_port_index][frame_record->destination_port_index];
 
-    if (frame_record->vlan_id == test_ports[frame_record->destination_port_index].vlan)
+    const uint16_t expected_vlan = arg_expect_injection_loopback ?
+            /* When testing injection loopback expect to receive on the source VLAN */
+            test_ports[frame_record->source_port_index].vlan :
+            /* When testing a switch expect to receive on the destination VLAN, as routing frames via the switch should
+             * have caused the switch to change the VLAN. */
+            test_ports[frame_record->destination_port_index].vlan;
+
+    if (frame_record->vlan_id == expected_vlan)
     {
         /* The frame was received with the VLAN ID for the expected destination port, compare against the pending frames */
         bool pending_match_found = false;
@@ -1992,6 +2011,7 @@ int main (int argc, char *argv[])
         console_printf ("Writing per-port counts to %s\n", results_summary.per_port_counts_csv_filename);
         console_printf ("Test interval = %" PRIi64 " (secs)\n", arg_test_interval_secs);
         console_printf ("Frame debug enabled = %s\n", arg_frame_debug_enabled ? "Yes" : "No");
+        console_printf ("Expect injection port loopback = %s\n", arg_expect_injection_loopback ? "Yes" : "No");
         console_printf ("Sanity checks enabled = %s\n", arg_sanity_checks_enabled ? "Yes" : "No");
 
         /* Start the transmit/receive thread running */
