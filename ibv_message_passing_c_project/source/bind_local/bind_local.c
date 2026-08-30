@@ -3,8 +3,10 @@
  * @date 4 Sep 2022
  * @author Chester Gillon
  * @details
- *   To investigate https://stackoverflow.com/questions/23907095/address-already-in-use-but-nothing-in-netstat-or-lsof
- *   and checking which ports iwpmd has reserved.
+ *   To investigate:
+ *   a. https://stackoverflow.com/questions/23907095/address-already-in-use-but-nothing-in-netstat-or-lsof
+ *   b. https://unix.stackexchange.com/questions/781819/linux-kernel-get-status-of-bound-but-otherwise-unused-sockets
+ *   c. Checking which ports iwpmd has reserved.
  */
 
 #define _GNU_SOURCE /* Avoids the need for a cast in the address parameter to bind() */
@@ -183,7 +185,8 @@ int main (int argc, char *argv[])
             exit (EXIT_FAILURE);
         }
 
-        printf ("fd %d bound to %s scope-id %" PRIu32 " port %u\n", socket_fd, addr_string, local_addr_in6->sin6_scope_id, ntohs (local_addr_in6->sin6_port));
+        printf ("PID %d fd %d bound to %s scope-id %" PRIu32 " port %u\n",
+                getpid (), socket_fd, addr_string, local_addr_in6->sin6_scope_id, ntohs (local_addr_in6->sin6_port));
     }
     else
     {
